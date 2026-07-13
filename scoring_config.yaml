@@ -1,0 +1,20 @@
+# TPDL Lead Intelligence Pipeline — scoring weights
+# (mirrors the Neotek pipeline's scoring_config.yaml; see TPDL_Pipeline_Documentation §6)
+#
+# Final score (0–10) = signal_strength (0–6, set by Claude Sonnet)
+#                     + recency        (0–2, computed from the event date)
+#                     + corroboration  (0–2, computed from source count/quality)
+#
+# Edit these values to retune prioritisation — no code or prompt changes needed.
+
+recency:
+  within_90_days: 2    # event in the last 3 months — full value
+  within_6_months: 1   # event 3–6 months ago — partial value
+  no_date: 0           # undated event — no recency credit
+
+corroboration:
+  multiple_sources: 2  # 2+ sources confirm the event
+  single_verified: 1   # 1 source with a verifiable URL
+  single_unverified: 0 # Perplexity only, no URL
+
+outreach_threshold: 8.0  # assessed_score >= this  →  Outreach Eligible: TRUE

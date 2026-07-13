@@ -1,0 +1,585 @@
+{% extends "base.html" %}
+{% block title %}Sales — TPDL{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<style>
+  .filter-pill {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid var(--tpdl-border);
+    background: white;
+    color: var(--tpdl-text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .filter-pill:hover { border-color: var(--tpdl-dark-ink); color: var(--tpdl-text); }
+  .filter-pill.is-active { background: var(--tpdl-dark-ink); color: white; border-color: var(--tpdl-dark-ink); }
+
+  .filter-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    padding-right: 1.6rem;
+    background-color: white;
+  }
+
+  .score-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 38px; padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600; font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .signal-chip {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 9999px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  /* Grid row — adjusted column widths for the real CSV (longer locations etc) */
+  .grid-row {
+    display: grid;
+    grid-template-columns: minmax(200px, 1.6fr) 130px 160px 90px 70px 80px 110px 160px 30px;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--tpdl-border);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.1s ease;
+  }
+  .grid-row:hover { background: var(--tpdl-bg-2); }
+  .grid-row.is-expanded { background: var(--tpdl-bg); cursor: default; }
+  .grid-row.is-expanded:hover { background: var(--tpdl-bg); }
+
+  .grid-head {
+    display: grid;
+    grid-template-columns: minmax(200px, 1.6fr) 130px 160px 90px 70px 80px 110px 160px 30px;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    background: var(--tpdl-bg-2);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--tpdl-text-muted); font-weight: 500;
+    border-bottom: 1px solid var(--tpdl-border);
+  }
+  .grid-head .sortable { cursor: pointer; }
+  .grid-head .sortable:hover { color: var(--tpdl-text); }
+
+  .detail-panel {
+    padding: 1.5rem 2rem;
+    background: var(--tpdl-bg);
+    border-bottom: 1px solid var(--tpdl-border);
+  }
+
+  .sort-arrow { font-size: 9px; margin-left: 4px; color: var(--tpdl-text-faint); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div x-data="intelPage()" x-init="init()">
+
+  <!-- ================================================================ -->
+  <!-- HEADER + PIPELINE STATS                                          -->
+  <!-- ================================================================ -->
+  <section class="mb-12">
+    <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Sales pipeline</p>
+    <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-2xl leading-tight">
+      The Lead Intelligence Pipeline
+    </h1>
+    <p class="text-ink-2 max-w-2xl">
+      492 European pharma, medtech, dental and life-sciences companies tracked across
+      6 commercial signal categories. Every finding traceable to a source URL.
+    </p>
+
+    <!-- Sales pipeline — 4 stages -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
+      <a href="/agent/hugo" class="tpdl-card p-4 hover:border-ink transition-colors">
+        <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 1</div>
+        <div class="font-semibold text-sm">Hugo</div>
+        <div class="text-xs text-ink-3">Research &amp; scoring</div>
+      </a>
+      <a href="/agent/maya" class="tpdl-card p-4 hover:border-ink transition-colors">
+        <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 2</div>
+        <div class="font-semibold text-sm">Maya</div>
+        <div class="text-xs text-ink-3">Top 50 &amp; trends</div>
+      </a>
+      <a href="/agent/ines" class="tpdl-card p-4 hover:border-ink transition-colors">
+        <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 3</div>
+        <div class="font-semibold text-sm">Inès</div>
+        <div class="text-xs text-ink-3">Contacts &amp; radars</div>
+      </a>
+      <a href="/agent/julie" class="tpdl-card p-4 hover:border-ink transition-colors">
+        <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 4</div>
+        <div class="font-semibold text-sm">Julie</div>
+        <div class="text-xs text-ink-3">Segmented outreach</div>
+      </a>
+    </div>
+
+    <!-- Team activity feed strip -->
+    <div class="mt-6 mb-2" x-show="activity.length > 0" x-cloak>
+      <div class="text-xs uppercase tracking-wider text-ink-3 mb-2">Recent team activity</div>
+      <div class="flex gap-2 overflow-x-auto pb-2">
+        <template x-for="a in activity.slice(0, 8)" :key="a.id">
+          <div class="flex items-center gap-2 bg-white border border-line rounded-full px-3 py-1.5 text-xs shrink-0">
+            <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${a.user.avatar_seed}`"
+                 class="w-5 h-5 rounded-full bg-bg-2">
+            <span class="font-medium" x-text="a.user.display_name"></span>
+            <span class="text-ink-3" x-text="actionVerb(a.action)"></span>
+            <span class="font-medium truncate max-w-[140px]" x-text="a.target_company"></span>
+            <template x-if="a.action === 'status_changed'">
+              <span class="text-ink-3 text-[10px]">
+                (→ <span x-text="statusLabel(a.metadata.to_status)"></span>)
+              </span>
+            </template>
+            <span class="text-ink-3 text-[10px]" x-text="relativeTime(a.created_at)"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Pipeline KPIs -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-8" x-show="stats" x-cloak>
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Companies</div>
+        <div class="text-3xl font-semibold" x-text="stats?.pipeline.total_companies"></div>
+        <div class="text-xs text-ink-3 mt-1">Across both lists</div>
+      </div>
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">In scope</div>
+        <div class="text-3xl font-semibold" x-text="stats?.pipeline.in_scope"></div>
+        <div class="text-xs text-ink-3 mt-1">After ICP filter</div>
+      </div>
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">ICP-flagged</div>
+        <div class="text-3xl font-semibold" x-text="stats?.pipeline.icp_flagged"></div>
+        <div class="text-xs text-ink-3 mt-1">USA HQ / Middle East / sub-€100M</div>
+      </div>
+      <div class="tpdl-card p-5" style="background: var(--tpdl-accent-soft); border-color: #c8efd9;">
+        <div class="text-xs uppercase tracking-wider mb-1" style="color: var(--tpdl-accent-ink)">Outreach eligible</div>
+        <div class="text-3xl font-semibold" style="color: var(--tpdl-accent-ink)" x-text="stats?.pipeline.outreach_eligible"></div>
+        <div class="text-xs mt-1" style="color: var(--tpdl-accent-ink)">Assessed score ≥ 8</div>
+      </div>
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Review flagged</div>
+        <div class="text-3xl font-semibold" x-text="stats?.pipeline.review_flagged"></div>
+        <div class="text-xs text-ink-3 mt-1">60s manual check</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <!-- CHARTS                                                           -->
+  <!-- ================================================================ -->
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12" x-show="stats" x-cloak>
+    <div class="tpdl-card p-6">
+      <h3 class="font-semibold text-sm mb-1">Score distribution</h3>
+      <p class="text-xs text-ink-3 mb-4">Pipeline output — 4 bands</p>
+      <div style="height: 200px;"><canvas id="score-chart"></canvas></div>
+    </div>
+    <div class="tpdl-card p-6">
+      <h3 class="font-semibold text-sm mb-1">Signal coverage</h3>
+      <p class="text-xs text-ink-3 mb-4">Companies with ≥1 signal in each category</p>
+      <div style="height: 200px;"><canvas id="signals-chart"></canvas></div>
+    </div>
+    <div class="tpdl-card p-6">
+      <h3 class="font-semibold text-sm mb-1">Sector buckets</h3>
+      <p class="text-xs text-ink-3 mb-4">Pharma · Medtech · Diagnostics · Dermatology · Dental · Healthcare · Other</p>
+      <div style="height: 200px;"><canvas id="sectors-chart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <!-- FILTERS + TABLE                                                  -->
+  <!-- ================================================================ -->
+  <section class="mb-8">
+    <div class="flex items-baseline justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-semibold">Scored companies</h2>
+        <p class="text-xs text-ink-3 mt-1">
+          <span x-text="filteredCompanies.length"></span> of <span x-text="companies.length"></span> shown
+          · click any row to see the full Intelligence Summary + signal detail
+        </p>
+      </div>
+      <button @click="resetFilters()"
+              class="tpdl-btn tpdl-btn--ghost text-xs">Reset filters</button>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <select x-model="filters.sector_bucket"
+              class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink">
+        <option value="">All sectors</option>
+        <template x-for="v in distinctBuckets()" :key="v">
+          <option :value="v" x-text="v"></option>
+        </template>
+      </select>
+
+      <select x-model="filters.signal_type"
+              class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink">
+        <option value="">Any signal</option>
+        <option value="leadership_change">Leadership change</option>
+        <option value="hiring">Hiring</option>
+        <option value="ma_expansion">M&A / Expansion</option>
+        <option value="pe_event">PE event</option>
+        <option value="digital_initiative">Digital initiative</option>
+        <option value="org_restructuring">Org restructuring</option>
+      </select>
+
+      <button @click="filters.outreach_eligible = !filters.outreach_eligible"
+              :class="filters.outreach_eligible ? 'filter-pill is-active' : 'filter-pill'">
+        ✓ Outreach eligible
+      </button>
+
+      <button @click="filters.review_flag = !filters.review_flag"
+              :class="filters.review_flag ? 'filter-pill is-active' : 'filter-pill'">
+        ⚑ Review flagged
+      </button>
+
+      <button @click="showICP = !showICP"
+              :class="showICP ? 'filter-pill is-active' : 'filter-pill'">
+        Include ICP-flagged
+      </button>
+
+      <span class="ml-auto text-xs text-ink-3" x-show="stats">
+        Last run: <span x-text="formatDate(stats?.pipeline.last_run)"></span>
+        · pipeline <span x-text="stats?.pipeline.pipeline_version"></span>
+      </span>
+    </div>
+
+    <!-- Grid-based "table" -->
+    <div class="tpdl-card overflow-hidden">
+      <div class="overflow-x-auto">
+        <div class="grid-head" style="min-width: 1150px;">
+          <div class="sortable" @click="setSort('name')">Company
+            <span class="sort-arrow" x-show="sortKey==='name'" x-text="sortDesc ? '▼' : '▲'"></span>
+          </div>
+          <div>Sector</div>
+          <div>Location</div>
+          <div>Revenue</div>
+          <div class="sortable" @click="setSort('assessed_score')">Score
+            <span class="sort-arrow" x-show="sortKey==='assessed_score'" x-text="sortDesc ? '▼' : '▲'"></span>
+          </div>
+          <div>Coverage</div>
+          <div>Signals</div>
+          <div>Flags</div>
+          <div></div>
+        </div>
+
+        <div style="min-width: 1150px;">
+          <template x-if="filteredCompanies.length === 0">
+            <div class="text-center text-ink-3 py-12">No company matches the current filters.</div>
+          </template>
+
+          <template x-for="c in filteredCompanies" :key="c.name">
+            <div>
+              <!-- Main row -->
+              <div class="grid-row"
+                   :class="expandedRow === c.name ? 'is-expanded' : ''"
+                   @click="expandedRow = expandedRow === c.name ? null : c.name; if (expandedRow === c.name) loadWorkspace(c.name)">
+                <div>
+                  <div class="font-semibold text-ink" x-text="c.name"></div>
+                  <div class="text-xs text-ink-3 mt-0.5" x-text="c.website || ''"></div>
+                </div>
+                <div><span class="tpdl-badge tpdl-badge--outline" x-text="c.sector_bucket"></span></div>
+                <div class="text-ink-2 text-xs truncate" :title="c.location" x-text="c.location || '—'"></div>
+                <div class="text-ink-2 text-xs" x-text="c.revenue || '—'"></div>
+                <div>
+                  <span class="score-pill"
+                        :style="`background: ${scoreClass(c.assessed_score).bg}; color: ${scoreClass(c.assessed_score).color}`"
+                        x-text="c.assessed_score.toFixed(1)"></span>
+                </div>
+                <div class="text-ink-2 text-xs" x-text="(c.coverage || '').split(' ').slice(0,3).join(' ')"></div>
+                <div>
+                  <template x-for="sig in c.signals" :key="sig.category">
+                    <span class="signal-chip"
+                          :title="signalLabel(sig.category)"
+                          :style="`background: ${signalColor(sig.category)}`"></span>
+                  </template>
+                  <span x-show="c.signals.length === 0" class="text-xs text-ink-3">—</span>
+                </div>
+                <div class="flex flex-wrap gap-1">
+                  <span x-show="c.outreach_eligible" class="tpdl-badge tpdl-badge--accent">Eligible</span>
+                  <span x-show="c.icp_flag" class="tpdl-badge tpdl-badge--outline"
+                        style="color: #854d0e; border-color: #fde68a;">ICP</span>
+                  <span x-show="c.review_flag" class="tpdl-badge tpdl-badge--outline"
+                        style="color: #7f1d1d; border-color: #fecaca;">Review</span>
+                </div>
+                <div class="text-right text-ink-3 text-lg" x-text="expandedRow === c.name ? '−' : '+'"></div>
+              </div>
+
+              <!-- Expanded detail panel -->
+              <div class="detail-panel" x-show="expandedRow === c.name" x-cloak>
+
+                <!-- =============== Workspace (claim + status + comments) =============== -->
+                <div class="bg-white border border-line rounded-lg p-4 mb-6">
+                  <div class="flex items-center gap-4 flex-wrap mb-3">
+                    <!-- Claim badge / button -->
+                    <template x-if="!workspace(c.name).assignment?.user">
+                      <button @click="claimCompany(c.name)"
+                              class="tpdl-btn tpdl-btn--dark text-xs">
+                        📌 Claim this company
+                      </button>
+                    </template>
+                    <template x-if="workspace(c.name).assignment?.user">
+                      <div class="flex items-center gap-2">
+                        <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${workspace(c.name).assignment.user.avatar_seed}`"
+                             class="w-7 h-7 rounded-full bg-bg-2 border border-line">
+                        <div class="text-sm">
+                          <span class="font-medium" x-text="workspace(c.name).assignment.user.display_name"></span>
+                          <span class="text-ink-3 text-xs">working on it</span>
+                        </div>
+                        <button x-show="$store.me.user && $store.me.user.id === workspace(c.name).assignment.user.id"
+                                @click="releaseCompany(c.name)"
+                                class="text-xs text-ink-3 hover:text-[color:var(--tpdl-error)] underline ml-2">
+                          release
+                        </button>
+                      </div>
+                    </template>
+
+                    <!-- Status badge + selector -->
+                    <div class="ml-auto flex items-center gap-2">
+                      <span class="text-xs uppercase tracking-wider text-ink-3">Status</span>
+                      <span class="tpdl-badge"
+                            :style="`background: ${statusStyle(workspace(c.name).status?.value || 'new').bg}; color: ${statusStyle(workspace(c.name).status?.value || 'new').color}`"
+                            x-text="statusLabel(workspace(c.name).status?.value || 'new')"></span>
+                      <select @change="setStatus(c.name, $event.target.value)"
+                              :value="workspace(c.name).status?.value || 'new'"
+                              class="text-xs border border-line rounded px-2 py-1 bg-white">
+                        <option value="new">New</option>
+                        <option value="in_review">In review</option>
+                        <option value="outreach_drafted">Outreach drafted</option>
+                        <option value="sent">Sent</option>
+                        <option value="replied">Replied</option>
+                        <option value="won">Won</option>
+                        <option value="lost">Lost</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Comments -->
+                  <div class="border-t border-line pt-3">
+                    <div class="text-xs uppercase tracking-wider text-ink-3 mb-2">
+                      Comments (<span x-text="workspace(c.name).comments.length"></span>)
+                    </div>
+                    <div class="space-y-2 max-h-48 overflow-y-auto mb-3">
+                      <template x-for="cm in workspace(c.name).comments" :key="cm.id">
+                        <div class="flex gap-2 text-xs">
+                          <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${cm.author.avatar_seed}`"
+                               class="w-6 h-6 rounded-full bg-bg-2 shrink-0">
+                          <div class="flex-1">
+                            <div class="flex items-baseline gap-2">
+                              <span class="font-medium" x-text="cm.author.display_name"></span>
+                              <span class="text-ink-3 text-[10px]" x-text="relativeTime(cm.created_at)"></span>
+                            </div>
+                            <p class="text-ink-2 leading-relaxed whitespace-pre-wrap" x-text="cm.content"></p>
+                          </div>
+                        </div>
+                      </template>
+                      <template x-if="!workspace(c.name).loading && workspace(c.name).comments.length === 0">
+                        <div class="text-xs text-ink-3 italic py-2">No comments yet — be the first to leave a note for the team.</div>
+                      </template>
+                    </div>
+                    <form @submit.prevent="postComment(c.name)" class="flex gap-2">
+                      <input type="text"
+                             x-model="commentDrafts[c.name]"
+                             placeholder="Leave a note for the team..."
+                             class="flex-1 text-xs px-3 py-2 border border-line rounded focus:border-ink focus:outline-none">
+                      <button type="submit"
+                              :disabled="!(commentDrafts[c.name] || '').trim()"
+                              class="tpdl-btn tpdl-btn--primary text-xs disabled:opacity-40">
+                        Post
+                      </button>
+                    </form>
+                  </div>
+                </div>
+
+                <!-- =============== Intelligence Summary + Tech =============== -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                  <div class="lg:col-span-8">
+                    <div class="text-xs uppercase tracking-wider text-ink-3 mb-2">Intelligence Summary</div>
+                    <p class="text-sm leading-relaxed text-ink" x-text="c.intelligence_summary"></p>
+
+                    <template x-if="c.historical_context">
+                      <div class="mt-4 p-3 rounded border-l-2 border-line-2 bg-white">
+                        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Historical context</div>
+                        <p class="text-xs text-ink-2" x-text="c.historical_context"></p>
+                      </div>
+                    </template>
+                  </div>
+
+                  <div class="lg:col-span-4">
+                    <div class="text-xs uppercase tracking-wider text-ink-3 mb-2">Tech stack</div>
+                    <div class="text-xs space-y-1.5" x-data="{ ts: parseTechStack(c.tech_stack_summary) }">
+                      <div><span class="text-ink-3">CRM:</span> <span class="text-ink" x-text="ts.crm"></span></div>
+                      <div><span class="text-ink-3">MAP:</span> <span class="text-ink" x-text="ts.marketing_automation"></span></div>
+                      <div><span class="text-ink-3">Analytics:</span> <span class="text-ink" x-text="ts.analytics"></span></div>
+                      <div x-show="ts.advertising !== '—'"><span class="text-ink-3">Ads:</span> <span class="text-ink" x-text="ts.advertising"></span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Signals detail -->
+                <div class="mt-6" x-show="c.signals.length > 0">
+                  <div class="text-xs uppercase tracking-wider text-ink-3 mb-3">Signal detail</div>
+                  <div class="space-y-3">
+                    <template x-for="sig in c.signals" :key="sig.category">
+                      <div class="border border-line rounded-lg p-4 bg-white">
+                        <div class="flex items-center gap-3 mb-2 flex-wrap">
+                          <span class="tpdl-badge text-white"
+                                :style="`background: ${signalColor(sig.category)}`"
+                                x-text="signalLabel(sig.category)"></span>
+                          <span class="tpdl-badge"
+                                :style="`background: ${confidenceStyle(sig.confidence).bg}; color: ${confidenceStyle(sig.confidence).color}`"
+                                x-text="`Confidence: ${sig.confidence}`"></span>
+                          <div class="ml-auto flex items-center gap-2">
+                            <!-- Generate / Re-run brief button -->
+                            <template x-if="!getBrief(c.name, specialistFor(sig.category)) && !isGenerating(c.name, specialistFor(sig.category))">
+                              <button @click="generateBrief(c.name, specialistFor(sig.category))"
+                                      class="tpdl-btn tpdl-btn--primary text-xs">
+                                ✨ Generate brief
+                              </button>
+                            </template>
+                            <template x-if="isGenerating(c.name, specialistFor(sig.category))">
+                              <span class="text-xs text-ink-3 italic">Generating...</span>
+                            </template>
+                            <template x-if="getBrief(c.name, specialistFor(sig.category))">
+                              <button @click="regenerateBrief(c.name, specialistFor(sig.category))"
+                                      class="tpdl-btn tpdl-btn--ghost text-xs"
+                                      title="Re-run with fresh Claude call">↻ Re-run</button>
+                            </template>
+                            <a :href="briefBySpecialistUrl(c, sig.category)"
+                               class="tpdl-btn tpdl-btn--outline text-xs"
+                               title="Open chat with the specialist">💬 Chat</a>
+                          </div>
+                        </div>
+                        <div class="text-sm text-ink mb-2">
+                          <span class="text-ink-3 text-xs uppercase tracking-wider">What happened: </span>
+                          <span x-text="sig.what_happened"></span>
+                        </div>
+                        <div class="text-sm text-ink-2 mb-2">
+                          <span class="text-ink-3 text-xs uppercase tracking-wider">Why it matters: </span>
+                          <span x-text="sig.why_it_matters"></span>
+                        </div>
+                        <div class="text-sm mb-2" x-show="sig.tpdl_relevance">
+                          <span class="text-ink-3 text-xs uppercase tracking-wider">TPDL relevance: </span>
+                          <span class="tpdl-badge tpdl-badge--dark" x-text="sig.tpdl_relevance"></span>
+                        </div>
+                        <div class="text-xs" x-show="sig.urls.length > 0 || sig.sources.length > 0">
+                          <span class="text-ink-3 uppercase tracking-wider">Sources:</span>
+                          <div class="mt-1 space-y-1">
+                            <template x-for="(url, idx) in sig.urls" :key="idx">
+                              <div class="ml-2">
+                                <a :href="url" target="_blank" rel="noopener"
+                                   class="text-[color:var(--tpdl-info)] hover:underline break-all"
+                                   x-text="url"></a>
+                              </div>
+                            </template>
+                            <template x-if="sig.urls.length === 0 && sig.sources.length > 0">
+                              <div class="ml-2 text-ink-3 italic" x-text="sig.sources.join(', ')"></div>
+                            </template>
+                          </div>
+                        </div>
+
+                        <!-- ===== Inline specialist brief (cached) ===== -->
+                        <template x-if="getBrief(c.name, specialistFor(sig.category))">
+                          <div class="mt-4 pt-4 border-t border-line"
+                               x-data="{ b: getBrief(c.name, specialistFor(sig.category)) }">
+                            <div class="flex items-center gap-2 mb-3">
+                              <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${b.agent.avatar_seed}`"
+                                   class="w-8 h-8 rounded-full bg-bg-2 border border-line">
+                              <div class="flex-1">
+                                <div class="text-sm font-semibold" x-text="`${b.agent.name}'s brief`"></div>
+                                <div class="text-[10px] text-ink-3">
+                                  Generated <span x-text="relativeTime(b.generated_at)"></span>
+                                  <template x-if="b.generated_by">
+                                    by <span x-text="b.generated_by.display_name"></span>
+                                  </template>
+                                </div>
+                              </div>
+                              <button @click="navigator.clipboard.writeText(b.output)"
+                                      class="text-xs text-ink-3 hover:text-ink underline"
+                                      title="Copy to clipboard">copy</button>
+                            </div>
+                            <pre class="text-xs leading-relaxed whitespace-pre-wrap font-sans bg-bg p-3 rounded border border-line text-ink"
+                                 x-text="b.output"></pre>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Signals NOT evidenced -->
+                <div class="mt-4 text-xs text-ink-3"
+                     x-show="c.signals_not_evidenced && c.signals_not_evidenced.length > 0">
+                  <span class="uppercase tracking-wider">Not evidenced:</span>
+                  <template x-for="sig in c.signals_not_evidenced" :key="sig">
+                    <span class="ml-2 tpdl-badge tpdl-badge--outline" x-text="signalLabel(sig)"></span>
+                  </template>
+                </div>
+
+                <!-- Review flag reason -->
+                <div class="mt-4 text-xs text-[color:var(--tpdl-error)]"
+                     x-show="c.review_flag && c.review_flag_reason">
+                  ⚑ <span class="uppercase tracking-wider">Review:</span>
+                  <span x-text="c.review_flag_reason"></span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <!-- TOP SIGNALS TIMELINE                                             -->
+  <!-- ================================================================ -->
+  <section class="mt-12">
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold">Top signals across the pipeline</h2>
+      <p class="text-xs text-ink-3 mt-1">Highest-scoring signals from the latest run</p>
+    </div>
+    <div class="tpdl-card p-6">
+      <ol class="relative border-l border-line ml-3">
+        <template x-for="(s, i) in signals.slice(0, 15)" :key="i">
+          <li class="mb-5 ml-6">
+            <span class="absolute -left-[6px] w-3 h-3 rounded-full ring-4 ring-white"
+                  :style="`background: ${signalColor(s.category)}`"></span>
+            <div class="flex items-baseline gap-2 flex-wrap">
+              <span class="tpdl-badge text-white" :style="`background: ${signalColor(s.category)}`"
+                    x-text="signalLabel(s.category)"></span>
+              <span class="text-sm font-semibold" x-text="s.company"></span>
+              <span class="ml-auto text-xs text-ink-2 font-mono">company score <span x-text="s.score"></span></span>
+            </div>
+            <p class="text-sm text-ink-2 mt-1" x-text="s.what_happened"></p>
+            <p class="text-xs text-ink-3 mt-0.5">
+              <span x-text="s.sector_bucket"></span>
+              <span x-show="s.location"> · <span x-text="s.location"></span></span>
+              <span x-show="s.tpdl_relevance"> · TPDL: <span x-text="s.tpdl_relevance"></span></span>
+            </p>
+          </li>
+        </template>
+      </ol>
+    </div>
+  </section>
+
+  <template x-if="error">
+    <div class="mt-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm" x-text="error"></div>
+  </template>
+  <template x-if="loading">
+    <div class="mt-12 text-center text-ink-3 text-sm">Loading pipeline...</div>
+  </template>
+
+</div>
+
+<script src="/static/js/intel.js?v=5"></script>
+{% endblock %}

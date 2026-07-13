@@ -1,0 +1,19 @@
+{
+  "brand_voice": {
+    "tone": "Analytical, direct, data-driven. No corporate jargon. UK English.",
+    "audience": "VP and C-suite in European pharma, medtech, dental companies.",
+    "avoid": [
+      "AI hype",
+      "buzzwords",
+      "generic advice",
+      "passive voice"
+    ],
+    "structure": "Strong hook → concrete data point → TPDL angle → clear CTA.",
+    "examples": []
+  },
+  "treated_subjects": [],
+  "feedbacks": [],
+  "top_performers": [],
+  "veille_runs": [],
+  "last_updated": "2026-06-03T15:10:17.679650+00:00"
+}

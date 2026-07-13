@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Data — TPDL{% endblock %}
+
+{% block content %}
+
+<div class="mb-8" x-data="onedrivePage()" x-init="init()">
+
+  <div class="flex items-start justify-between mb-6">
+    <div>
+      <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Shared data</p>
+      <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-2xl leading-tight">
+        The team's CSV, live
+      </h1>
+      <p class="text-ink-2 max-w-2xl">
+        The list your team maintains in OneDrive. Click “Refresh” to pull the latest version.
+      </p>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="tpdl-card p-4 mb-6 flex items-center gap-4 flex-wrap">
+    <button @click="refresh()"
+            :disabled="loading"
+            class="tpdl-btn tpdl-btn--primary"
+            :class="loading ? 'opacity-50 cursor-not-allowed' : ''">
+      <span x-show="!loading">↻ Refresh</span>
+      <span x-show="loading">Loading…</span>
+    </button>
+
+    <label class="flex items-center gap-2 cursor-pointer select-none text-sm">
+      <div class="relative">
+        <input type="checkbox" x-model="autoRefresh" @change="toggleAuto()" class="sr-only peer">
+        <div class="w-9 h-5 rounded-full peer-checked:bg-[color:var(--tpdl-accent-ink)] bg-gray-300 transition-colors"></div>
+        <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+      </div>
+      Auto-refresh (30s)
+    </label>
+
+    <span class="text-xs text-ink-3" x-show="lastRefreshed">
+      Last updated: <span x-text="lastRefreshed"></span>
+    </span>
+
+    <span class="text-xs text-ink-3 ml-auto" x-show="rowCount > 0">
+      <span x-text="rowCount"></span> rows · <span x-text="columns.length"></span> columns
+    </span>
+  </div>
+
+  <!-- Not configured -->
+  <template x-if="!configured">
+    <div class="tpdl-card p-8 text-center">
+      <p class="text-sm text-ink-2 mb-2">No OneDrive link configured.</p>
+      <p class="text-xs text-ink-3">
+        Set the <code class="px-1 py-0.5 bg-bg-2 rounded">ONEDRIVE_CSV_URL</code>
+        variable (an “anyone with the link can view” share link) and restart.
+      </p>
+    </div>
+  </template>
+
+  <!-- Error -->
+  <template x-if="error">
+    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4" x-text="error"></div>
+  </template>
+
+  <!-- Search -->
+  <template x-if="rows.length > 0">
+    <div class="mb-4">
+      <input x-model="search" type="text" placeholder="Filter…"
+             class="w-full md:w-80 border border-line rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[color:var(--tpdl-accent-ink)] bg-white">
+    </div>
+  </template>
+
+  <!-- Table -->
+  <template x-if="rows.length > 0">
+    <div class="tpdl-card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-bg-2 border-b border-line sticky top-0">
+            <tr class="text-left text-xs uppercase tracking-wider text-ink-3">
+              <template x-for="col in columns" :key="col">
+                <th class="px-4 py-3 font-medium whitespace-nowrap" x-text="col"></th>
+              </template>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-line">
+            <template x-for="(row, idx) in filteredRows" :key="idx">
+              <tr class="hover:bg-bg-2">
+                <template x-for="col in columns" :key="col">
+                  <td class="px-4 py-2.5 whitespace-nowrap" x-text="row[col]"></td>
+                </template>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  <template x-if="configured && rows.length === 0 && !loading && !error">
+    <div class="tpdl-card p-8 text-center text-sm text-ink-3">
+      Click “Refresh” to load the data.
+    </div>
+  </template>
+
+</div>
+
+<script src="/static/js/onedrive.js?v=2"></script>
+{% endblock %}

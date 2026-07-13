@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}Performance — TPDL{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<div class="mb-10">
+  <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Performance</p>
+  <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-2xl leading-tight">
+    What's working
+  </h1>
+  <p class="text-ink-2 max-w-2xl">
+    Content produced, agent activity, top subjects — everything the team has done since day one.
+  </p>
+</div>
+
+<div x-data="performancePage()" x-init="init()">
+
+  <template x-if="error">
+    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-6" x-text="error"></div>
+  </template>
+
+  <template x-if="loading">
+    <div class="tpdl-card p-12 text-center text-sm text-ink-3">Loading analytics…</div>
+  </template>
+
+  <template x-if="!loading">
+    <div>
+
+      <!-- ── KPI row ──────────────────────────────────────────────────────── -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Tasks completed</div>
+          <div class="text-3xl font-semibold mt-1" x-text="summary.total_tasks"></div>
+          <div class="text-xs text-ink-3 mt-1">All agents combined</div>
+        </div>
+
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Conversations</div>
+          <div class="text-3xl font-semibold mt-1" x-text="summary.total_conversations"></div>
+          <div class="text-xs text-ink-3 mt-1">
+            <span x-text="summary.user_messages"></span> user messages
+          </div>
+        </div>
+
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Marketing tasks</div>
+          <div class="text-3xl font-semibold mt-1" style="color:var(--tpdl-accent-ink)"
+               x-text="summary.marketing_tasks"></div>
+          <div class="text-xs text-ink-3 mt-1">Iris · Marc · Oliver</div>
+        </div>
+
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Active last 7 days</div>
+          <div class="text-3xl font-semibold mt-1" x-text="summary.recent_7d"></div>
+          <div class="text-xs text-ink-3 mt-1">actions logged</div>
+        </div>
+
+      </div>
+
+      <!-- ── Activity timeline + content types ───────────────────────────── -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+        <!-- Timeline chart -->
+        <div class="lg:col-span-2 tpdl-card p-6">
+          <h3 class="font-semibold text-sm mb-1">Activity — last 30 days</h3>
+          <p class="text-xs text-ink-3 mb-4">All agents vs. Marketing team</p>
+          <div style="height:220px">
+            <canvas id="timeline-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- Content types donut -->
+        <div class="tpdl-card p-6">
+          <h3 class="font-semibold text-sm mb-1">Content produced</h3>
+          <p class="text-xs text-ink-3 mb-4">By action type</p>
+          <div style="height:160px">
+            <canvas id="content-chart"></canvas>
+          </div>
+          <div class="mt-4 space-y-1.5">
+            <template x-for="(ct, i) in contentTypes" :key="ct.label">
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                  <div class="w-2.5 h-2.5 rounded-full"
+                       :style="`background:${chartColors[i % chartColors.length]}`"></div>
+                  <span x-text="ct.label"></span>
+                </div>
+                <span class="font-medium" x-text="ct.count"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── Agent leaderboard + top subjects ────────────────────────────── -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+        <!-- Agent leaderboard -->
+        <div class="lg:col-span-2 tpdl-card overflow-hidden">
+          <div class="px-6 py-4 border-b border-line">
+            <h3 class="font-semibold text-sm">Agent activity</h3>
+            <p class="text-xs text-ink-3 mt-0.5">Tasks + messages produced, sorted by output</p>
+          </div>
+          <div class="divide-y divide-line">
+            <template x-for="agent in agentStats" :key="agent.id">
+              <div class="px-6 py-3 flex items-center gap-4">
+                <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${agent.avatar_seed}`"
+                     class="w-9 h-9 rounded-full bg-bg-2 shrink-0">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium text-sm" x-text="agent.name"></span>
+                    <span class="text-xs text-ink-3" x-text="agent.role"></span>
+                    <span class="tpdl-badge text-xs"
+                          :class="agent.team === 'marketing' ? 'tpdl-badge--outline' : ''"
+                          x-text="agent.team"></span>
+                  </div>
+                  <!-- Activity bar -->
+                  <div class="mt-1.5 h-1.5 bg-bg-2 rounded-full overflow-hidden w-full max-w-xs">
+                    <div class="h-full rounded-full transition-all"
+                         :style="`width:${maxOutput > 0 ? Math.round((agent.tasks + agent.messages) / maxOutput * 100) : 0}%; background:${agent.color}`">
+                    </div>
+                  </div>
+                </div>
+                <div class="shrink-0 text-right">
+                  <div class="text-sm font-semibold" x-text="agent.tasks + agent.messages"></div>
+                  <div class="text-xs text-ink-3">
+                    <span x-text="agent.tasks"></span>t · <span x-text="agent.messages"></span>m
+                  </div>
+                </div>
+                <div class="shrink-0 text-xs text-ink-3 w-20 text-right"
+                     x-text="agent.last_active ? relativeTime(agent.last_active) : 'no activity'">
+                </div>
+              </div>
+            </template>
+            <template x-if="agentStats.length === 0">
+              <div class="px-6 py-10 text-center text-sm text-ink-3">
+                No agent activity yet — start chatting with the team.
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Top subjects -->
+        <div class="tpdl-card p-6">
+          <h3 class="font-semibold text-sm mb-1">Top subjects</h3>
+          <p class="text-xs text-ink-3 mb-4">Most frequent words in marketing task titles</p>
+          <template x-if="subjects.length === 0">
+            <p class="text-xs text-ink-3 italic">No marketing tasks yet.</p>
+          </template>
+          <div class="space-y-2">
+            <template x-for="(s, i) in subjects.slice(0, 10)" :key="s.word">
+              <div class="flex items-center gap-2">
+                <div class="flex-1">
+                  <div class="flex items-center justify-between mb-0.5">
+                    <span class="text-xs font-medium capitalize" x-text="s.word"></span>
+                    <span class="text-xs text-ink-3" x-text="s.count"></span>
+                  </div>
+                  <div class="h-1.5 bg-bg-2 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full"
+                         style="background: var(--tpdl-accent)"
+                         :style="`width:${subjects[0]?.count > 0 ? Math.round(s.count / subjects[0].count * 100) : 0}%; background:var(--tpdl-accent)`">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── Action breakdown table ───────────────────────────────────────── -->
+      <div class="tpdl-card overflow-hidden">
+        <div class="px-6 py-4 border-b border-line">
+          <h3 class="font-semibold text-sm">Action breakdown</h3>
+          <p class="text-xs text-ink-3 mt-0.5">Every action type logged in the system</p>
+        </div>
+        <table class="w-full text-sm">
+          <thead class="bg-bg-2 border-b border-line">
+            <tr class="text-left text-xs uppercase tracking-wider text-ink-3">
+              <th class="px-6 py-3 font-medium">Action</th>
+              <th class="px-6 py-3 font-medium">Count</th>
+              <th class="px-6 py-3 font-medium">Share</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-line">
+            <template x-for="row in actions" :key="row.action">
+              <tr>
+                <td class="px-6 py-3">
+                  <span class="font-medium" x-text="row.label"></span>
+                  <span class="text-xs text-ink-3 ml-2 font-mono" x-text="`(${row.action})`"></span>
+                </td>
+                <td class="px-6 py-3 font-semibold" x-text="row.count"></td>
+                <td class="px-6 py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-24 h-1.5 bg-bg-2 rounded-full overflow-hidden">
+                      <div class="h-full rounded-full"
+                           style="background: var(--tpdl-accent-ink)"
+                           :style="`width:${totalActions > 0 ? Math.round(row.count / totalActions * 100) : 0}%`">
+                      </div>
+                    </div>
+                    <span class="text-xs text-ink-3"
+                          x-text="`${totalActions > 0 ? Math.round(row.count / totalActions * 100) : 0}%`">
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            </template>
+            <template x-if="actions.length === 0">
+              <tr>
+                <td colspan="3" class="px-6 py-10 text-center text-sm text-ink-3">
+                  No actions logged yet.
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </template>
+
+</div>
+
+<script src="/static/js/performance.js"></script>
+{% endblock %}

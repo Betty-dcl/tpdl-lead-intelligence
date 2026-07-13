@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consulting AI Firm — Open Space</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; }
+  .agent-card { transition: all 0.2s ease; }
+  .agent-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.15); }
+  .status-dot { box-shadow: 0 0 0 3px white; }
+  .status-online { background: #10b981; }
+  .status-busy { background: #f59e0b; }
+  .chat-bubble-user { background: #1E3A8A; color: white; }
+  .chat-bubble-manager { background: #f3f4f6; color: #111827; }
+  .typing-indicator span { animation: bounce 1.4s infinite ease-in-out; }
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+  .route-suggestion { animation: slideIn 0.3s ease-out; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+<!-- HEADER -->
+<header class="bg-white border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-gradient-to-br from-blue-900 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold">CF</div>
+      <div>
+        <h1 class="font-semibold text-slate-900">Consulting AI Firm</h1>
+        <p class="text-xs text-slate-500">Votre équipe IA · 6 collaborateurs en ligne</p>
+      </div>
+    </div>
+    <nav class="flex gap-1">
+      <a href="#" class="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium">🏢 Open Space</a>
+      <a href="#" class="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 text-sm font-medium">📊 Marketing</a>
+      <a href="#" class="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 text-sm font-medium">🔍 Market Intel</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-8" x-data="{
+  messages: [
+    { role: 'manager', text: 'Bonjour. Je suis Alex, ton Manager. Décris-moi ce dont tu as besoin et je te dirige vers la bonne personne de l\'équipe.' },
+    { role: 'user', text: 'J\'aimerais identifier des boîtes de PE en France qui viennent de recruter un nouveau Managing Partner' },
+    { role: 'manager', text: 'C\'est typiquement le terrain de Sarah — elle surveille les signaux de leadership change et peut faire un /scan ciblé. Une fois les boîtes détectées, Léa pourra les scorer en ICP-fit.', route: 'sarah', routeName: 'Sarah' }
+  ],
+  input: ''
+}">
+
+<!-- SECTION MANAGER -->
+<section class="bg-white rounded-2xl shadow-sm border border-slate-200 mb-8 overflow-hidden">
+  <div class="grid grid-cols-12 gap-0">
+
+    <!-- Avatar du Manager + intro -->
+    <div class="col-span-12 md:col-span-4 bg-gradient-to-br from-blue-900 to-blue-700 text-white p-8 flex flex-col items-center text-center">
+      <div class="relative mb-4">
+        <img src="https://api.dicebear.com/9.x/personas/svg?seed=manager-alex" class="w-32 h-32 rounded-full bg-white shadow-xl" alt="Alex">
+        <div class="absolute bottom-2 right-2 w-5 h-5 status-online status-dot rounded-full"></div>
+      </div>
+      <h2 class="text-2xl font-bold">Alex</h2>
+      <p class="text-blue-200 text-sm mb-4">Manager de l'équipe</p>
+      <p class="text-sm text-blue-100 leading-relaxed">
+        Je suis ton point d'entrée. Décris-moi ce dont tu as besoin et je te route vers le bon spécialiste.
+      </p>
+      <div class="mt-6 pt-6 border-t border-blue-600/40 w-full">
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <div><div class="text-blue-200">Conv. aujourd'hui</div><div class="text-xl font-semibold">14</div></div>
+          <div><div class="text-blue-200">Routage moyen</div><div class="text-xl font-semibold">3.2s</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone chat -->
+    <div class="col-span-12 md:col-span-8 flex flex-col" style="min-height: 480px;">
+      <!-- Messages -->
+      <div class="flex-1 p-6 overflow-y-auto space-y-4">
+        <template x-for="msg in messages" :key="msg.text">
+          <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+            <div class="max-w-md">
+              <div :class="msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-manager'" class="px-4 py-3 rounded-2xl text-sm leading-relaxed" x-text="msg.text"></div>
+              <template x-if="msg.route">
+                <button class="route-suggestion mt-2 flex items-center gap-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                  <span>→ Continuer avec</span>
+                  <img :src="`https://api.dicebear.com/9.x/personas/svg?seed=sarah-mitchell`" class="w-6 h-6 rounded-full">
+                  <span x-text="msg.routeName" class="font-semibold"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Input -->
+      <div class="border-t border-slate-200 p-4 bg-slate-50">
+        <div class="flex gap-2">
+          <input
+            type="text"
+            x-model="input"
+            placeholder="Décris ce dont tu as besoin..."
+            class="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none text-sm">
+          <button class="px-5 py-3 bg-blue-900 hover:bg-blue-800 text-white rounded-xl font-medium text-sm transition-colors">
+            Envoyer
+          </button>
+        </div>
+        <div class="mt-2 flex gap-2 text-xs text-slate-500">
+          <span>Suggestions :</span>
+          <button class="hover:text-blue-700">Trouve des cibles PE</button><span>·</span>
+          <button class="hover:text-blue-700">Rédige un post LinkedIn</button><span>·</span>
+          <button class="hover:text-blue-700">Prépare un case study</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION ÉQUIPE -->
+<section>
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h3 class="text-lg font-semibold text-slate-900">L'équipe</h3>
+      <p class="text-sm text-slate-500">Clique sur un membre pour démarrer une conversation directe</p>
+    </div>
+    <div class="text-sm text-slate-500">5 agents · tous en ligne</div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+
+    <!-- Sarah -->
+    <div class="agent-card bg-white rounded-2xl border border-slate-200 p-5 cursor-pointer">
+      <div class="relative inline-block">
+        <img src="https://api.dicebear.com/9.x/personas/svg?seed=sarah-mitchell" class="w-20 h-20 rounded-full bg-cyan-50" alt="Sarah">
+        <div class="absolute bottom-1 right-1 w-4 h-4 status-online status-dot rounded-full"></div>
+      </div>
+      <h4 class="mt-3 font-semibold text-slate-900">Sarah</h4>
+      <p class="text-xs text-cyan-600 font-medium">Market Intelligence Lead</p>
+      <p class="text-xs text-slate-500 mt-2 leading-relaxed">Détecte les boîtes cibles et leurs signaux clés</p>
+      <div class="mt-3 pt-3 border-t border-slate-100">
+        <p class="text-xs text-slate-400">il y a 12 min</p>
+        <p class="text-xs text-slate-700 mt-1">📍 a détecté 3 nouvelles boîtes (PE / FR)</p>
+      </div>
+      <button class="mt-3 w-full px-3 py-2 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded-lg text-xs font-medium">
+        Parler à Sarah
+      </button>
+    </div>
+
+    <!-- Léa -->
+    <div class="agent-card bg-white rounded-2xl border border-slate-200 p-5 cursor-pointer">
+      <div class="relative inline-block">
+        <img src="https://api.dicebear.com/9.x/personas/svg?seed=lea-chen" class="w-20 h-20 rounded-full bg-violet-50" alt="Léa">
+        <div class="absolute bottom-1 right-1 w-4 h-4 status-online status-dot rounded-full"></div>
+      </div>
+      <h4 class="mt-3 font-semibold text-slate-900">Léa</h4>
+      <p class="text-xs text-violet-600 font-medium">ICP Analyst</p>
+      <p class="text-xs text-slate-500 mt-2 leading-relaxed">Score les cibles et interprète l'angle d'attaque</p>
+      <div class="mt-3 pt-3 border-t border-slate-100">
+        <p class="text-xs text-slate-400">il y a 28 min</p>
+        <p class="text-xs text-slate-700 mt-1">📊 a scoré 5 boîtes — 2 hot (>80)</p>
+      </div>
+      <button class="mt-3 w-full px-3 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-lg text-xs font-medium">
+        Parler à Léa
+      </button>
+    </div>
+
+    <!-- Marcus -->
+    <div class="agent-card bg-white rounded-2xl border border-slate-200 p-5 cursor-pointer">
+      <div class="relative inline-block">
+        <img src="https://api.dicebear.com/9.x/personas/svg?seed=marcus-okonkwo" class="w-20 h-20 rounded-full bg-amber-50" alt="Marcus">
+        <div class="absolute bottom-1 right-1 w-4 h-4 status-busy status-dot rounded-full"></div>
+      </div>
+      <h4 class="mt-3 font-semibold text-slate-900">Marcus</h4>
+      <p class="text-xs text-amber-600 font-medium">LinkedIn Strategist</p>
+      <p class="text-xs text-slate-500 mt-2 leading-relaxed">Rédige posts et ligne édito LinkedIn</p>
+      <div class="mt-3 pt-3 border-t border-slate-100">
+        <p class="text-xs text-slate-400">en cours</p>
+        <p class="text-xs text-slate-700 mt-1">✍️ rédige un post sur les deals PE</p>
+      </div>
+      <button class="mt-3 w-full px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-medium">
+        Parler à Marcus
+      </button>
+    </div>
+
+    <!-- Tom -->
+    <div class="agent-card bg-white rounded-2xl border border-slate-200 p-5 cursor-pointer">
+      <div class="relative inline-block">
+        <img src="https://api.dicebear.com/9.x/personas/svg?seed=tom-bjornsson" class="w-20 h-20 rounded-full bg-emerald-50" alt="Tom">
+        <div class="absolute bottom-1 right-1 w-4 h-4 status-online status-dot rounded-full"></div>
+      </div>
+      <h4 class="mt-3 font-semibold text-slate-900">Tom</h4>
+      <p class="text-xs text-emerald-600 font-medium">Outreach Copywriter</p>
+      <p class="text-xs text-slate-500 mt-2 leading-relaxed">Mails et InMails personnalisés</p>
+      <div class="mt-3 pt-3 border-t border-slate-100">
+        <p class="text-xs text-slate-400">il y a 1h</p>
+        <p class="text-xs text-slate-700 mt-1">📧 4 mails draftés (prêts à valider)</p>
+      </div>
+      <button class="mt-3 w-full px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium">
+        Parler à Tom
+      </button>
+    </div>
+
+    <!-- Nina -->
+    <div class="agent-card bg-white rounded-2xl border border-slate-200 p-5 cursor-pointer">
+      <div class="relative inline-block">
+        <img src="https://api.dicebear.com/9.x/personas/svg?seed=nina-petrova" class="w-20 h-20 rounded-full bg-pink-50" alt="Nina">
+        <div class="absolute bottom-1 right-1 w-4 h-4 status-online status-dot rounded-full"></div>
+      </div>
+      <h4 class="mt-3 font-semibold text-slate-900">Nina</h4>
+      <p class="text-xs text-pink-600 font-medium">Case Studies & PPT</p>
+      <p class="text-xs text-slate-500 mt-2 leading-relaxed">Études de cas et templates de présentation</p>
+      <div class="mt-3 pt-3 border-t border-slate-100">
+        <p class="text-xs text-slate-400">il y a 2h</p>
+        <p class="text-xs text-slate-700 mt-1">🎨 a structuré 1 case study (client X)</p>
+      </div>
+      <button class="mt-3 w-full px-3 py-2 bg-pink-50 hover:bg-pink-100 text-pink-700 rounded-lg text-xs font-medium">
+        Parler à Nina
+      </button>
+    </div>
+
+  </div>
+</section>
+
+<!-- FOOTER stats -->
+<section class="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+  <div class="bg-white rounded-xl p-4 border border-slate-200">
+    <div class="text-2xl font-bold text-slate-900">23</div>
+    <div class="text-xs text-slate-500 mt-1">Boîtes détectées (7j)</div>
+  </div>
+  <div class="bg-white rounded-xl p-4 border border-slate-200">
+    <div class="text-2xl font-bold text-slate-900">8</div>
+    <div class="text-xs text-slate-500 mt-1">Mails outbound prêts</div>
+  </div>
+  <div class="bg-white rounded-xl p-4 border border-slate-200">
+    <div class="text-2xl font-bold text-slate-900">5</div>
+    <div class="text-xs text-slate-500 mt-1">Posts LinkedIn en attente</div>
+  </div>
+  <div class="bg-white rounded-xl p-4 border border-slate-200">
+    <div class="text-2xl font-bold text-slate-900">2</div>
+    <div class="text-xs text-slate-500 mt-1">Case studies en cours</div>
+  </div>
+</section>
+
+</main>
+
+<footer class="mt-12 py-6 text-center text-xs text-slate-400">
+  Consulting AI Firm · V1 (Mock-up Open Space) · Propulsé par Claude
+</footer>
+
+</body>
+</html>

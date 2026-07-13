@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Contacts — TPDL{% endblock %}
+
+{% block head %}
+<style>
+  .filter-pill {
+    display: inline-flex; align-items: center;
+    padding: 0.35rem 0.7rem; font-size: 0.75rem;
+    border-radius: 9999px; border: 1px solid var(--tpdl-border);
+    background: white; color: var(--tpdl-text-muted);
+    cursor: pointer; transition: all 0.15s ease;
+  }
+  .filter-pill:hover { border-color: var(--tpdl-dark-ink); color: var(--tpdl-text); }
+  .filter-pill.is-active { background: var(--tpdl-dark-ink); color: white; border-color: var(--tpdl-dark-ink); }
+  .score-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; padding: 4px 8px; border-radius: 6px;
+    font-weight: 600; font-size: 12px; font-variant-numeric: tabular-nums;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="contactsPage()" x-init="init()">
+
+  <section class="mb-10">
+    <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Contacts / CRM</p>
+    <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-2xl leading-tight">
+      Decision-makers &amp; radars
+    </h1>
+    <p class="text-ink-2 max-w-2xl">
+      Inès pulls CEO, CTO and CFO contacts (via Apollo) for the shortlisted companies and
+      tags them. The Lunch Campaign radar (Switzerland &amp; Spain) already runs on the scored
+      companies' locations — in-person targets where TPDL is present.
+    </p>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Switzerland</div>
+        <div class="text-3xl font-semibold" x-text="radars.counts?.switzerland ?? '–'"></div>
+        <div class="text-xs text-ink-3 mt-1">Lunch Campaign</div>
+      </div>
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Spain</div>
+        <div class="text-3xl font-semibold" x-text="radars.counts?.spain ?? '–'"></div>
+        <div class="text-xs text-ink-3 mt-1">Lunch + Spanish</div>
+      </div>
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Contacts</div>
+        <div class="text-3xl font-semibold" x-text="contacts.length"></div>
+        <div class="text-xs text-ink-3 mt-1">Stored by Inès</div>
+      </div>
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Apollo</div>
+        <div class="text-lg font-semibold mt-1" x-text="apolloConnected ? 'Connected' : 'Not connected'"
+             :style="apolloConnected ? 'color: var(--tpdl-accent-ink)' : ''"></div>
+        <div class="text-xs text-ink-3 mt-1" x-show="!apolloConnected">Add APOLLO_API_KEY</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Lunch Campaign radar -->
+  <section class="mb-12">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <h2 class="text-xl font-semibold">Lunch Campaign radar</h2>
+      <div class="flex gap-2">
+        <button class="filter-pill" :class="region==='all' && 'is-active'" @click="region='all'">All</button>
+        <button class="filter-pill" :class="region==='CH' && 'is-active'" @click="region='CH'">Switzerland</button>
+        <button class="filter-pill" :class="region==='ES' && 'is-active'" @click="region='ES'">Spain</button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <template x-for="c in visibleRadar" :key="c.company + c.location">
+        <div class="tpdl-card p-4 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="font-medium truncate" x-text="c.company"></div>
+            <div class="text-xs text-ink-3 truncate">
+              <span x-text="c.sector"></span> · <span x-text="c.location"></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-xs px-2 py-0.5 rounded-full"
+                  style="background:#E1F5EE; color:#085041;">lunch</span>
+            <span class="text-xs px-2 py-0.5 rounded-full" x-show="c._es"
+                  style="background:#FAEEDA; color:#633806;">ES</span>
+            <span class="score-pill"
+                  :style="(c.outreach_eligible ? 'background:var(--tpdl-accent-soft);color:var(--tpdl-accent-ink)' : 'background:var(--tpdl-bg-2);color:var(--tpdl-text-muted)')"
+                  x-text="c.score"></span>
+          </div>
+        </div>
+      </template>
+    </div>
+    <p class="text-xs text-ink-3 mt-3" x-show="visibleRadar.length === 0">No companies in this region.</p>
+  </section>
+
+  <!-- Stored contacts -->
+  <section>
+    <h2 class="text-xl font-semibold mb-4">Contacts</h2>
+
+    <template x-if="contacts.length === 0">
+      <div class="tpdl-card p-6 text-center">
+        <div class="font-medium mb-1">No contacts pulled yet</div>
+        <p class="text-sm text-ink-3 max-w-md mx-auto">
+          Once Apollo is connected, Inès pulls CEO/CTO/CFO + LinkedIn for the shortlist and
+          tags each (Lunch Campaign · language · Premium 5 → Andrés). They appear here, filterable.
+        </p>
+      </div>
+    </template>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <template x-for="p in contacts" :key="p.id">
+        <div class="tpdl-card p-4 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="font-medium truncate" x-text="p.full_name"></div>
+            <div class="text-xs text-ink-3 truncate">
+              <span x-text="p.title || '—'"></span> · <span x-text="p.company"></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-xs px-2 py-0.5 rounded-full" x-show="p.lunch_campaign"
+                  style="background:#E1F5EE; color:#085041;">lunch</span>
+            <span class="text-xs px-2 py-0.5 rounded-full" x-show="p.language === 'es'"
+                  style="background:#FAEEDA; color:#633806;">ES</span>
+            <span class="text-xs px-2 py-0.5 rounded-full" x-show="p.premium"
+                  style="background:#FBEAF0; color:#72243E;">premium → Andrés</span>
+          </div>
+        </div>
+      </template>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  function contactsPage() {
+    return {
+      radars: { switzerland: [], spain: [], counts: {} },
+      contacts: [],
+      apolloConnected: false,
+      region: 'all',
+      async init() {
+        try {
+          const r = await fetch('/api/contacts/radars');
+          this.radars = await r.json();
+        } catch (e) {}
+        try {
+          const c = await fetch('/api/contacts');
+          const data = await c.json();
+          this.contacts = data.contacts || [];
+          this.apolloConnected = !!data.apollo_connected;
+        } catch (e) {}
+      },
+      get visibleRadar() {
+        const ch = (this.radars.switzerland || []).map(x => ({ ...x, _es: false }));
+        const es = (this.radars.spain || []).map(x => ({ ...x, _es: true }));
+        if (this.region === 'CH') return ch;
+        if (this.region === 'ES') return es;
+        return [...ch, ...es].sort((a, b) => (b.score || 0) - (a.score || 0));
+      },
+    };
+  }
+</script>
+{% endblock %}

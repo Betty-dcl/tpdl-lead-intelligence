@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Sign in — TPDL{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-12 mb-20" x-data="loginPage()">
+
+  <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Team workspace</p>
+  <h1 class="text-3xl font-semibold mb-3 leading-tight">Sign in</h1>
+  <p class="text-ink-2 mb-8 text-sm">
+    Internal — TPDL BD team. Pick your name, enter the team password.
+    {% if already_logged_in %}
+      <span class="block mt-2 text-[color:var(--tpdl-accent-ink)]">
+        You're already signed in. <a href="/intel" class="underline">Open dashboard →</a>
+      </span>
+    {% endif %}
+  </p>
+
+  <form @submit.prevent="submit" class="tpdl-card p-6 space-y-4">
+
+    <div>
+      <label class="block text-xs uppercase tracking-wider text-ink-3 mb-2">I am</label>
+      <div class="grid grid-cols-5 gap-2">
+        {% for u in users %}
+        <button type="button"
+                @click="username = '{{ u.username }}'"
+                :class="username === '{{ u.username }}' ? 'border-ink bg-bg-2' : 'border-line'"
+                class="border-2 rounded-lg p-2 text-center transition-colors hover:border-ink">
+          <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed={{ u.avatar_seed }}"
+               class="w-12 h-12 rounded-full bg-bg-2 mx-auto" alt="{{ u.display_name }}">
+          <div class="text-xs mt-1 font-medium">{{ u.display_name }}</div>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <label for="pw" class="block text-xs uppercase tracking-wider text-ink-3 mb-2">Team password</label>
+      <input id="pw" type="password" x-model="password" required
+             class="w-full px-3 py-2 text-sm rounded-md border border-line focus:border-ink focus:outline-none transition-colors"
+             :placeholder="hint">
+    </div>
+
+    <template x-if="error">
+      <div class="text-xs text-[color:var(--tpdl-error)] px-3 py-2 border border-[color:var(--tpdl-error)] rounded-md"
+           x-text="error"></div>
+    </template>
+
+    <button type="submit"
+            :disabled="!username || !password || submitting"
+            class="tpdl-btn tpdl-btn--primary w-full disabled:opacity-40 disabled:cursor-not-allowed">
+      <span x-show="!submitting">Sign in →</span>
+      <span x-show="submitting">...</span>
+    </button>
+
+    <p class="text-xs text-ink-3 text-center pt-2">
+      Demo borrador — TPDL BD team only.
+    </p>
+  </form>
+</div>
+
+<script>
+function loginPage() {
+  return {
+    username: '',
+    password: '',
+    submitting: false,
+    error: null,
+    hint: '(default: tpdl)',
+    async submit() {
+      this.error = null;
+      if (!this.username) { this.error = 'Pick your name first'; return; }
+      this.submitting = true;
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: this.username, password: this.password }),
+        });
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e.detail || `HTTP ${res.status}`);
+        }
+        // success → redirect to intel
+        const next = new URLSearchParams(location.search).get('next') || '/intel';
+        location.href = next;
+      } catch (e) {
+        this.error = e.message;
+      } finally {
+        this.submitting = false;
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,333 @@
+/* ============================================================================
+   TPDL design system — v2 "studio grade"
+   Palette from www.thepharmadatalab.com — warm off-white, deep teal, signature
+   mint-green. Type: Space Grotesk (display) · Inter (body) · JetBrains Mono
+   (labels & data). Pixel-art avatars via DiceBear.
+   ============================================================================ */
+
+:root {
+  /* Surfaces */
+  --tpdl-bg:          #fafaf8;
+  --tpdl-surface:     #ffffff;
+  --tpdl-surface-2:   #f3f3ef;
+  --tpdl-dark:        #094752;   /* deep teal */
+  --tpdl-dark-2:      #0c5a68;   /* teal lift for gradients */
+  --tpdl-dark-ink:    #0a0a0a;
+
+  /* Text */
+  --tpdl-text:        #111110;
+  --tpdl-text-muted:  #5c5c5c;
+  --tpdl-text-faint:  #8a8a8a;
+  --tpdl-text-on-dark:#ffffff;
+
+  /* Lines */
+  --tpdl-border:      #eceae5;
+  --tpdl-border-strong:#d4d4d2;
+
+  /* Accents */
+  --tpdl-accent:      #34D591;
+  --tpdl-accent-2:    #19b87a;   /* deeper accent for gradients */
+  --tpdl-accent-ink:  #0a3a26;
+  --tpdl-accent-soft: #e8faf1;
+
+  /* Status */
+  --tpdl-success:     #34D591;
+  --tpdl-warn:        #d97706;
+  --tpdl-error:       #e32d23;
+  --tpdl-info:        #094752;
+
+  /* Radii */
+  --tpdl-radius-sm:   6px;
+  --tpdl-radius:      8px;
+  --tpdl-radius-lg:   14px;
+
+  /* Shadows — layered, barely-there */
+  --tpdl-shadow-xs:   0 1px 2px rgba(9, 71, 82, 0.04);
+  --tpdl-shadow-sm:   0 1px 2px rgba(9, 71, 82, 0.05), 0 2px 8px rgba(9, 71, 82, 0.04);
+  --tpdl-shadow-md:   0 2px 4px rgba(9, 71, 82, 0.05), 0 8px 24px rgba(9, 71, 82, 0.07);
+  --tpdl-shadow-glow: 0 0 0 3px rgba(52, 213, 145, 0.22);
+
+  /* Type */
+  --tpdl-font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --tpdl-font-body:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --tpdl-font-mono:    'JetBrains Mono', 'SF Mono', Menlo, monospace;
+}
+
+/* ----------------------------- Base ---------------------------------------- */
+
+html, body {
+  font-family: var(--tpdl-font-body);
+  font-feature-settings: 'cv11', 'ss01';
+  color: var(--tpdl-text);
+  background: var(--tpdl-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle dot-grid backdrop — the "lab bench" */
+body {
+  background-image: radial-gradient(rgba(9, 71, 82, 0.05) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--tpdl-font-display);
+  letter-spacing: -0.025em;
+  font-weight: 600;
+}
+
+/* Big numerals (KPI cards use text-3xl/2xl) read as instrument dials */
+.text-3xl, .text-2xl {
+  font-family: var(--tpdl-font-display);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Micro-labels — uppercase trackers get the mono treatment */
+.uppercase.tracking-wider, .uppercase.tracking-\[0\.2em\] {
+  font-family: var(--tpdl-font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+}
+
+code, pre {
+  font-family: var(--tpdl-font-mono);
+  font-size: 0.85em;
+}
+
+::selection { background: rgba(52, 213, 145, 0.35); }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--tpdl-border-strong);
+  border-radius: 9999px;
+  border: 2px solid var(--tpdl-bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--tpdl-text-faint); }
+
+/* Keyboard focus — accent ring everywhere */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--tpdl-shadow-glow);
+  border-radius: var(--tpdl-radius-sm);
+}
+
+/* Page entrance */
+main {
+  animation: tpdl-rise 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes tpdl-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ----------------------------- Buttons ------------------------------------- */
+
+.tpdl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.15rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--tpdl-radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+}
+.tpdl-btn:active { transform: translateY(1px) scale(0.99); }
+
+.tpdl-btn--primary {
+  background: linear-gradient(135deg, var(--tpdl-accent) 0%, var(--tpdl-accent-2) 100%);
+  color: var(--tpdl-accent-ink);
+  box-shadow: var(--tpdl-shadow-xs);
+}
+.tpdl-btn--primary:hover {
+  box-shadow: 0 4px 14px rgba(52, 213, 145, 0.4);
+  transform: translateY(-1px);
+}
+
+.tpdl-btn--dark {
+  background: linear-gradient(135deg, var(--tpdl-dark) 0%, var(--tpdl-dark-2) 100%);
+  color: white;
+}
+.tpdl-btn--dark:hover { box-shadow: 0 4px 14px rgba(9, 71, 82, 0.35); transform: translateY(-1px); }
+
+.tpdl-btn--outline {
+  background: var(--tpdl-surface);
+  color: var(--tpdl-text);
+  border-color: var(--tpdl-border-strong);
+}
+.tpdl-btn--outline:hover {
+  border-color: var(--tpdl-dark);
+  background: var(--tpdl-dark);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.tpdl-btn--ghost {
+  background: transparent;
+  color: var(--tpdl-text-muted);
+  padding: 0.4rem 0.7rem;
+}
+.tpdl-btn--ghost:hover { color: var(--tpdl-text); background: var(--tpdl-surface-2); }
+
+/* ----------------------------- Cards ---------------------------------------- */
+
+.tpdl-card {
+  background: var(--tpdl-surface);
+  border: 1px solid var(--tpdl-border);
+  border-radius: var(--tpdl-radius-lg);
+  box-shadow: var(--tpdl-shadow-sm);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+}
+.tpdl-card:hover {
+  box-shadow: var(--tpdl-shadow-md);
+  border-color: var(--tpdl-border-strong);
+}
+
+.tpdl-card--dark {
+  background: linear-gradient(150deg, var(--tpdl-dark) 0%, var(--tpdl-dark-2) 100%);
+  color: var(--tpdl-text-on-dark);
+  border: none;
+}
+
+/* Card section headers get a faint tinted strip */
+.tpdl-card > .border-b {
+  background: linear-gradient(to bottom, rgba(243, 243, 239, 0.55), transparent);
+}
+
+/* Table rows breathe on hover */
+.tpdl-card tbody tr { transition: background 0.12s ease; }
+.tpdl-card tbody tr:hover { background: var(--tpdl-accent-soft); }
+
+/* ----------------------------- Nav ------------------------------------------ */
+
+.tpdl-nav-link {
+  position: relative;
+  padding: 0.5rem 0.95rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--tpdl-text-muted);
+  border-radius: 9999px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.tpdl-nav-link:hover { color: var(--tpdl-text); background: var(--tpdl-surface-2); }
+.tpdl-nav-link.is-active {
+  color: var(--tpdl-text-on-dark);
+  background: linear-gradient(135deg, var(--tpdl-dark) 0%, var(--tpdl-dark-2) 100%);
+  box-shadow: var(--tpdl-shadow-xs);
+}
+.tpdl-nav-link.is-active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 14px;
+  height: 2px;
+  transform: translateX(-50%);
+  background: var(--tpdl-accent);
+  border-radius: 9999px;
+}
+.tpdl-nav-link.is-disabled {
+  color: var(--tpdl-text-faint);
+  cursor: not-allowed;
+}
+
+/* Logo mark — 2x2 pixel grid, nods to the pixel avatars */
+.tpdl-logo-mark {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.tpdl-logo-mark span { border-radius: 2.5px; }
+.tpdl-logo-mark span:nth-child(1) { background: var(--tpdl-dark); }
+.tpdl-logo-mark span:nth-child(2) { background: var(--tpdl-accent); }
+.tpdl-logo-mark span:nth-child(3) { background: var(--tpdl-accent); }
+.tpdl-logo-mark span:nth-child(4) { background: var(--tpdl-dark); }
+a:hover .tpdl-logo-mark span { animation: tpdl-pix 0.5s ease; }
+.tpdl-logo-mark span:nth-child(2) { animation-delay: 0.06s; }
+.tpdl-logo-mark span:nth-child(3) { animation-delay: 0.12s; }
+.tpdl-logo-mark span:nth-child(4) { animation-delay: 0.18s; }
+@keyframes tpdl-pix {
+  50% { transform: scale(0.6); border-radius: 50%; }
+}
+
+/* ----------------------------- Badges --------------------------------------- */
+
+.tpdl-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.tpdl-badge--accent  { background: var(--tpdl-accent-soft); color: var(--tpdl-accent-ink); }
+.tpdl-badge--dark    { background: var(--tpdl-dark); color: white; }
+.tpdl-badge--outline { border: 1px solid var(--tpdl-border-strong); color: var(--tpdl-text-muted); background: var(--tpdl-surface); }
+
+/* ----------------------------- Avatars -------------------------------------- */
+
+/* Pixel avatars sit on a soft accent tile instead of a plain grey circle */
+img[src*="dicebear"] {
+  background: linear-gradient(160deg, var(--tpdl-accent-soft) 0%, #f0f9f4 100%);
+  border: 1px solid var(--tpdl-border);
+  image-rendering: pixelated;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+img[src*="dicebear"]:hover {
+  transform: scale(1.12) rotate(-3deg);
+  box-shadow: var(--tpdl-shadow-md);
+}
+
+/* ----------------------------- Chat bubbles --------------------------------- */
+
+.tpdl-bubble-user {
+  background: linear-gradient(135deg, var(--tpdl-dark) 0%, var(--tpdl-dark-2) 100%);
+  color: white;
+}
+.tpdl-bubble-assistant { background: var(--tpdl-surface-2); color: var(--tpdl-text); }
+
+/* ----------------------------- Status dot ----------------------------------- */
+
+.tpdl-status-dot {
+  box-shadow: 0 0 0 3px white;
+  border-radius: 9999px;
+  display: inline-block;
+}
+.tpdl-status-dot--online {
+  background: var(--tpdl-accent);
+  animation: tpdl-pulse 2.4s ease-in-out infinite;
+}
+@keyframes tpdl-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px white, 0 0 0 3px rgba(52, 213, 145, 0); }
+  50%      { box-shadow: 0 0 0 3px white, 0 0 0 7px rgba(52, 213, 145, 0.25); }
+}
+
+/* ----------------------------- Inputs ---------------------------------------- */
+
+input[type="text"], input[type="date"], textarea, select {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input[type="text"]:focus, input[type="date"]:focus, textarea:focus, select:focus {
+  border-color: var(--tpdl-accent) !important;
+  box-shadow: 0 0 0 3px rgba(52, 213, 145, 0.16);
+  outline: none;
+}
+
+/* ----------------------------- Misc ------------------------------------------ */
+
+[x-cloak] { display: none !important; }
+
+/* Reduced motion: keep it calm */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

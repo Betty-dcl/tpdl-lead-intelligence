@@ -1,0 +1,41 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ai-consulting-firm",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/bettydeclety/Documents/TPDL/claude code dashboard' && exec .venv/bin/python -m uvicorn app.main:app --port 8000 --log-level warning"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "ai-consulting-firm-qa",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/bettydeclety/Documents/TPDL/claude code dashboard' && exec .venv/bin/python -m uvicorn app.main:app --port 8010 --log-level warning"
+      ],
+      "port": 8010
+    },
+    {
+      "name": "cca-study-preview",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/bettydeclety/Downloads' && exec python3 -m http.server 8742"
+      ],
+      "port": 8742
+    },
+    {
+      "name": "frise",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/bettydeclety/Documents/TPDL' && exec python3 -m http.server 8765"
+      ],
+      "port": 8765
+    }
+  ]
+}

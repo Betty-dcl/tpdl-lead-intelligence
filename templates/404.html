@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Not found — AI Consulting Firm{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto text-center py-20">
+  <div class="text-7xl font-bold text-slate-200 mb-3 select-none">404</div>
+  <h1 class="text-xl font-semibold text-slate-900 mb-2">Page not found</h1>
+  <p class="text-sm text-slate-500 mb-8">
+    No route matched
+    <code class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-700 text-xs">{{ path }}</code>.
+  </p>
+  <a href="/"
+     class="inline-block px-5 py-2.5 bg-blue-900 hover:bg-blue-800 text-white rounded-xl text-sm font-medium transition-colors">
+    ← Back to the Open Space
+  </a>
+</div>
+{% endblock %}

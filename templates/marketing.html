@@ -1,0 +1,845 @@
+{% extends "base.html" %}
+{% block title %}Marketing — TPDL{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<style>
+  .side-link {
+    display: block; width: 100%;
+    text-align: left;
+    padding: 0.7rem 1rem;
+    border-radius: var(--tpdl-radius);
+    font-size: 0.875rem;
+    color: var(--tpdl-text-muted);
+    transition: all 0.15s ease;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+  }
+  .side-link:hover { background: var(--tpdl-bg-2); color: var(--tpdl-text); }
+  .side-link.is-active {
+    background: var(--tpdl-dark-ink);
+    color: white;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .status-live    { background: #dcf7e7; color: #0a3a26; }
+  .status-draft   { background: #fef3c7; color: #854d0e; }
+  .status-planned { background: #e0e7ff; color: #3730a3; }
+  .status-sent    { background: #dbeafe; color: #1e40af; }
+  .status-replied { background: #dcf7e7; color: #0a3a26; }
+  .status-pending { background: #fef3c7; color: #854d0e; }
+  .status-published { background: #dcf7e7; color: #0a3a26; }
+  .status-review  { background: #dbeafe; color: #1e40af; }
+
+  .seo-bar { height: 5px; background: var(--tpdl-border); border-radius: 9999px; overflow: hidden; }
+  .seo-fill { height: 100%; border-radius: 9999px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="mb-10">
+  <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Marketing pipeline</p>
+  <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-2xl leading-tight">
+    The firm's voice in the market
+  </h1>
+  <p class="text-ink-2 max-w-2xl">
+    Iris researches and scores the week's themes; Marc writes the content; Oliver produces
+    the formats. Nothing goes live without your approval.
+  </p>
+
+  <!-- Marketing pipeline — 3 stages -->
+  <div class="grid grid-cols-3 gap-3 mt-8">
+    <a href="/agent/iris" class="tpdl-card p-4 hover:border-ink transition-colors">
+      <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 1</div>
+      <div class="font-semibold text-sm">Iris</div>
+      <div class="text-xs text-ink-3">Research &amp; trend scoring</div>
+    </a>
+    <a href="/agent/marc" class="tpdl-card p-4 hover:border-ink transition-colors">
+      <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 2</div>
+      <div class="font-semibold text-sm">Marc</div>
+      <div class="text-xs text-ink-3">Content architect</div>
+    </a>
+    <a href="/agent/oliver" class="tpdl-card p-4 hover:border-ink transition-colors">
+      <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 3</div>
+      <div class="font-semibold text-sm">Oliver</div>
+      <div class="text-xs text-ink-3">Format producer</div>
+    </a>
+  </div>
+</div>
+
+<div class="grid grid-cols-12 gap-6" x-data="marketingPage()" x-init="init()">
+
+  <!-- =========================================================== -->
+  <!-- SIDEBAR                                                     -->
+  <!-- =========================================================== -->
+  <aside class="col-span-12 md:col-span-3 lg:col-span-2">
+    <nav class="tpdl-card p-2 sticky top-24">
+      <button @click="section = 'linkedin'"
+              :class="section === 'linkedin' ? 'side-link is-active' : 'side-link'">
+        LinkedIn
+      </button>
+      <button @click="section = 'case_studies'"
+              :class="section === 'case_studies' ? 'side-link is-active' : 'side-link'">
+        Case Studies
+      </button>
+      <button @click="section = 'website'"
+              :class="section === 'website' ? 'side-link is-active' : 'side-link'">
+        Website
+      </button>
+      <button @click="section = 'outreach'"
+              :class="section === 'outreach' ? 'side-link is-active' : 'side-link'">
+        Outreach
+      </button>
+      <button @click="section = 'pipeline'"
+              :class="section === 'pipeline' ? 'side-link is-active' : 'side-link'">
+        ⚡ Auto Pipeline
+      </button>
+      <button @click="section = 'carousel'"
+              :class="section === 'carousel' ? 'side-link is-active' : 'side-link'">
+        ✦ Carousel Studio
+      </button>
+      <hr class="my-2 border-line">
+      <button @click="section = 'newsletter'"
+              :class="section === 'newsletter' ? 'side-link is-active' : 'side-link'">
+        Newsletter
+      </button>
+    </nav>
+  </aside>
+
+  <!-- =========================================================== -->
+  <!-- MAIN                                                        -->
+  <!-- =========================================================== -->
+  <main class="col-span-12 md:col-span-9 lg:col-span-10">
+
+    <template x-if="error">
+      <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4" x-text="error"></div>
+    </template>
+
+    <template x-if="actionFeedback">
+      <div class="bg-[color:var(--tpdl-accent-soft)] border border-[color:#c8efd9] text-[color:var(--tpdl-accent-ink)] px-4 py-3 rounded text-sm mb-4" x-text="actionFeedback"></div>
+    </template>
+
+    <template x-if="loading">
+      <div class="tpdl-card p-12 text-center text-sm text-ink-3">Loading...</div>
+    </template>
+
+    <!-- ============= LINKEDIN ============= -->
+    <section x-show="!loading && section === 'linkedin'">
+      <h2 class="text-xl font-semibold mb-1">LinkedIn</h2>
+      <p class="text-sm text-ink-3 mb-6">Drafts by Marc, engagement signal, KPIs over the last 30 days.</p>
+
+      <!-- KPIs -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Posts published (30d)</div>
+          <div class="text-3xl font-semibold mt-1" x-text="kpis.posts_published_30d"></div>
+        </div>
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Impressions (30d)</div>
+          <div class="text-3xl font-semibold mt-1" x-text="formatNumber(kpis.impressions_30d)"></div>
+        </div>
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Engagement rate</div>
+          <div class="text-3xl font-semibold mt-1">
+            <span x-text="kpis.engagement_rate_pct"></span><span class="text-base text-ink-3">%</span>
+          </div>
+        </div>
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Followers Δ (30d)</div>
+          <div class="text-3xl font-semibold mt-1" style="color: var(--tpdl-accent-ink)">
+            +<span x-text="kpis.followers_delta_30d"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="tpdl-card p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="font-semibold text-sm">Daily impressions — 30 days</h3>
+            <p class="text-xs text-ink-3 mt-0.5">Mock data — replaced by LinkedIn API in V2.</p>
+          </div>
+        </div>
+        <div style="height: 220px;">
+          <canvas id="engagement-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Drafts -->
+      <div class="tpdl-card overflow-hidden">
+        <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+          <div>
+            <h3 class="font-semibold text-sm">Drafts pending validation</h3>
+            <p class="text-xs text-ink-3 mt-0.5">From <span class="font-medium text-ink">Marc</span></p>
+          </div>
+          <a href="/?drawer=marc"
+             class="tpdl-btn tpdl-btn--outline text-xs">+ Brief Marc on a new post</a>
+        </div>
+        <div class="divide-y divide-line">
+          <template x-if="drafts.length === 0">
+            <div class="px-6 py-12 text-center text-sm text-ink-3">
+              No drafts pending. Ask Marc to <code class="px-1 py-0.5 bg-bg-2 rounded">/content [topic]</code> to add more.
+            </div>
+          </template>
+          <template x-for="draft in drafts" :key="draft.id">
+            <div class="px-6 py-4 flex items-start gap-4">
+              <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content"
+                   class="w-10 h-10 rounded-full bg-bg-2 shrink-0">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-medium text-sm" x-text="draft.topic"></span>
+                  <span class="tpdl-badge tpdl-badge--outline" x-text="draft.angle"></span>
+                  <span class="text-xs text-ink-3" x-text="relativeTime(draft.created_at)"></span>
+                </div>
+                <p class="text-sm text-ink-2 mt-2 leading-relaxed" x-text="draft.preview"></p>
+                <details class="mt-2">
+                  <summary class="text-xs text-[color:var(--tpdl-info)] cursor-pointer hover:underline">Read full draft</summary>
+                  <pre class="mt-2 p-3 bg-bg-2 rounded text-xs whitespace-pre-wrap text-ink leading-relaxed font-sans" x-text="draft.full_text"></pre>
+                </details>
+              </div>
+              <div class="flex flex-col gap-2 shrink-0">
+                <button @click="approveDraft(draft.id)"
+                        class="tpdl-btn tpdl-btn--primary text-xs">✓ Approve</button>
+                <button class="tpdl-btn tpdl-btn--ghost text-xs"
+                        title="Edit not wired in V1">✎ Edit</button>
+                <button @click="rejectDraft(draft.id)"
+                        class="tpdl-btn tpdl-btn--ghost text-xs"
+                        style="color: var(--tpdl-error)">✕ Reject</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============= CASE STUDIES ============= -->
+    <section x-show="!loading && section === 'case_studies'">
+      <h2 class="text-xl font-semibold mb-1">Case Studies</h2>
+      <p class="text-sm text-ink-3 mb-6">Structured by Marc from delivered missions.</p>
+
+      <div class="tpdl-card overflow-hidden">
+        <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+          <h3 class="font-semibold text-sm">Existing case studies</h3>
+          <a href="/?drawer=marc"
+             class="tpdl-btn tpdl-btn--outline text-xs">+ New case study with Marc</a>
+        </div>
+        <div class="divide-y divide-line">
+          <template x-if="caseStudies.length === 0">
+            <div class="px-6 py-12 text-center text-sm text-ink-3">No case studies yet.</div>
+          </template>
+          <template x-for="cs in caseStudies" :key="cs.id">
+            <div class="px-6 py-4 flex items-start gap-4">
+              <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content"
+                   class="w-10 h-10 rounded-full bg-bg-2 shrink-0">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium" x-text="cs.title"></div>
+                <div class="text-xs text-ink-3 mt-1 flex items-center gap-2 flex-wrap">
+                  <span x-text="cs.client"></span>
+                  <span>·</span>
+                  <span x-text="cs.sector"></span>
+                  <span>·</span>
+                  <span x-text="formatDate(cs.date)"></span>
+                </div>
+              </div>
+              <span class="status-badge" :class="`status-${cs.status}`" x-text="cs.status"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============= WEBSITE ============= -->
+    <section x-show="!loading && section === 'website'">
+      <h2 class="text-xl font-semibold mb-1">Website</h2>
+      <p class="text-sm text-ink-3 mb-6">Pages live, in draft or planned. SEO scores are mocked in V1.</p>
+
+      <div class="tpdl-card overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-bg-2 border-b border-line">
+            <tr class="text-left text-xs uppercase tracking-wider text-ink-3">
+              <th class="px-6 py-3 font-medium">Page</th>
+              <th class="px-6 py-3 font-medium">Status</th>
+              <th class="px-6 py-3 font-medium">SEO score</th>
+              <th class="px-6 py-3 font-medium">Last updated</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-line">
+            <template x-for="page in websitePages" :key="page.path">
+              <tr>
+                <td class="px-6 py-3">
+                  <div class="font-medium" x-text="page.title"></div>
+                  <div class="text-xs text-ink-3" x-text="page.path"></div>
+                </td>
+                <td class="px-6 py-3">
+                  <span class="status-badge" :class="`status-${page.status}`" x-text="page.status"></span>
+                </td>
+                <td class="px-6 py-3">
+                  <div class="flex items-center gap-3">
+                    <div class="seo-bar w-24">
+                      <div class="seo-fill"
+                           :style="`width: ${page.seo_score}%; background: ${page.seo_score >= 70 ? '#34D591' : page.seo_score >= 50 ? '#f59e0b' : '#8a8a8a'}`"></div>
+                    </div>
+                    <span class="text-xs text-ink-2 w-8 font-mono" x-text="page.seo_score"></span>
+                  </div>
+                </td>
+                <td class="px-6 py-3 text-xs text-ink-3">
+                  <span x-text="page.last_updated || '—'"></span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============= OUTREACH ============= -->
+    <section x-show="!loading && section === 'outreach'">
+      <h2 class="text-xl font-semibold mb-1">Outreach</h2>
+      <p class="text-sm text-ink-3 mb-6">Julie's outreach pipeline and ICP-segment templates.</p>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Pipeline -->
+        <div class="lg:col-span-2 tpdl-card overflow-hidden">
+          <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+            <h3 class="font-semibold text-sm">Pipeline</h3>
+            <a href="/?drawer=julie"
+               class="tpdl-btn tpdl-btn--outline text-xs">+ Brief Julie on a new email</a>
+          </div>
+          <div class="divide-y divide-line">
+            <template x-if="outreach.pipeline.length === 0">
+              <div class="px-6 py-12 text-center text-sm text-ink-3">Pipeline is empty.</div>
+            </template>
+            <template x-for="em in outreach.pipeline" :key="em.id">
+              <div class="px-6 py-3 flex items-center gap-4">
+                <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=julie-tpdl-outreach"
+                     class="w-8 h-8 rounded-full bg-bg-2 shrink-0">
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium truncate" x-text="em.subject"></div>
+                  <div class="text-xs text-ink-3 mt-0.5">
+                    <span x-text="em.company"></span> · <span x-text="formatDate(em.created_at)"></span>
+                  </div>
+                </div>
+                <span class="status-badge" :class="`status-${em.status}`" x-text="em.status"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Templates -->
+        <div class="tpdl-card overflow-hidden">
+          <div class="px-6 py-4 border-b border-line">
+            <h3 class="font-semibold text-sm">ICP templates</h3>
+          </div>
+          <div class="divide-y divide-line">
+            <template x-for="tpl in outreach.templates" :key="tpl.id">
+              <div class="px-6 py-3">
+                <div class="text-xs font-medium" style="color: var(--tpdl-accent-ink)" x-text="tpl.segment"></div>
+                <p class="text-xs text-ink-2 mt-1 leading-relaxed" x-text="tpl.preview"></p>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============= AUTO PIPELINE ============= -->
+    <section x-show="!loading && section === 'pipeline'">
+      <h2 class="text-xl font-semibold mb-1">⚡ Auto Pipeline</h2>
+      <p class="text-sm text-ink-3 mb-6">
+        Iris finds the subject → Marc writes the content → Oliver produces the formats → you approve. No briefing needed.
+      </p>
+
+      <!-- Pipeline diagram -->
+      <div class="flex items-center gap-2 mb-6 flex-wrap">
+        <div class="tpdl-card px-4 py-2 text-sm font-medium flex items-center gap-2">
+          <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=iris-tpdl-marketing-intel" class="w-6 h-6 rounded-full">
+          Iris — finds subject
+        </div>
+        <span class="text-ink-3">→</span>
+        <div class="tpdl-card px-4 py-2 text-sm font-medium flex items-center gap-2">
+          <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content" class="w-6 h-6 rounded-full">
+          Marc — writes content
+        </div>
+        <span class="text-ink-3">→</span>
+        <div class="tpdl-card px-4 py-2 text-sm font-medium flex items-center gap-2">
+          <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=oliver-tpdl-format" class="w-6 h-6 rounded-full">
+          Oliver — produces formats
+        </div>
+        <span class="text-ink-3">→</span>
+        <div class="tpdl-card px-4 py-2 text-sm font-medium">
+          ✓ You approve
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="tpdl-card p-6 mb-6">
+        <div class="mb-4">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-2">
+            Subject <span class="font-normal normal-case">(leave empty — Iris picks from live trends)</span>
+          </label>
+          <input x-model="pipeline.subject" type="text"
+                 placeholder="e.g. AI in clinical trial recruitment — or leave empty"
+                 class="w-full border border-line rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[color:var(--tpdl-accent-ink)] bg-white">
+        </div>
+
+        <div class="mb-5">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-3">Formats to generate</label>
+          <div class="flex gap-3 flex-wrap">
+            <template x-for="fmt in pipeline.formatOptions" :key="fmt.id">
+              <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer text-sm transition-all"
+                     :class="fmt.selected ? 'border-[color:var(--tpdl-accent-ink)] bg-[color:var(--tpdl-accent-soft)] font-medium' : 'border-line bg-bg-2'">
+                <input type="checkbox" x-model="fmt.selected" class="sr-only">
+                <span x-text="fmt.icon"></span>
+                <span x-text="fmt.label"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <button @click="runPipeline()"
+                :disabled="pipeline.running"
+                class="tpdl-btn tpdl-btn--primary"
+                :class="pipeline.running ? 'opacity-50 cursor-not-allowed' : ''">
+          <span x-show="!pipeline.running">⚡ Run pipeline</span>
+          <span x-show="pipeline.running">Iris, Marc &amp; Oliver working…</span>
+        </button>
+        <template x-if="pipeline.error">
+          <p class="mt-3 text-xs text-red-600" x-text="pipeline.error"></p>
+        </template>
+      </div>
+
+      <!-- Last run result -->
+      <template x-if="pipeline.lastRun">
+        <div class="space-y-4 mb-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="tpdl-badge" style="background:var(--tpdl-accent-soft);color:var(--tpdl-accent-ink)">
+              ✓ Pipeline ran
+            </span>
+            <span class="font-medium text-sm" x-text="pipeline.lastRun.subject"></span>
+            <template x-if="pipeline.lastRun.auto_subject">
+              <span class="tpdl-badge tpdl-badge--outline text-xs">🔍 Subject picked by Iris</span>
+            </template>
+            <template x-if="pipeline.lastRun.search_enriched">
+              <span class="tpdl-badge tpdl-badge--outline text-xs">🌐 Web-enriched</span>
+            </template>
+          </div>
+
+          <!-- Iris subjects if auto -->
+          <template x-if="pipeline.lastRun.iris_output">
+            <div class="tpdl-card p-4">
+              <div class="text-xs font-semibold uppercase tracking-wider text-ink-3 mb-2">📡 Iris — subjects found this week</div>
+              <pre class="text-xs leading-relaxed whitespace-pre-wrap font-sans text-ink-2" x-text="pipeline.lastRun.iris_output"></pre>
+            </div>
+          </template>
+
+          <!-- Marc + Oliver results -->
+          <template x-for="fmt in pipeline.formatOptions.filter(f => f.selected)" :key="fmt.id">
+            <div class="tpdl-card overflow-hidden">
+              <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span x-text="fmt.icon"></span>
+                  <h3 class="font-semibold text-sm" x-text="fmt.label"></h3>
+                  <template x-if="pipeline.lastRun.results[fmt.id]?.review">
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full"
+                          :style="scoreBadgeStyle(pipeline.lastRun.results[fmt.id].review.score)"
+                          :title="pipeline.lastRun.results[fmt.id].review.verdict"
+                          x-text="`⭐ ${pipeline.lastRun.results[fmt.id].review.score}/10`"></span>
+                  </template>
+                </div>
+                <div class="flex gap-2">
+                  <button @click="copyPipelineContent(fmt.id)" class="tpdl-btn tpdl-btn--outline text-xs">⎘ Copy</button>
+                  <button @click="exportPipelinePDF(fmt.id)" class="tpdl-btn tpdl-btn--primary text-xs">↓ PDF</button>
+                </div>
+              </div>
+              <div class="px-6 py-4">
+                <template x-if="pipeline.lastRun.results[fmt.id]?.review">
+                  <div class="mb-3 p-3 rounded-lg border border-line bg-white text-xs space-y-1.5">
+                    <p class="text-ink-2 italic" x-text="pipeline.lastRun.results[fmt.id].review.verdict"></p>
+                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                      <template x-for="s in pipeline.lastRun.results[fmt.id].review.strengths" :key="s">
+                        <span class="text-[color:var(--tpdl-accent-ink)]">✓ <span x-text="s"></span></span>
+                      </template>
+                      <template x-for="iss in pipeline.lastRun.results[fmt.id].review.issues" :key="iss">
+                        <span class="text-amber-700">⚠ <span x-text="iss"></span></span>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="pipeline.lastRun.results[fmt.id]?.content">
+                  <pre class="text-xs leading-relaxed whitespace-pre-wrap font-sans text-ink bg-bg-2 p-4 rounded-lg overflow-auto max-h-80"
+                       x-text="pipeline.lastRun.results[fmt.id].content"></pre>
+                </template>
+                <template x-if="pipeline.lastRun.results[fmt.id]?.error">
+                  <p class="text-xs text-red-600" x-text="pipeline.lastRun.results[fmt.id].error"></p>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- Run history -->
+      <div class="tpdl-card overflow-hidden">
+        <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+          <h3 class="font-semibold text-sm">Pipeline history</h3>
+          <button @click="loadPipelineHistory()" class="tpdl-btn tpdl-btn--ghost text-xs">↺ Refresh</button>
+        </div>
+        <div class="divide-y divide-line">
+          <template x-if="pipeline.history.length === 0">
+            <div class="px-6 py-10 text-center text-sm text-ink-3">No runs yet. Click "Run pipeline" above.</div>
+          </template>
+          <template x-for="run in pipeline.history" :key="run.id">
+            <div class="px-6 py-3 flex items-center gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium truncate" x-text="run.subject"></div>
+                <div class="text-xs text-ink-3 mt-0.5">
+                  <span x-text="(run.formats || []).join(' · ')"></span>
+                  · <span x-text="run.created_at ? new Date(run.created_at).toLocaleDateString('en-GB') : ''"></span>
+                </div>
+              </div>
+              <span class="status-badge status-published">done</span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ============= CAROUSEL STUDIO ============= -->
+    <section x-show="!loading && section === 'carousel'">
+      <div class="flex items-start justify-between mb-1">
+        <h2 class="text-xl font-semibold">Carousel Studio</h2>
+        <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content"
+             class="w-10 h-10 rounded-full bg-bg-2">
+      </div>
+      <p class="text-sm text-ink-3 mb-6">
+        Brief Marc — he writes the content and Oliver shapes each format. Choose one or more formats, produced at the right depth.
+      </p>
+
+      <!-- Brief form -->
+      <div class="tpdl-card p-6 mb-6">
+        <div class="mb-4">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-2">Subject / Topic</label>
+          <input x-model="carousel.subject" type="text"
+                 placeholder="e.g. AI in medical education for pharma sales reps"
+                 class="w-full border border-line rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[color:var(--tpdl-accent-ink)] bg-white">
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-2">Context <span class="font-normal normal-case">(optional — sector, audience, angle)</span></label>
+          <textarea x-model="carousel.context" rows="2"
+                    placeholder="e.g. Focus on European pharma, medical education directors, data showing AI adoption gap"
+                    class="w-full border border-line rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[color:var(--tpdl-accent-ink)] bg-white resize-none"></textarea>
+        </div>
+
+        <div class="mb-5">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-3">Format(s) — select one or more</label>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <template x-for="fmt in carousel.formatOptions" :key="fmt.id">
+              <label class="relative flex flex-col gap-1.5 p-3 rounded-lg border cursor-pointer transition-all"
+                     :class="fmt.selected
+                       ? 'border-[color:var(--tpdl-accent-ink)] bg-[color:var(--tpdl-accent-soft)]'
+                       : 'border-line bg-bg-2 hover:border-ink-3'">
+                <input type="checkbox" x-model="fmt.selected" class="sr-only">
+                <span class="text-lg leading-none" x-text="fmt.icon"></span>
+                <span class="text-xs font-semibold" x-text="fmt.label"></span>
+                <span class="text-xs text-ink-3 leading-tight" x-text="fmt.hint"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <!-- Web search toggle -->
+        <div class="flex items-center gap-3 mb-5">
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <div class="relative">
+              <input type="checkbox" x-model="carousel.webSearch" class="sr-only peer">
+              <div class="w-9 h-5 rounded-full peer-checked:bg-[color:var(--tpdl-accent-ink)] bg-gray-300 transition-colors"></div>
+              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+            </div>
+            <span class="text-sm font-medium">🔍 Web Search</span>
+            <span class="text-xs text-ink-3">Iris searches the web for real data before Marc writes</span>
+          </label>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button @click="generateCarousel()"
+                  :disabled="carousel.generating || !carousel.subject.trim() || carousel.formatOptions.every(f => !f.selected)"
+                  class="tpdl-btn tpdl-btn--primary"
+                  :class="(carousel.generating || !carousel.subject.trim() || carousel.formatOptions.every(f => !f.selected)) ? 'opacity-50 cursor-not-allowed' : ''">
+            <span x-show="!carousel.generating">✦ Generate with Marc</span>
+            <span x-show="carousel.generating">Marc &amp; Oliver are working…</span>
+          </button>
+          <button x-show="carousel.results" @click="carousel.results = null; carousel.subject = ''; carousel.context = ''"
+                  class="tpdl-btn tpdl-btn--ghost text-xs">
+            ↺ New brief
+          </button>
+        </div>
+
+        <template x-if="carousel.error">
+          <p class="mt-3 text-xs text-red-600" x-text="carousel.error"></p>
+        </template>
+      </div>
+
+      <!-- Results -->
+      <template x-if="carousel.results">
+        <div class="space-y-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs text-ink-3">Generated for:</span>
+            <span class="font-medium text-sm" x-text="carousel.results.subject"></span>
+          </div>
+
+          <template x-for="fmt in carousel.formatOptions.filter(f => f.selected)" :key="fmt.id">
+            <div class="tpdl-card overflow-hidden">
+              <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span x-text="fmt.icon"></span>
+                  <h3 class="font-semibold text-sm" x-text="fmt.label"></h3>
+                  <template x-if="carousel.results.results[fmt.id] && carousel.results.results[fmt.id].tokens">
+                    <span class="text-xs text-ink-3"
+                          x-text="`${carousel.results.results[fmt.id].tokens} tokens`"></span>
+                  </template>
+                </div>
+                <div class="flex gap-2 flex-wrap items-center">
+                  <template x-if="carousel.results.results[fmt.id]?.review">
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full"
+                          :style="scoreBadgeStyle(carousel.results.results[fmt.id].review.score)"
+                          :title="carousel.results.results[fmt.id].review.verdict"
+                          x-text="`⭐ ${carousel.results.results[fmt.id].review.score}/10`"></span>
+                  </template>
+                  <template x-if="carousel.results.search_enriched">
+                    <span class="tpdl-badge tpdl-badge--outline text-xs">🔍 Web-enriched</span>
+                  </template>
+                  <button @click="copyContent(fmt.id)"
+                          class="tpdl-btn tpdl-btn--outline text-xs">
+                    ⎘ Copy
+                  </button>
+                  <button @click="downloadContent(fmt.id, carousel.results.subject)"
+                          class="tpdl-btn tpdl-btn--outline text-xs">
+                    ↓ .txt
+                  </button>
+                  <button @click="exportPDF(fmt.id)"
+                          :disabled="carousel.exportingPdf[fmt.id]"
+                          class="tpdl-btn tpdl-btn--primary text-xs"
+                          :class="carousel.exportingPdf[fmt.id] ? 'opacity-50 cursor-not-allowed' : ''">
+                    <span x-show="!carousel.exportingPdf[fmt.id]">↓ PDF</span>
+                    <span x-show="carousel.exportingPdf[fmt.id]">Generating…</span>
+                  </button>
+                </div>
+              </div>
+              <div class="px-6 py-4">
+                <template x-if="carousel.results.results[fmt.id] && carousel.results.results[fmt.id].error">
+                  <p class="text-xs text-red-600" x-text="carousel.results.results[fmt.id].error"></p>
+                </template>
+
+                <!-- Reviewer verdict -->
+                <template x-if="carousel.results.results[fmt.id]?.review">
+                  <div class="mb-3 p-3 rounded-lg border border-line bg-white text-xs space-y-1.5">
+                    <p class="text-ink-2 italic" x-text="carousel.results.results[fmt.id].review.verdict"></p>
+                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                      <template x-for="s in carousel.results.results[fmt.id].review.strengths" :key="s">
+                        <span class="text-[color:var(--tpdl-accent-ink)]">✓ <span x-text="s"></span></span>
+                      </template>
+                      <template x-for="iss in carousel.results.results[fmt.id].review.issues" :key="iss">
+                        <span class="text-amber-700">⚠ <span x-text="iss"></span></span>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <template x-if="carousel.results.results[fmt.id] && carousel.results.results[fmt.id].content">
+                  <pre class="text-xs leading-relaxed whitespace-pre-wrap font-sans text-ink bg-bg-2 p-4 rounded-lg overflow-auto max-h-96"
+                       x-text="carousel.results.results[fmt.id].content"></pre>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+
+    </section>
+
+    <!-- ============= NEWSLETTER ============= -->
+    <section x-show="!loading && section === 'newsletter'">
+      <h2 class="text-xl font-semibold mb-1">Newsletter</h2>
+      <p class="text-sm text-ink-3 mb-6">Editorial calendar — 1 edition per month. Build a community, generate future clients.</p>
+
+      <!-- KPIs -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Editions planned</div>
+          <div class="text-3xl font-semibold mt-1" x-text="newsletter.editions.length"></div>
+        </div>
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Next edition</div>
+          <div class="text-lg font-semibold mt-1" x-text="newsletter.nextEdition ? formatDate(newsletter.nextEdition.date) : '—'"></div>
+        </div>
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">In draft</div>
+          <div class="text-3xl font-semibold mt-1" x-text="newsletter.editions.filter(e => e.status === 'draft').length"></div>
+        </div>
+        <div class="tpdl-card p-5">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Published</div>
+          <div class="text-3xl font-semibold mt-1" x-text="newsletter.editions.filter(e => e.status === 'published').length"></div>
+        </div>
+      </div>
+
+      <!-- Season tabs -->
+      <div class="flex items-center gap-2 mb-4 flex-wrap">
+        <template x-for="season in newsletter.seasons" :key="season.id">
+          <button
+            @click="newsletter.activeSeason = season.id"
+            :class="newsletter.activeSeason === season.id
+              ? 'px-4 py-1.5 rounded-full text-sm font-medium bg-[color:var(--tpdl-dark-ink)] text-white'
+              : 'px-4 py-1.5 rounded-full text-sm font-medium bg-bg-2 text-ink-2 hover:bg-bg-3'"
+            x-text="season.label">
+          </button>
+        </template>
+      </div>
+
+      <!-- Calendar grid -->
+      <div class="tpdl-card overflow-hidden mb-6">
+        <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+          <div>
+            <h3 class="font-semibold text-sm">Editorial calendar</h3>
+            <span class="text-xs text-ink-3">Click an edition, then ✎ Edit to change title, date or status</span>
+          </div>
+          <button @click="addEdition()" class="tpdl-btn tpdl-btn--outline text-xs">+ New edition</button>
+        </div>
+
+        <template x-if="newsletter.error">
+          <div class="px-6 py-2 bg-red-50 border-b border-red-200 text-red-700 text-xs" x-text="newsletter.error"></div>
+        </template>
+
+        <div class="divide-y divide-line">
+          <template x-for="ed in newsletter.editions.filter(e => e.season === newsletter.activeSeason)" :key="ed.id">
+            <div class="px-6 py-4 flex items-start gap-4 hover:bg-bg-2 cursor-pointer transition-colors"
+                 @click="newsletter.selected = newsletter.selected === ed.id ? null : ed.id">
+
+              <!-- Date column -->
+              <div class="shrink-0 w-16 text-center">
+                <div class="text-xs uppercase tracking-wider text-ink-3" x-text="edMonth(ed.date)"></div>
+                <div class="text-2xl font-semibold leading-tight" x-text="edDay(ed.date)"></div>
+              </div>
+
+              <!-- Edition number + title -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <span class="text-xs font-mono text-ink-3" x-text="`#${String(ed.number).padStart(2,'0')}`"></span>
+                  <span class="font-medium text-sm" x-text="ed.title"></span>
+                  <span class="tpdl-badge tpdl-badge--outline text-xs" x-text="ed.type"></span>
+                </div>
+                <p class="text-xs text-ink-3" x-text="ed.angle"></p>
+
+                <!-- Expanded detail -->
+                <template x-if="newsletter.selected === ed.id && newsletter.editing !== ed.id">
+                  <div class="mt-3 p-3 bg-bg-2 rounded text-xs space-y-2 text-ink-2">
+                    <div><span class="font-medium text-ink">Format :</span> <span x-text="ed.format"></span></div>
+                    <div><span class="font-medium text-ink">Season :</span> <span x-text="ed.seasonLabel"></span></div>
+                    <div class="flex gap-2 mt-2">
+                      <button @click.stop="startEditEdition(ed)"
+                              class="tpdl-btn tpdl-btn--outline text-xs">✎ Edit</button>
+                      <a :href="`/?drawer=marc&prefill=${encodeURIComponent('/content ' + ed.title)}`"
+                         @click.stop
+                         class="tpdl-btn tpdl-btn--outline text-xs">→ Brief Marc</a>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Edit form -->
+                <template x-if="newsletter.editing === ed.id">
+                  <div class="mt-3 p-4 bg-bg-2 rounded space-y-3" @click.stop>
+                    <div>
+                      <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-1">Title</label>
+                      <input x-model="newsletter.editDraft.title" type="text"
+                             class="w-full border border-line rounded px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[color:var(--tpdl-accent-ink)]">
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-1">Angle</label>
+                      <textarea x-model="newsletter.editDraft.angle" rows="2"
+                                class="w-full border border-line rounded px-3 py-1.5 text-sm bg-white resize-none focus:outline-none focus:border-[color:var(--tpdl-accent-ink)]"></textarea>
+                    </div>
+                    <div class="flex gap-3 flex-wrap">
+                      <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-1">Date</label>
+                        <input x-model="newsletter.editDraft.date" type="date"
+                               class="border border-line rounded px-3 py-1.5 text-sm bg-white focus:outline-none">
+                      </div>
+                      <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-1">Status</label>
+                        <select x-model="newsletter.editDraft.status"
+                                class="border border-line rounded px-3 py-1.5 text-sm bg-white focus:outline-none">
+                          <option value="planned">planned</option>
+                          <option value="draft">draft</option>
+                          <option value="review">review</option>
+                          <option value="published">published</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                      <button @click="saveEdition(ed.id)"
+                              :disabled="newsletter.saving"
+                              class="tpdl-btn tpdl-btn--primary text-xs"
+                              :class="newsletter.saving ? 'opacity-50' : ''">
+                        <span x-show="!newsletter.saving">✓ Save</span>
+                        <span x-show="newsletter.saving">Saving…</span>
+                      </button>
+                      <button @click="cancelEditEdition()" class="tpdl-btn tpdl-btn--ghost text-xs">Cancel</button>
+                      <button @click="deleteEdition(ed.id)"
+                              class="tpdl-btn tpdl-btn--ghost text-xs ml-auto"
+                              style="color: var(--tpdl-error)">🗑 Delete</button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Status -->
+              <div class="shrink-0 flex flex-col items-end gap-1">
+                <span class="status-badge" :class="`status-${ed.status}`" x-text="ed.status"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Monthly mini-calendar -->
+      <div class="tpdl-card p-6">
+        <h3 class="font-semibold text-sm mb-4">Month view — next 6 months</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <template x-for="month in newsletter.monthView" :key="month.label">
+            <div class="border border-line rounded-lg p-3">
+              <div class="text-xs font-semibold uppercase tracking-wider text-ink-3 mb-2" x-text="month.label"></div>
+              <template x-if="month.edition">
+                <div class="flex items-center gap-2">
+                  <div class="w-2 h-2 rounded-full shrink-0"
+                       :style="`background: ${statusColor(month.edition.status)}`"></div>
+                  <div>
+                    <div class="text-xs font-medium" x-text="`#${String(month.edition.number).padStart(2,'0')} · ${month.edition.title}`"></div>
+                    <div class="text-xs text-ink-3" x-text="formatDate(month.edition.date)"></div>
+                  </div>
+                </div>
+              </template>
+              <template x-if="!month.edition">
+                <div class="text-xs text-ink-3 italic">No edition this month</div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+</div>
+
+<script src="/static/js/marketing.js?v=2"></script>
+{% endblock %}

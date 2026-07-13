@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}The Pharma Data Lab — AI Team{% endblock %}</title>
+
+<!-- Space Grotesk (display) · Inter (body) · JetBrains Mono (labels & data) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script>
+  // Map Tailwind config to TPDL tokens so utility classes pick the right values
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink:       '#0a0a0a',
+          'ink-2':   '#5c5c5c',
+          'ink-3':   '#8a8a8a',
+          line:      '#ebebeb',
+          'line-2':  '#d4d4d2',
+          bg:        '#fafaf8',
+          'bg-2':    '#f3f3ef',
+          accent:    '#34D591',
+          'accent-soft': '#e8faf1',
+          dark:      '#094752',
+        },
+        fontFamily: {
+          sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          display: ['Space Grotesk', 'Inter', 'sans-serif'],
+          mono: ['JetBrains Mono', 'SF Mono', 'Menlo', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+<script defer src="/static/js/auth.js?v=3"></script>
+<script defer src="/static/js/realtime.js"></script>
+<link rel="stylesheet" href="/static/css/custom.css?v=2">
+
+{% block head %}{% endblock %}
+</head>
+<body class="bg-bg text-ink min-h-screen antialiased">
+
+<header class="border-b border-line bg-bg/90 backdrop-blur-md sticky top-0 z-40">
+  <div class="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-3 flex-wrap">
+    <a href="/" class="flex items-center gap-2.5 text-ink hover:opacity-90 transition-opacity shrink-0">
+      <span class="tpdl-logo-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+      <span class="text-lg font-semibold tracking-tight font-display whitespace-nowrap">The Pharma Data Lab</span>
+      <span class="hidden sm:inline text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full whitespace-nowrap"
+            style="background: var(--tpdl-accent-soft); color: var(--tpdl-accent-ink)">AI Team</span>
+    </a>
+    <nav class="flex items-center gap-1 flex-wrap">
+      <a href="/" class="tpdl-nav-link {% if active_page == 'office' %}is-active{% endif %}">Home</a>
+      <a href="/today" class="tpdl-nav-link {% if active_page == 'today' %}is-active{% endif %}">Today</a>
+      <a href="/intel" class="tpdl-nav-link {% if active_page == 'intel' %}is-active{% endif %}">Sales</a>
+      <a href="/marketing" class="tpdl-nav-link {% if active_page == 'marketing' %}is-active{% endif %}">Marketing</a>
+      <a href="/contacts" class="tpdl-nav-link {% if active_page == 'contacts' %}is-active{% endif %}">Contacts</a>
+      <a href="/performance" class="tpdl-nav-link {% if active_page == 'performance' %}is-active{% endif %}">Performance</a>
+      <a href="/data" class="tpdl-nav-link {% if active_page == 'data' %}is-active{% endif %}">Data</a>
+
+      <!-- User badge — only shown when auth gate is ON.
+           In public-demo mode the header stays clean. -->
+      <template x-if="$store.me?.loaded && $store.me?.authGate">
+        <div class="ml-3 pl-3 border-l border-line" x-data="userBadge()">
+          <template x-if="me">
+            <div class="flex items-center gap-2">
+              <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${me.avatar_seed}`"
+                   class="w-8 h-8 rounded-full bg-bg-2 border border-line" :alt="me.display_name">
+              <span class="text-sm font-medium" x-text="me.display_name"></span>
+              <button @click="logout"
+                      class="text-xs text-ink-3 hover:text-ink ml-1"
+                      title="Sign out">↩</button>
+            </div>
+          </template>
+          <template x-if="!me">
+            <a href="/login" class="tpdl-nav-link">Sign in</a>
+          </template>
+        </div>
+      </template>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-8 py-12">
+{% block content %}{% endblock %}
+</main>
+
+<footer class="mt-20 border-t border-line bg-bg/60">
+  <div class="max-w-7xl mx-auto px-8 py-8 flex items-center justify-between text-xs text-ink-3 font-mono">
+    <span class="flex items-center gap-2">
+      <span class="tpdl-status-dot tpdl-status-dot--online w-1.5 h-1.5"></span>
+      The Pharma Data Lab · AI Team · v2.0
+    </span>
+    <span>Powered by Claude</span>
+  </div>
+</footer>
+
+</body>
+</html>

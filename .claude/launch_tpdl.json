@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tpdl-proxy",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/bettydeclety/Documents/TPDL/claude code dashboard' && exec .venv/bin/python -c 'import http.server,socketserver; h=type(\"\",(http.server.BaseHTTPRequestHandler,),{\"do_GET\":lambda s: (s.send_response(302), s.send_header(\"Location\",\"https://www.thepharmadatalab.com\"), s.end_headers())}); socketserver.TCPServer((\"\",8001), h).serve_forever()'"
+      ],
+      "port": 8001
+    }
+  ]
+}
