@@ -21,6 +21,10 @@ def chat(agent_id: str, req: ChatRequest, db: Session = Depends(get_db)) -> dict
 
     try:
         return agent.respond(req.conversation_id, req.message)
+    except AgentNotFoundError as exc:
+        # respond() → _get_or_create_conversation raises this for a stale/foreign
+        # conversation_id — a normal client situation, so 404 not 500.
+        raise HTTPException(status_code=404, detail=str(exc))
     except AgentResponseError as exc:
         logger.error("[%s] response failed: %s", agent_id, exc)
         raise HTTPException(

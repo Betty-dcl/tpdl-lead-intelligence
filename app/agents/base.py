@@ -14,7 +14,12 @@ logger = logging.getLogger(__name__)
 
 ROUTE_RE = re.compile(r"\[ROUTE_TO:\s*([a-zA-Z0-9_-]+)\s*\]", re.IGNORECASE)
 MAX_HISTORY_MESSAGES = 30
-DEFAULT_MAX_TOKENS = 1024
+# Agents produce full briefs, ranked lists, outreach drafts and long-form content
+# (Oliver's A4 article, Marc's content pieces). 1024 truncated these mid-output.
+# 8192 covers every agent's deliverable and stays well under the non-streaming
+# HTTP-timeout ceiling (~16k). max_tokens is a cap, not a target — no extra cost
+# for short replies (e.g. Alex's 2-3 sentence routing).
+DEFAULT_MAX_TOKENS = 8192
 
 _anthropic_client: Anthropic | None = None
 _async_anthropic_client: AsyncAnthropic | None = None
@@ -206,12 +211,18 @@ class BaseAgent:
             .order_by(Message.id.asc())
             .all()
         )
-        rows = rows[-MAX_HISTORY_MESSAGES:]
-        return [
+        history = [
             {"role": m.role, "content": m.content}
-            for m in rows
+            for m in rows[-MAX_HISTORY_MESSAGES:]
             if m.role in ("user", "assistant")
         ]
+        # The Anthropic API requires the first message to be `user`. Trimming to
+        # the last N can land the window on an assistant turn (odd message count
+        # past the cap) → a 400. Drop any leading assistant turns so the window
+        # always opens on a user message.
+        while history and history[0]["role"] != "user":
+            history.pop(0)
+        return history
 
     def _call_claude(self, messages: list[dict]) -> tuple[str, dict]:
         if not settings.anthropic_api_key or settings.anthropic_api_key == "not-set":

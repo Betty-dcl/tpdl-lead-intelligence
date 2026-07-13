@@ -59,9 +59,9 @@ app = FastAPI(title="TPDL — AI Team", version="2.0.0", lifespan=lifespan)
 # ---------------------------------------------------------------------------
 
 PUBLIC_PREFIXES = (
-    "/static/", "/favicon", "/healthz",
+    "/static", "/healthz",
     "/login", "/api/login", "/api/me", "/api/logout",
-    "/api/agents", "/api/intel/stats", "/api/marketing/",
+    "/api/agents", "/api/intel/stats", "/api/marketing",
 )
 PUBLIC_EXACT = {"/", "/marketing"}
 
@@ -69,7 +69,11 @@ PUBLIC_EXACT = {"/", "/marketing"}
 def _is_public(path: str) -> bool:
     if path in PUBLIC_EXACT:
         return True
-    return any(path == p.rstrip("/") or path.startswith(p) for p in PUBLIC_PREFIXES)
+    if path.startswith("/favicon"):          # /favicon.ico, /favicon-32.png, …
+        return True
+    # Boundary match: a prefix matches only the exact path or a segment beneath
+    # it, so "/api/me" no longer whitelists "/api/memory" (auth-bypass fix).
+    return any(path == p or path.startswith(p + "/") for p in PUBLIC_PREFIXES)
 
 
 @app.middleware("http")

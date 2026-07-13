@@ -73,7 +73,8 @@ class IrisAgent(BaseAgent):
             }
 
         # ── /trends [sector?]  and  /themes ──────────────────────────────
-        if low.startswith("/trends") or low == "/themes" or low.startswith("/themes"):
+        if low.startswith("/trends") or low.startswith("/themes"):
+            cmd = "/themes" if low.startswith("/themes") else "/trends"
             parts = text.split(maxsplit=1)
             sector = parts[1].strip() if len(parts) > 1 else "pharma medtech dental"
             ctx = _research(f"{sector} industry trends news 2026")
@@ -81,7 +82,7 @@ class IrisAgent(BaseAgent):
                          "(Live web search returned nothing — work from known industry context, "
                          "do not fabricate sources.)\n\n")
             augmented = (
-                f"The user ran `/trends {sector}`. {ctx_block}"
+                f"The user ran `{cmd} {sector}`. {ctx_block}"
                 f"As Iris, identify the most interesting THEMES of the week for {sector} and "
                 f"**score each 0-10** on content-worthiness for TPDL's audience (relevance × "
                 f"timeliness × differentiation). Return a ranked shortlist: theme — score — "

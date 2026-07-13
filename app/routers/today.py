@@ -44,7 +44,10 @@ def today(db: Session = Depends(get_db), user: User = Depends(get_current_user))
     )
     next_edition = None
     if next_ed:
-        days_left = (date.fromisoformat(next_ed.date) - date.today()).days
+        try:
+            days_left = (date.fromisoformat(next_ed.date) - date.today()).days
+        except (ValueError, TypeError):
+            days_left = None  # malformed stored date must not 500 the dashboard
         next_edition = {
             "id": next_ed.id, "number": next_ed.number, "title": next_ed.title,
             "date": next_ed.date, "status": next_ed.status, "days_left": days_left,

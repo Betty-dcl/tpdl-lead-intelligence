@@ -78,10 +78,10 @@ From the full batch, hand-pick the **5 most strategic contacts** and route them 
 
 You pass the batch **minus the Premium 5** to **Julie**, fully tagged: function, seniority, geo, language, CRM segment — plus the company's lead signal, so her message is anchored in why this person is worth contacting now.
 
-# 11. Engine status (be honest about what persists)
+# 11. Engine status (be honest about what's live)
 
-- Live people pulls need `APOLLO_API_KEY` (missing today).
-- The `Contact` table currently stores: name, title, email, LinkedIn, country, language, lunch_campaign, premium, status. The three deeper axes — **function, seniority, CRM segment** — are your analytical framework today but are **not yet persisted fields**; storing them per contact needs a small extension of the `Contact` model + the radar tooling (a workflow task, roadmap Step 3). Until then, you present them in-chat; you don't claim they're saved.
+- The `Contact` table stores the **full tag set** — name, title, email, LinkedIn, country, language, lunch_campaign, **function, seniority, CRM segment**, premium, status. The three segmentation axes are **persisted** (since 2026-07-12: the `Contact` model + `app/tools/segmentation.py`); they're derived automatically from each contact's title + the company's score at pull time, and deduped on re-run.
+- The one thing still missing is the **live data itself**: `APOLLO_API_KEY` is not set, so no real people are pulled yet. Until then you run the radars on real company locations and describe the persona set you'd fetch — never inventing a contact. Downstream *consumption* of the stored segmentation (Julie tailoring an email per contact) lands once contacts actually exist.
 
 # Style
 

@@ -88,14 +88,25 @@ class InesAgent(BaseAgent):
             else:
                 fetched = apollo.fetch_contacts(c.name)
                 with SessionLocal() as db:
+                    # Dedup on re-run: one row per (company, person). Skip anyone
+                    # already stored for this company so /contacts is idempotent
+                    # and doesn't double rows (or clobber a Premium tag) on re-pull.
+                    existing = {
+                        n.lower() for (n,) in db.query(Contact.full_name)
+                        .filter(Contact.company_name == c.name).all()
+                    }
+                    added = 0
                     for p in fetched:
+                        full_name = p.get("full_name", "Unknown")
+                        if full_name.lower() in existing:
+                            continue
                         title = p.get("title")
-                        r = apply_radars(p.get("full_name"), p.get("location") or c.location)
+                        r = apply_radars(full_name, p.get("location") or c.location)
                         fn = classify_function(title)
                         seniority = classify_seniority(title)
                         db.add(Contact(
                             company_name=c.name,
-                            full_name=p.get("full_name", "Unknown"),
+                            full_name=full_name,
                             title=title,
                             email=p.get("email"),
                             linkedin_url=p.get("linkedin_url"),
@@ -107,11 +118,14 @@ class InesAgent(BaseAgent):
                             seniority=seniority,
                             crm_segment=initial_crm_segment(c.outreach_eligible, fn, seniority),
                         ))
+                        existing.add(full_name.lower())
+                        added += 1
                     db.commit()
                 augmented = (
-                    f"The user ran `/contacts {c.name}`. Pulled and tagged {len(fetched)} "
-                    f"decision-maker(s) via Apollo, each with the full 5-axis segmentation "
-                    f"(function · seniority · geo · language · CRM segment).\n\n{company_line}\n\n"
+                    f"The user ran `/contacts {c.name}`. Apollo returned {len(fetched)} "
+                    f"decision-maker(s); stored {added} new (deduped on re-run), each tagged "
+                    f"with the full 5-axis segmentation (function · seniority · geo · language · "
+                    f"CRM segment).\n\n{company_line}\n\n"
                     f"As Inès, summarise who was found with their function/seniority and CRM "
                     f"segment (2 = active pursuit, 3 = nurture; segment 1 is deferred to CRM "
                     f"confirmation), their radar tags, and which to prioritise. Remind the user "

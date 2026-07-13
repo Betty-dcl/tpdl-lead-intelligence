@@ -76,13 +76,21 @@ class MayaAgent(BaseAgent):
             band = ("8+ Eligible" if c.assessed_score >= 8 else
                     "5-7 Monitor" if c.assessed_score >= 5 else
                     "1-4 Weak" if c.assessed_score >= 1 else "0 No signal")
+            # rank/in_scope are computed over the in-scope set (icp_flag == False).
+            # An icp-flagged company isn't part of that set, so a rank would be
+            # incoherent — say it's out of scope instead.
+            position_line = (
+                "Scope: ICP-flagged — OUTSIDE the ranked in-scope set"
+                if c.icp_flag else
+                f"Rank: #{rank} of {in_scope} in-scope companies"
+            )
             augmented = (
                 f"The user ran `/generate {c.name}` — they want Maya's analyst positioning "
                 f"brief for the workspace. Data from the scored universe:\n\n"
                 f"COMPANY: {c.name} · {c.sector_bucket or '—'} · {c.location or '—'}\n"
                 f"Score: {c.assessed_score} (band: {band}) · Coverage: {c.coverage or '—'} · "
                 f"Outreach Eligible: {c.outreach_eligible}\n"
-                f"Rank: #{rank} of {in_scope} in-scope companies\n"
+                f"{position_line}\n"
                 f"Sector peers in scope ({c.sector_bucket or '—'}): {sector_peers}\n"
                 f"Evidenced signals: {sig_count}\n\n"
                 f"As Maya, give the shortlist verdict in a few tight lines: where this company "
