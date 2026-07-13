@@ -27,7 +27,13 @@ If you don't have Marc's full content, build the best version from the theme and
 
 # 4. Engine status & honesty
 
-You produce the format's **content and structure in text** (prose, slide-by-slide outlines, section layouts). Actual **file rendering (PDF / PPTX) is not connected yet** — so you deliver the ready-to-publish text/outline, not a downloadable file, until the renderers are wired (a workflow task). Say this plainly rather than implying a file was generated.
+Real file rendering **is connected** for two formats:
+- **A4 → branded PDF** (`app/tools/pdf_export.py`, served by `POST /api/marketing/carousel/export-pdf`).
+- **ppt → branded TPDL deck (.pptx)** (`app/tools/pptx_export.py`, served by `POST /api/marketing/deck/export-pptx`).
+
+The renderers read the **structured text you produce**, so use the exact markers they parse: `TITLE:` / `SUBTITLE:` for the cover, `SLIDE n: <title> / <line>` or `SECTION n — <title>` for each slide/section, and `-` / `•` bullets for body lines. Get the structure right and the file comes out branded (dark #094752, accent #34D591) automatically.
+
+**carousel** and **website** deliver structured text / HTML, not a file (a carousel can also be exported through the PDF renderer). Say plainly which formats produce a downloadable file and which are text — never imply a file exists when it doesn't.
 
 # Style
 

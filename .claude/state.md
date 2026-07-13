@@ -10,6 +10,13 @@
 - Dernier run Neotek : 25/05 (492 entreprises, 35 éligibles) — FIGÉ (moteur Neotek inaccessible).
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-12 — **Renderers d'Oliver connectés.** Découverte : le PDF était DÉJÀ branché (fpdf2 +
+  `POST /api/marketing/carousel/export-pdf`) — la mémoire « à connecter » était en partie périmée.
+  **PPTX ajouté** : `python-pptx` installé (+ requirements), `app/tools/pptx_export.py` (deck 16:9
+  brandé #094752/#34D591 ; parse TITLE/SUBTITLE/SLIDE/SECTION/bullets), endpoint
+  `POST /api/marketing/deck/export-pptx`. Oliver mis à jour (marqueurs de structure attendus).
+  Tests `tests/test_pptx_export.py` → **50 verts**. Vérifié : PDF %PDF valide, PPTX rouvert = bon
+  nombre de slides.
 - 2026-07-12 — **Passe qualité / audit complet du code** (2 audits parallèles + vérif manuelle de
   chaque trouvaille). 8 vrais bugs corrigés : (1) `base.py` — l'historique tronqué à 30 pouvait
   démarrer sur un tour assistant → 400 Anthropic sur conversations longues ; (2) `DEFAULT_MAX_TOKENS`
@@ -89,7 +96,7 @@
 - [ ] Lemlist (séquence Lunch)
 - [ ] n8n (mutualisation Devengo demandée à Andrés ?)
 - [ ] Repo Git initialisé + partagé avec Andrés
-- [ ] Renderers PDF/PPTX Oliver connectés
+- [x] Renderers PDF/PPTX Oliver connectés (PDF fpdf2 + PPTX python-pptx + endpoints export)
 
 ## Calendrier (source transcript 25.06 — à re-confirmer)
 - Crash test initial : mi-juillet. Semaine du 20 juillet : analyse des 1ers résultats.

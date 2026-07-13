@@ -112,7 +112,7 @@ Maya `/recurring` reste AVEUGLE tant qu'il n'y a qu'un seul run (2e run bloqué 
 - Iris — Recherche/scoring sujets marketing. Outil cible : Serper (← DuckDuckGo).
 - Marc — Architecte de contenu. Dépend du Brand DNA.
 - Oliver — Producteur de formats (A4/carousel/PPT/web), branding #094752 / #34D591.
-  Renderers PDF/PPTX À CONNECTER.
+  Renderers PDF (fpdf2) + PPTX (python-pptx) CONNECTÉS (endpoints export dans `marketing.py`).
 - Andrés — Humain (fondateur). Voix des messages. Premium 5 = 5 comptes gérés en direct.
 
 ## FICHIERS CLÉS DU REPO (corrigés)

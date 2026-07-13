@@ -28,6 +28,12 @@ class CarouselExportPDFRequest(BaseModel):
     format_label: Optional[str] = "TPDL Report"
 
 
+class DeckExportPPTXRequest(BaseModel):
+    subject: str
+    content: str
+    format_label: Optional[str] = "TPDL Deck"
+
+
 FORMAT_PROMPTS = {
     "linkedin": (
         "Generate a LinkedIn carousel (6-8 slides) on the subject below.\n"
@@ -602,5 +608,35 @@ def export_carousel_pdf(req: CarouselExportPDFRequest) -> object:
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/deck/export-pptx")
+def export_deck_pptx(req: DeckExportPPTXRequest) -> object:
+    """Render Oliver's slide outline into a branded TPDL .pptx deck."""
+    from fastapi.responses import Response
+    from app.tools.pptx_export import generate_pptx
+
+    if not req.content.strip():
+        raise HTTPException(status_code=422, detail="Content cannot be empty.")
+
+    try:
+        pptx_bytes = generate_pptx(
+            subject=req.subject,
+            content=req.content,
+            format_label=req.format_label or "TPDL Deck",
+        )
+    except Exception as exc:
+        logger.exception("[pptx_export] generation failed")
+        raise HTTPException(status_code=500, detail=f"PPTX generation failed: {exc}")
+
+    slug = req.subject[:40].replace(" ", "_").replace("/", "-")
+    filename = f"TPDL_{slug}.pptx"
+    return Response(
+        content=pptx_bytes,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        ),
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
