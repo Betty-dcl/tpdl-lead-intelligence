@@ -65,6 +65,15 @@ def today_page(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/credits", response_class=HTMLResponse)
+def credits_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "credits.html",
+        {"active_page": "credits"},
+    )
+
+
 @router.get("/data", response_class=HTMLResponse)
 def data_view(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(

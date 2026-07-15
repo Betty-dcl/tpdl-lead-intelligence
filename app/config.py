@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     perplexity_api_key: str = ""   # Perplexity Sonar (financial press: M&A/PE)
     serpapi_key: str = ""          # SerpAPI (Google News + Google Jobs)
     apify_token: str = ""          # Apify / Wappalyzer actor (tech-stack scan)
+    firecrawl_api_key: str = ""    # Firecrawl (IR/website page fetch)
 
     # ── Inès — Apollo.io (decision-maker contacts) ──────────────────────
     apollo_api_key: str = ""       # Apollo people/search — CEO/CTO/CFO + LinkedIn

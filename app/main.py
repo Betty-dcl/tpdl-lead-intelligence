@@ -11,7 +11,7 @@ from app.auth import AUTH_GATE_ENABLED, SESSION_SECRET
 from app.config import STATIC_DIR, TEMPLATES_DIR
 from app.database import init_db
 from app.routers import (
-    agents, auth, briefs, chat, companies, contacts, conversations, intel,
+    agents, auth, briefs, chat, companies, contacts, conversations, credits, intel,
     marketing, memory_api, onedrive, pages, performance, pipeline, realtime, today, veille,
 )
 
@@ -127,6 +127,7 @@ app.include_router(companies.router)
 app.include_router(performance.router)
 app.include_router(pipeline.router)
 app.include_router(memory_api.router)
+app.include_router(credits.router)
 app.include_router(veille.router)
 app.include_router(realtime.router)
 app.include_router(onedrive.router)

@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}Usage & Credits — TPDL{% endblock %}
+
+{% block head %}
+<style>
+  .usage-bar {
+    height: 6px; border-radius: 9999px;
+    background: var(--tpdl-accent-soft); overflow: hidden;
+  }
+  .usage-bar > div { height: 100%; border-radius: 9999px; transition: width .4s ease; }
+  .provider-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.7rem; font-weight: 600; letter-spacing: .04em;
+    padding: 3px 10px; border-radius: 9999px; text-transform: uppercase;
+  }
+  .chip-live   { background: rgba(52, 213, 145, .14); color: #0c7a4d; }
+  .chip-local  { background: rgba(9, 71, 82, .10);  color: var(--tpdl-dark-ink); }
+  .chip-off    { background: rgba(120, 120, 120, .12); color: var(--tpdl-text-muted); }
+  .chip-error  { background: rgba(220, 80, 80, .12);  color: #b23c3c; }
+  .big-number  { font-variant-numeric: tabular-nums; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="creditsPage()" x-init="init()">
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <section class="mb-10">
+    <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Subscriptions / API</p>
+    <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-2xl leading-tight">
+      Usage &amp; credits
+    </h1>
+    <p class="text-ink-2 max-w-2xl">
+      One card per subscription powering the team and the Lead Intelligence engine.
+      Live balances are read from each provider's <em>account</em> endpoint — these
+      calls are free and consume no credits. Claude usage is tallied locally from
+      the agents' own call logs.
+    </p>
+
+    <!-- ── Summary row ──────────────────────────────────────────────── -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Configured</div>
+        <div class="text-3xl font-semibold big-number">
+          <span x-text="summary.configured ?? '–'"></span><span class="text-ink-3 text-xl font-normal">/<span x-text="summary.total ?? '–'"></span></span>
+        </div>
+      </div>
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">API errors</div>
+        <div class="text-3xl font-semibold big-number"
+             :class="(summary.errors ?? 0) > 0 ? 'text-red-600' : ''"
+             x-text="summary.errors ?? '–'"></div>
+      </div>
+      <div class="tpdl-card p-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Claude spend (est.)</div>
+        <div class="text-3xl font-semibold big-number">
+          <span x-text="claudeSpend()"></span>
+        </div>
+        <div class="text-[11px] text-ink-3 mt-1">local tally · list price</div>
+      </div>
+      <div class="tpdl-card p-5 flex flex-col justify-between">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Checked</div>
+        <div class="text-sm text-ink-2" x-text="fetchedAt || '–'"></div>
+        <button @click="refresh()"
+                class="mt-2 text-xs font-semibold text-white rounded-md px-3 py-1.5 self-start transition-opacity hover:opacity-90"
+                style="background: var(--tpdl-dark-ink)"
+                :disabled="loading"
+                x-text="loading ? 'Refreshing…' : 'Refresh'"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Provider cards ─────────────────────────────────────────────── -->
+  <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-16">
+    <template x-for="p in panels" :key="p.provider">
+      <div class="tpdl-card p-6 flex flex-col" :class="!p.configured ? 'opacity-70' : ''">
+
+        <!-- Card head -->
+        <div class="flex items-start justify-between mb-1">
+          <div class="text-lg font-semibold" x-text="p.label"></div>
+          <span class="provider-chip" :class="chipClass(p)" x-text="chipLabel(p)"></span>
+        </div>
+        <p class="text-xs text-ink-3 mb-4 leading-relaxed" x-text="p.role"></p>
+
+        <!-- Numbers -->
+        <template x-if="p.configured && p.ok">
+          <div class="mb-3">
+            <div class="flex items-baseline gap-2">
+              <span class="text-3xl font-semibold big-number"
+                    x-text="headline(p)"></span>
+              <span class="text-xs text-ink-3" x-text="p.unit"></span>
+            </div>
+            <div class="text-xs text-ink-3 mt-0.5" x-text="subline(p)"></div>
+
+            <!-- Progress bar (only when both used & limit exist) -->
+            <template x-if="pct(p) !== null">
+              <div class="mt-3">
+                <div class="usage-bar">
+                  <div :style="'width:' + pct(p) + '%; background:' + barColor(p)"></div>
+                </div>
+                <div class="flex justify-between text-[11px] text-ink-3 mt-1">
+                  <span x-text="'used ' + fmt(p.used)"></span>
+                  <span x-text="pct(p) + '%'"></span>
+                  <span x-text="'limit ' + fmt(p.limit)"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- Not configured -->
+        <template x-if="!p.configured">
+          <div class="mb-3 text-sm text-ink-3">
+            Key absent from <code class="text-xs">.env</code> — this engine stays offline.
+          </div>
+        </template>
+
+        <!-- Error -->
+        <template x-if="p.configured && !p.ok && p.error">
+          <div class="mb-3 text-xs text-red-700 bg-red-50 border border-red-100 rounded-md p-2.5"
+               x-text="p.error"></div>
+        </template>
+
+        <!-- Detail + footer -->
+        <p class="text-xs text-ink-2 leading-relaxed mb-4" x-show="p.detail" x-text="p.detail"></p>
+        <div class="mt-auto pt-3 border-t" style="border-color: var(--tpdl-border)">
+          <a :href="p.dashboard_url" target="_blank" rel="noopener"
+             class="text-xs font-semibold hover:underline" style="color: var(--tpdl-dark-ink)">
+            Open provider dashboard ↗
+          </a>
+        </div>
+      </div>
+    </template>
+
+    <!-- Loading skeletons -->
+    <template x-if="loading && panels.length === 0">
+      <div class="tpdl-card p-6 animate-pulse h-48 md:col-span-2 xl:col-span-3
+                  flex items-center justify-center text-ink-3 text-sm">
+        Querying provider account endpoints…
+      </div>
+    </template>
+  </section>
+
+  <!-- ── Claude spend by agent ──────────────────────────────────────── -->
+  <section class="mb-12" x-show="byAgent().length > 0">
+    <h2 class="text-xl font-semibold mb-1">Claude spend by agent</h2>
+    <p class="text-sm text-ink-3 mb-4">
+      Local tally from the agents' call logs — estimated at Opus 4.8 list price.
+    </p>
+    <div class="tpdl-card overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs uppercase tracking-wider text-ink-3 border-b"
+              style="border-color: var(--tpdl-border)">
+            <th class="px-5 py-3">Agent</th>
+            <th class="px-5 py-3 text-right">Calls</th>
+            <th class="px-5 py-3 text-right">Tokens in</th>
+            <th class="px-5 py-3 text-right">Tokens out</th>
+            <th class="px-5 py-3 text-right">Est. cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="a in byAgent()" :key="a.agent">
+            <tr class="border-b last:border-b-0" style="border-color: var(--tpdl-border)">
+              <td class="px-5 py-3 font-medium capitalize" x-text="a.agent"></td>
+              <td class="px-5 py-3 text-right big-number" x-text="fmt(a.calls)"></td>
+              <td class="px-5 py-3 text-right big-number" x-text="fmt(a.tokens_in)"></td>
+              <td class="px-5 py-3 text-right big-number" x-text="fmt(a.tokens_out)"></td>
+              <td class="px-5 py-3 text-right big-number font-semibold"
+                  x-text="'$' + a.cost"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Engine runs ────────────────────────────────────────────────── -->
+  <section class="mb-16">
+    <h2 class="text-xl font-semibold mb-1">Engine runs</h2>
+    <p class="text-sm text-ink-3 mb-4">
+      One row per scored_results import. Maya's <code>/recurring</code> unlocks
+      at 2+ runs — the rebuilt engine will add rows here.
+    </p>
+    <div class="tpdl-card overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs uppercase tracking-wider text-ink-3 border-b"
+              style="border-color: var(--tpdl-border)">
+            <th class="px-5 py-3">Run ID</th>
+            <th class="px-5 py-3">Run date</th>
+            <th class="px-5 py-3">Imported</th>
+            <th class="px-5 py-3 text-right">Companies</th>
+            <th class="px-5 py-3 text-right">Outreach eligible</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="r in runs" :key="r.run_id">
+            <tr class="border-b last:border-b-0" style="border-color: var(--tpdl-border)">
+              <td class="px-5 py-3 font-mono text-xs" x-text="r.run_id"></td>
+              <td class="px-5 py-3" x-text="dateOnly(r.run_date)"></td>
+              <td class="px-5 py-3" x-text="dateOnly(r.imported_at)"></td>
+              <td class="px-5 py-3 text-right big-number" x-text="fmt(r.companies)"></td>
+              <td class="px-5 py-3 text-right big-number font-semibold"
+                  x-text="fmt(r.eligible)"></td>
+            </tr>
+          </template>
+          <tr x-show="runs.length === 0">
+            <td colspan="5" class="px-5 py-6 text-center text-ink-3 text-sm">
+              No runs imported yet.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+function creditsPage() {
+  return {
+    panels: [],
+    summary: {},
+    runs: [],
+    loading: false,
+    fetchedAt: null,
+
+    async init() { await this.refresh(); },
+
+    async refresh() {
+      this.loading = true;
+      try {
+        const [credRes, runsRes] = await Promise.all([
+          fetch('/api/credits'),
+          fetch('/api/credits/runs'),
+        ]);
+        const data = await credRes.json();
+        this.panels = data.panels || [];
+        this.summary = data.summary || {};
+        this.runs = (await runsRes.json()).runs || [];
+        this.fetchedAt = new Date().toLocaleTimeString();
+      } catch (e) {
+        this.summary = { configured: '–', total: '–', errors: '–' };
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    byAgent() {
+      const a = this.panels.find(p => p.provider === 'anthropic');
+      return (a && a.by_agent) || [];
+    },
+    dateOnly(iso) { return iso ? String(iso).slice(0, 10) : '—'; },
+
+    chipLabel(p) {
+      if (!p.configured) return 'Not configured';
+      if (!p.ok) return 'Error';
+      if (p.provider === 'anthropic') return 'Local tally';
+      if (p.remaining !== null || p.limit !== null) return 'Live';
+      return 'Configured';
+    },
+    chipClass(p) {
+      if (!p.configured) return 'chip-off';
+      if (!p.ok) return 'chip-error';
+      if (p.provider === 'anthropic') return 'chip-local';
+      if (p.remaining !== null || p.limit !== null) return 'chip-live';
+      return 'chip-local';
+    },
+
+    headline(p) {
+      if (p.provider === 'anthropic') return p.used !== null ? '$' + this.fmt(p.used) : '—';
+      if (p.remaining !== null) return this.fmt(p.remaining);
+      if (p.used !== null) return this.fmt(p.used);
+      return '—';
+    },
+    subline(p) {
+      if (p.provider === 'anthropic') return p.plan || '';
+      if (p.remaining !== null) return 'remaining' + (p.plan ? ' · ' + p.plan : '');
+      return p.plan || '';
+    },
+
+    pct(p) {
+      if (p.used === null || p.limit === null || !p.limit) return null;
+      return Math.min(100, Math.round(100 * p.used / p.limit));
+    },
+    barColor(p) {
+      const v = this.pct(p);
+      if (v === null) return 'var(--tpdl-accent, #34D591)';
+      if (v >= 90) return '#d05050';
+      if (v >= 70) return '#e0a13c';
+      return '#34D591';
+    },
+    fmt(v) {
+      if (v === null || v === undefined) return '—';
+      return typeof v === 'number' ? v.toLocaleString('en-US') : v;
+    },
+    claudeSpend() {
+      const a = this.panels.find(p => p.provider === 'anthropic');
+      return a && a.used !== null && a.used !== undefined ? '$' + a.used : '–';
+    },
+  };
+}
+</script>
+{% endblock %}
