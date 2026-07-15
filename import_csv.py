@@ -10,9 +10,9 @@ Default path: data/csv/scored_results.csv
 """
 import argparse
 import csv
+import hashlib
 import logging
 import sys
-import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -138,7 +138,11 @@ def import_csv(path: Path) -> None:
         sys.exit(f"CSV not found: {path}")
 
     init_db()
-    run_id = uuid.uuid4().hex[:12]
+    # Content-derived run id: re-importing the SAME file is idempotent (same id →
+    # its snapshot already exists → skipped below), so Maya's /recurring never
+    # counts one dataset imported twice as a fabricated recurrence. A genuinely
+    # new run (different content, incl. a fresh run_date) hashes differently.
+    run_id = hashlib.sha1(path.read_bytes()).hexdigest()[:12]
     logger.info("Importing %s (run_id=%s)", path, run_id)
 
     created = 0
@@ -245,17 +249,25 @@ def import_csv(path: Path) -> None:
     from sqlalchemy import func as sql_func
     from app.models import RunSnapshot
     with SessionLocal() as db:
-        for c in db.query(Company).filter(Company.import_run_id == run_id).all():
-            db.add(RunSnapshot(
-                import_run_id=run_id,
-                company_name=c.name,
-                assessed_score=c.assessed_score,
-                coverage=c.coverage,
-                outreach_eligible=c.outreach_eligible,
-                signals_found=c.signals_found,
-                run_date=c.run_date,
-            ))
-        db.commit()
+        # Idempotent: if this exact run is already in history (same content hash),
+        # don't append a duplicate — that would be a phantom 2nd run for /recurring.
+        already = (db.query(sql_func.count(RunSnapshot.id))
+                   .filter(RunSnapshot.import_run_id == run_id).scalar() or 0)
+        if already:
+            logger.info("Run %s already in history (%d snapshots) — skipping "
+                        "(idempotent re-import).", run_id, already)
+        else:
+            for c in db.query(Company).filter(Company.import_run_id == run_id).all():
+                db.add(RunSnapshot(
+                    import_run_id=run_id,
+                    company_name=c.name,
+                    assessed_score=c.assessed_score,
+                    coverage=c.coverage,
+                    outreach_eligible=c.outreach_eligible,
+                    signals_found=c.signals_found,
+                    run_date=c.run_date,
+                ))
+            db.commit()
         snap_runs = db.query(
             sql_func.count(sql_func.distinct(RunSnapshot.import_run_id))
         ).scalar() or 0

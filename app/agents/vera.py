@@ -9,6 +9,7 @@ Slash commands (read the DB; Claude interprets — every run is logged to
 activity_log via BaseAgent.respond, so Vera's checks are traceable):
   - /review          → the human-review queue (auto-flagged companies, pending).
   - /audit [company] → deep QA of one company, issue by issue, with a verdict.
+  - /qa [company]    → alias of /audit.
   - /stats           → QA health: flagged / reviewed / common reasons.
 """
 from typing import Optional

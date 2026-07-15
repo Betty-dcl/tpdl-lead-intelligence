@@ -12,6 +12,7 @@ interprets):
   - /generate [company] → analyst brief positioning one company in the universe
                           (used by the workspace "Generate brief" button).
 """
+import re
 from typing import Optional
 
 from sqlalchemy import func
@@ -107,10 +108,12 @@ class MayaAgent(BaseAgent):
 
         # ── /top [N?] ────────────────────────────────────────────────────
         if low == "/top" or low.startswith("/top"):
-            parts = low.split()
+            # Accept both "/top 5" and the glued "/top5" (the latter used to
+            # silently fall through to the default 50).
+            m = re.match(r"/top\s*(\d+)?", low)
             n = 50
-            if len(parts) > 1 and parts[1].isdigit():
-                n = max(5, min(100, int(parts[1])))
+            if m and m.group(1):
+                n = max(5, min(100, int(m.group(1))))
             with SessionLocal() as db:
                 rows = (
                     db.query(Company)

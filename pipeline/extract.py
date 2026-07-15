@@ -40,8 +40,18 @@ def verbatim_qa(items: list[EvidenceItem], docs: list[RawDoc]) -> tuple[list[Evi
     A quote is accepted only if it appears verbatim (modulo whitespace) inside
     at least one source document. Everything else is a violation — logged and
     DROPPED, never scored.
+
+    Attribution: a quote must appear in the doc(s) matching its OWN declared
+    source. If it appears only in a DIFFERENT source, it is still kept (the
+    sentence is real) but a `SOURCE MISMATCH` violation is recorded — a wrong
+    label would otherwise silently inflate corroboration (distinct sources/URLs).
     """
-    corpus = {d.source: _normalise(d.title + " " + d.text) for d in docs}
+    # Concatenate per source: two docs sharing a source must BOTH stay in the
+    # haystack (a plain dict comprehension would keep only the last one).
+    by_source: dict[str, list[str]] = {}
+    for d in docs:
+        by_source.setdefault(d.source, []).append(_normalise(d.title + " " + d.text))
+    corpus = {src: " ||| ".join(texts) for src, texts in by_source.items()}
     all_text = " ||| ".join(corpus.values())
 
     accepted: list[EvidenceItem] = []
@@ -51,9 +61,13 @@ def verbatim_qa(items: list[EvidenceItem], docs: list[RawDoc]) -> tuple[list[Evi
             violations.append(f"malformed item: {item!r}")
             continue
         needle = _normalise(item.quote)
-        haystack = corpus.get(item.source, all_text)
-        if needle in haystack or needle in all_text:
-            accepted.append(item)
+        if needle in corpus.get(item.source, ""):
+            accepted.append(item)                       # in its own declared source
+        elif needle in all_text:
+            accepted.append(item)                       # real, but mis-attributed
+            violations.append(
+                f"SOURCE MISMATCH [{item.category}]: quote not in declared "
+                f"source {item.source!r}: {item.quote[:100]!r}")
         else:
             violations.append(f"NOT VERBATIM [{item.category}]: {item.quote[:120]!r}")
     return accepted, violations
@@ -184,17 +198,23 @@ def date_in_text(text: str, today: date | None = None) -> date | None:
 # Speculation / negation / rumour markers — a quote containing one of these is
 # kept but FLAGGED for review: the verbatim lock proves the sentence is real,
 # not that the event actually happened (fix for the "sense not checked" gap).
+# Matched on WORD BOUNDARIES (see has_negation) so "not" doesn't fire inside
+# "cannot"/"another" and "may" doesn't fire inside "Mayer". Multi-word markers
+# match as phrases. Hedges kept deliberately narrow to limit false review noise.
 _NEGATION_MARKERS = (
-    "not ", "no longer", "denied", "denies", "deny", "rumour", "rumor",
-    "reportedly", "allegedly", "considering", "may ", "might ", "could ",
-    "would ", "plans to", "planning to", "expected to", "is set to",
+    "not", "no longer", "denied", "denies", "deny", "rumour", "rumor",
+    "reportedly", "allegedly", "considering", "may", "might", "could",
+    "would", "plans to", "planning to", "expected to", "is set to",
     "in talks", "explores", "exploring", "potential", "speculation",
 )
 
+_NEGATION_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(m) for m in _NEGATION_MARKERS) + r")\b")
+
 
 def has_negation(text: str) -> bool:
-    low = " " + text.lower() + " "
-    return any(marker in low for marker in _NEGATION_MARKERS)
+    """True if the quote hedges/negates — kept but flagged (event may not have happened)."""
+    return bool(_NEGATION_RE.search(text.lower()))
 
 
 # ─────────────────────────────────────────────────────────────────────────────

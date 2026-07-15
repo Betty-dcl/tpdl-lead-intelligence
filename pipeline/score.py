@@ -56,6 +56,12 @@ def _domain(url: str) -> str:
     return host.removeprefix("www.")
 
 
+# Sources that legitimately return no URL yet still corroborate (design: only
+# Perplexity Sonar — financial press without a stable link). Any OTHER url-less
+# item is a missing/failed URL, NOT a second source, so it must not bump the score.
+NO_URL_CORROBORATOR_SOURCES = {"perplexity"}
+
+
 def corroboration_points(cfg: EngineConfig, evidence: list[EvidenceItem]) -> int:
     """Anchors = distinct URL *domains* (two links on one site ≠ two sources).
 
@@ -65,7 +71,8 @@ def corroboration_points(cfg: EngineConfig, evidence: list[EvidenceItem]) -> int
     - 1 anchor alone                            ⇒ 1
     """
     anchors = {_domain(e.url) for e in evidence if e.url}
-    unanchored_corroborators = {e.source for e in evidence if not e.url}
+    unanchored_corroborators = {e.source for e in evidence
+                                if not e.url and e.source in NO_URL_CORROBORATOR_SOURCES}
     if not anchors:
         return int(cfg.corroboration["single_unverified"])
     if len(anchors) >= 2 or unanchored_corroborators:
@@ -129,31 +136,52 @@ def live_interpret(cfg: EngineConfig, block: EvidenceBlock) -> tuple[list[Interp
     return _parse_interpretation(text, block)
 
 
+def _coerce_strength(value) -> int:
+    """Opus should send an int 0-6, but tolerate a numeric string; never crash.
+
+    A non-numeric value (e.g. "high", null) ⇒ 0 — the deterministic clamp in
+    score_signal caps it anyway; the point is not to take down the run/batch.
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _parse_interpretation(text: str, block: EvidenceBlock) -> tuple[list[InterpretedSignal], list[str], str]:
     m = re.search(r"\{.*\}", text, re.DOTALL)
     if not m:
         return [], list(SIGNAL_CATEGORIES), "No interpretation produced. " * 3
-    payload = json.loads(m.group())
+    try:
+        payload = json.loads(m.group())
+    except json.JSONDecodeError:
+        # Mirror _parse_items: one bad reply must not abort the company (or, via
+        # the batch loop, discard every other company's paid results).
+        logger.warning("[score] unparseable JSON from model for %s", block.company_name)
+        return [], list(SIGNAL_CATEGORIES), "No interpretation produced. " * 3
     by_cat: dict[str, list[EvidenceItem]] = {}
     for e in block.items:
         by_cat.setdefault(e.category, []).append(e)
 
     signals = []
+    seen: set[str] = set()
     for raw in payload.get("signals", []):
         cat = raw.get("category", "")
         if cat not in by_cat:   # rule 4: no evidence ⇒ not a signal, period.
             continue
+        if cat in seen:         # one scored signal per category — never double-count
+            continue            # (else assessed_score is skewed vs coverage's dedup)
+        seen.add(cat)
         signals.append(InterpretedSignal(
             category=cat,
             what_happened=raw.get("what_happened", ""),
             why_it_matters=raw.get("why_it_matters", ""),
             tpdl_relevance=raw.get("tpdl_relevance") or "",
             confidence=raw.get("confidence", "low"),
-            signal_strength=int(raw.get("signal_strength", 0)),
+            signal_strength=_coerce_strength(raw.get("signal_strength", 0)),
             evidence=by_cat[cat],
         ))
-    not_evidenced = [c for c in SIGNAL_CATEGORIES
-                     if c not in {s.category for s in signals}]
+    not_evidenced = [c for c in SIGNAL_CATEGORIES if c not in seen]
     summary = payload.get("intelligence_summary", "")
     return signals, not_evidenced, summary
 

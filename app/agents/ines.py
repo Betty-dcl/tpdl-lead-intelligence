@@ -194,16 +194,25 @@ class InesAgent(BaseAgent):
                 target = parts[2].strip()
                 with SessionLocal() as db:
                     count = db.query(Contact).filter(Contact.premium.is_(True)).count()
-                    contact = None
-                    for c in db.query(Contact).all():
-                        if target.lower() in c.full_name.lower():
-                            contact = c
-                            break
-                    if contact is None:
+                    matches = [c for c in db.query(Contact).all()
+                               if target.lower() in c.full_name.lower()]
+                    if not matches:
                         augmented = (
                             f"The user tried to mark '{target}' as Premium, but no such contact is "
                             f"stored yet (contacts come from Apollo). As Inès, explain that the "
                             f"Premium 5 hand-pick happens once contacts are pulled."
+                        )
+                    elif len(matches) > 1:
+                        names = ", ".join(sorted(c.full_name for c in matches)[:8])
+                        augmented = (
+                            f"'{target}' matches {len(matches)} stored contacts ({names}). As Inès, "
+                            f"ask for the FULL name — a Premium pick goes to Andrés, so never guess "
+                            f"which person is meant."
+                        )
+                    elif matches[0].premium:
+                        augmented = (
+                            f"{matches[0].full_name} is ALREADY in the Premium {count}/5 (routed to "
+                            f"**Andrés**). As Inès, confirm no change was made — the count stays {count}/5."
                         )
                     elif count >= 5:
                         augmented = (
@@ -211,6 +220,7 @@ class InesAgent(BaseAgent):
                             "(`/premium clear`) before adding another — only 5 go to Andrés."
                         )
                     else:
+                        contact = matches[0]
                         contact.premium = True
                         contact.status = "handed_andres"
                         db.commit()

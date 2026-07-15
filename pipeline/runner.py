@@ -243,7 +243,9 @@ def _run_sequential(cfg, companies, args, existing_rows):
     """
     from pipeline import estimate as est_mod
     per_company = est_mod.estimate_run(1).per_company_usd
-    cap = args.max_usd if (cfg.live and args.max_usd) else None
+    # `is not None`, not truthiness: --max-usd 0 means "spend nothing", which must
+    # STOP the run, not disable the cap (0.0 is falsy).
+    cap = args.max_usd if (cfg.live and args.max_usd is not None) else None
 
     results, spent = [], 0.0
     for c in companies:
@@ -266,7 +268,7 @@ def _run_batched(cfg, companies, args):
 
     # Budget circuit-breaker (#44): a batch is submitted at once, so cap by
     # trimming the company list up front rather than mid-run.
-    if cfg.live and args.max_usd:
+    if cfg.live and args.max_usd is not None:
         per = est_mod.estimate_run(1).model_cost_batch_usd  # batch is -50%
         affordable = int(args.max_usd // per) if per else len(companies)
         if affordable < len(companies):

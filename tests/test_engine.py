@@ -76,6 +76,89 @@ def test_corroboration_bands(cfg):
     assert score.corroboration_points(cfg, perplexity_only) == 0
 
 
+def test_corroboration_ignores_non_perplexity_urlless(cfg):
+    """A url-less Exa/Serper item is a FAILED url, not a 2nd source — must stay 1."""
+    one_anchor_plus_broken = [_item(source="exa_q1", url="https://siteA.com/x"),
+                              _item(source="exa_q2", url=None)]
+    assert score.corroboration_points(cfg, one_anchor_plus_broken) == 1
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Live-parse robustness (findings #1/#4/#10) — no API, just the parser
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _block_with(*categories) -> EvidenceBlock:
+    items = [_item(category=c, source="serper_news") for c in categories]
+    return EvidenceBlock(company_name="Acme", sector=None, items=items)
+
+
+def test_parse_interpretation_survives_bad_json():
+    """Malformed model JSON must NOT crash (would discard a paid batch)."""
+    signals, not_ev, summary = score._parse_interpretation(
+        "here you go: {oops not valid json,,}", _block_with("hiring"))
+    assert signals == [] and set(not_ev) == set(SIGNAL_CATEGORIES)
+
+
+def test_parse_interpretation_dedupes_categories():
+    """Two 'hiring' objects ⇒ ONE scored signal (else assessed_score is skewed)."""
+    text = json.dumps({"signals": [
+        {"category": "hiring", "signal_strength": 4},
+        {"category": "hiring", "signal_strength": 6},
+    ], "intelligence_summary": "x"})
+    signals, _, _ = score._parse_interpretation(text, _block_with("hiring"))
+    assert [s.category for s in signals] == ["hiring"]
+
+
+def test_parse_interpretation_tolerates_non_int_strength():
+    text = json.dumps({"signals": [
+        {"category": "hiring", "signal_strength": "high"},   # non-numeric
+        {"category": "pe_event", "signal_strength": None},   # null
+    ]})
+    signals, _, _ = score._parse_interpretation(text, _block_with("hiring", "pe_event"))
+    assert {s.category for s in signals} == {"hiring", "pe_event"}
+    assert all(s.signal_strength == 0 for s in signals)      # coerced, no crash
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SERP date parsing (finding #2)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_parse_date_serp_formats():
+    assert research._parse_date("06/02/2026") == date(2026, 6, 2)   # SerpAPI US format
+    assert research._parse_date("2026-06-02") == date(2026, 6, 2)   # ISO still works
+    rel = research._parse_relative_date("3 days ago", today=date(2026, 6, 5))
+    assert rel == date(2026, 6, 2)                                  # Serper relative form
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Verbatim attribution (finding #6)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_verbatim_qa_flags_source_mismatch():
+    """A real quote under the WRONG source is kept but flagged (never silent)."""
+    docs = [RawDoc(source="serper_news", url="https://x", title="T",
+                   text="Acme appointed a new CEO in June 2026.")]
+    misattributed = _item(quote="Acme appointed a new CEO in June 2026.",
+                          source="exa_q1", category="leadership_change")
+    accepted, violations = extract.verbatim_qa([misattributed], docs)
+    assert accepted and any("SOURCE MISMATCH" in v for v in violations)
+
+
+def test_verbatim_qa_keeps_all_same_source_docs():
+    """Two docs sharing a source must both stay searchable (no dict collapse)."""
+    docs = [RawDoc(source="serper_news", url="https://a", title="", text="First doc alpha."),
+            RawDoc(source="serper_news", url="https://b", title="", text="Second doc beta.")]
+    early = _item(quote="First doc alpha.", source="serper_news", category="hiring")
+    accepted, violations = extract.verbatim_qa([early], docs)
+    assert accepted and not violations       # would fail if the earlier doc were dropped
+
+
+def test_has_negation_substring_safety():
+    assert not extract.has_negation("The CEO cannot be reached.")   # 'cannot' ⊅ 'not'
+    assert not extract.has_negation("Mr Mayer joined the board.")   # 'Mayer' ⊅ 'may'
+    assert extract.has_negation("The company may acquire a rival.") # real hedge
+
+
 def test_formula_and_strength_clamp(cfg):
     sig = InterpretedSignal(
         category="pe_event", what_happened="w", why_it_matters="y",

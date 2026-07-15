@@ -118,6 +118,57 @@ def test_julie_draft_addresses_stored_contact(client):
             db.commit()
 
 
+# ── Iris dispatch (was entirely untested) ──────────────────────────────────
+
+def test_iris_research_needs_topic(client):
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        iris = AGENT_CLASSES["iris"].load(db, "iris")
+        meta = iris._dispatch_command("/research")
+        assert meta["action"] == "researched" and "no topic" in meta["task_title"]
+
+
+def test_iris_research_and_themes(client, monkeypatch):
+    from app.agents import AGENT_CLASSES, iris as iris_mod
+    from app.database import SessionLocal
+    # Stub the live web search so the dispatch test never touches the network.
+    monkeypatch.setattr(iris_mod, "_research", lambda q: "- Some finding (source: x)")
+    with SessionLocal() as db:
+        iris = AGENT_CLASSES["iris"].load(db, "iris")
+        r = iris._dispatch_command("/research CRM in pharma")
+        assert r["metadata"]["topic"] == "CRM in pharma"
+        t = iris._dispatch_command("/themes dental")
+        assert t["action"] == "scored_themes" and t["metadata"]["sector"] == "dental"
+
+
+# ── Marc dispatch (was entirely untested) ───────────────────────────────────
+
+def test_marc_angles_and_content(client):
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        marc = AGENT_CLASSES["marc"].load(db, "marc")
+        assert "no theme" in marc._dispatch_command("/angles")["task_title"]
+        a = marc._dispatch_command("/angles stack consolidation")
+        assert a["action"] == "proposed_angles" and a["metadata"]["theme"] == "stack consolidation"
+        c = marc._dispatch_command("/content stack consolidation")
+        assert c["action"] == "wrote_content"
+        assert "[STAT TO VERIFY]" in c["augmented_message"]   # never-invent-data guardrail
+
+
+# ── Maya /top glued form (finding: /top5 fell through to default 50) ────────
+
+def test_maya_top_accepts_glued_number(client):
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        maya = AGENT_CLASSES["maya"].load(db, "maya")
+        meta = maya._dispatch_command("/top5")
+        # task_title is "Weekly Top {n}" — glued "/top5" must resolve n=5, not 50.
+        assert meta["task_title"] == "Weekly Top 5"
+
+
 # ── Oliver newsletter format (70/10/20 mix, feeds MailChimp) ────────────────
 
 def test_oliver_newsletter_is_supported(client):

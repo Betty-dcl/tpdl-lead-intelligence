@@ -102,12 +102,27 @@ def dedupe(docs: list[RawDoc]) -> list[RawDoc]:
 def _parse_date(value: str | None) -> date | None:
     if not value:
         return None
-    for fmt in ("%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d"):
+    s = value.strip()
+    # ISO first, then SerpAPI's US format (MM/DD/YYYY) — the news engines emit
+    # the latter, so without it every SERP-sourced doc lost its recency points.
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d",
+                "%m/%d/%Y", "%b %d, %Y", "%d %b %Y"):
         try:
-            return datetime.strptime(value.strip(), fmt).date()
+            return datetime.strptime(s, fmt).date()
         except ValueError:
             continue
-    return None
+    # Relative form ("2 days ago", "3 weeks ago") — Serper's news date field.
+    return _parse_relative_date(s)
+
+
+def _parse_relative_date(s: str, today: date | None = None) -> date | None:
+    m = re.match(r"(\d+)\s+(day|week|month|year)s?\s+ago", s.lower())
+    if not m:
+        return None
+    from datetime import timedelta
+    n, unit = int(m.group(1)), m.group(2)
+    days = {"day": 1, "week": 7, "month": 30, "year": 365}[unit] * n
+    return (today or date.today()) - timedelta(days=days)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

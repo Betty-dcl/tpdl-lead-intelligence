@@ -9,9 +9,10 @@ Slash commands:
   - /segment [sector]   → the messaging angle TPDL uses for a sector.
   - /draft [company]    → a segmented, signal-anchored outreach email.
   - /generate [company] → alias of /draft (used by the workspace "Generate brief" button).
+  - /linkedin [company] → a LinkedIn message in Andrés's voice (playbook v2.1).
 
-Sector angles are placeholders until TPDL fills them (see app/tools/sectors.py);
-brand voice + the real company signal already ground every draft.
+Sector angles are populated with TPDL's real (anonymised) positioning (see
+app/tools/sectors.py); brand voice + the real company signal ground every draft.
 """
 from pathlib import Path
 from typing import Optional

@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import case, func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -124,12 +124,14 @@ def stats(db: Session = Depends(get_db)) -> dict:
     eligible    = db.query(func.count(Company.name)).filter(Company.outreach_eligible.is_(True)).scalar() or 0
     reviewed    = db.query(func.count(Company.name)).filter(Company.review_flag.is_(True)).scalar() or 0
 
-    # Score bands matching the PDF: 8+, 5–7, 1–4, 0
+    # Score bands — CONTIGUOUS so every non-null score lands in exactly one
+    # (the old between(5,7.999)/between(1,4.999)/==0 dropped fractional scores in
+    # the gaps 0<x<1, 4.999<x<5, 7.999<x<8, so band counts undershot the total).
     bands_raw = db.query(
         func.sum(case((Company.assessed_score >= 8, 1), else_=0)),
-        func.sum(case((Company.assessed_score.between(5, 7.999), 1), else_=0)),
-        func.sum(case((Company.assessed_score.between(1, 4.999), 1), else_=0)),
-        func.sum(case((Company.assessed_score == 0, 1), else_=0)),
+        func.sum(case((and_(Company.assessed_score >= 5, Company.assessed_score < 8), 1), else_=0)),
+        func.sum(case((and_(Company.assessed_score >= 1, Company.assessed_score < 5), 1), else_=0)),
+        func.sum(case((Company.assessed_score < 1, 1), else_=0)),
     ).one()
     score_distribution = [
         {"label": "8+ Eligible", "count": int(bands_raw[0] or 0)},
