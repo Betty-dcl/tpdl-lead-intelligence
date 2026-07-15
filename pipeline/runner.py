@@ -10,8 +10,11 @@
         python -m pipeline.runner --top 100 --live --resume
 
 Output: a scored_results-compatible CSV (default data/csv/engine_run.csv),
-re-importable via `python import_csv.py <path>`. The CSV is rewritten after
-every company, so a crash still leaves a valid partial file.
+re-importable via `python import_csv.py <path>`. In sequential mode the CSV is
+rewritten after every company, so a crash still leaves a valid partial file
+(use --resume to continue). In --batch mode the companies are prepared then
+scored in one call, so the CSV is written once at the end — a crash mid-prepare
+loses that run's work (re-run; nothing was charged until the batch was submitted).
 """
 from __future__ import annotations
 
@@ -103,9 +106,22 @@ def run_company(cfg: EngineConfig, name: str, sector: str | None = None,
                      scored, not_evidenced, summary)
 
 
-def flag_boilerplate(results: list[CompanyResult]) -> None:
-    """Cross-company review flag: identical tpdl rationale on 3+ companies."""
+def flag_boilerplate(results: list[CompanyResult],
+                     existing_rows: list[dict] | None = None) -> None:
+    """Cross-company review flag: identical tpdl rationale on 3+ companies.
+
+    On --resume, seed the count from rows already written (their `Signal N Why
+    It Matters` columns) so boilerplate spanning the prior + current batch is
+    still caught — otherwise a rationale repeated across the resume boundary
+    slips through.
+    """
     rationales = Counter()
+    for row in existing_rows or []:
+        for col in ("Signal 1 Why It Matters", "Signal 2 Why It Matters",
+                    "Signal 3 Why It Matters"):
+            text = (row.get(col) or "").strip()
+            if text:
+                rationales[text] += 1
     for r in results:
         for s in r.signals:
             if s.signal.why_it_matters:
@@ -229,7 +245,7 @@ def main() -> None:
     else:
         results = _run_sequential(cfg, companies, args, existing_rows)
 
-    flag_boilerplate(results)
+    flag_boilerplate(results, existing_rows)
     export.write_csv(results, cfg, args.out, existing_rows)
     logger.info("Wrote %s (%d new + %d preserved) — re-import: python import_csv.py %s",
                 args.out, len(results), len(existing_rows), args.out)

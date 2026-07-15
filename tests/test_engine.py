@@ -681,3 +681,16 @@ def test_boilerplate_flags_three_identical_rationales(cfg):
     flag_boilerplate(results)
     assert all(r.review_flag for r in results)
     assert all("boilerplate" in (r.review_flag_reason or "") for r in results)
+
+
+def test_boilerplate_counts_preserved_rows_on_resume(cfg):
+    """On --resume, a rationale repeated across the resume boundary is still caught."""
+    shared = "SAME RATIONALE EVERYWHERE"
+    existing = [{"Signal 1 Why It Matters": shared},
+                {"Signal 1 Why It Matters": shared}]      # 2 already written last run
+    sig = InterpretedSignal(category="hiring", what_happened="w", why_it_matters=shared,
+                            tpdl_relevance="x", confidence="low", signal_strength=3,
+                            evidence=[_item()])
+    current = [CompanyResult(name="C", signals=[score.score_signal(cfg, sig, TODAY)])]
+    flag_boilerplate(current, existing)                   # 2 prior + 1 now = 3 ⇒ flag
+    assert current[0].review_flag and "boilerplate" in (current[0].review_flag_reason or "")

@@ -111,7 +111,10 @@
   ~1216 lignes) après vérif exhaustive (aucun import statique/dynamique, template, JS, ni test).
 - **Trous de test comblés** : coupe-circuit budget séquentiel, échappement CSV, `review_flag`,
   parsing Serper News / Perplexity (« none found » + hit sans URL) / Firecrawl (markdown vide).
-  Total suite : **142 verts**.
+- **Derniers items des audits fermés** : docstring `runner` honnête sur la crash-safety (séquentiel
+  OK / batch écrit une fois) ; `flag_boilerplate` compte désormais les lignes préservées au
+  `--resume` (boilerplate franchissant la frontière de reprise) + test. **Les 2 audits sont
+  entièrement traités.** Total suite : **143 verts**.
 
 ## ✅ Corrigés le 2026-07-14 (lot gratuit, 0 dépense)
 - **#4** QA sémantique : détecteur de négation/spéculation (`extract.has_negation`) → citations
