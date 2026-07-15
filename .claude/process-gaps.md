@@ -107,8 +107,11 @@
 - **App `ines.py`** : `/premium add` sur un déjà-Premium recomptait « +1 » à tort + match par
   sous-chaîne prenait le mauvais homonyme → court-circuit + désambiguïsation.
 - Docstrings : Julie `/linkedin`, Vera `/qa` documentés ; note « placeholder » de Julie corrigée.
-> ⏳ NON fait (destructif, à valider) : supprimer 3 mocks morts (~1216 lignes — `app/mocks/intel.py`,
-> `marketing_intel.py`, `companies.py`, importés nulle part). Proposé à Betty, pas exécuté seul.
+- **Ménage : 3 mocks morts supprimés** (`app/mocks/intel.py`, `marketing_intel.py`, `companies.py`,
+  ~1216 lignes) après vérif exhaustive (aucun import statique/dynamique, template, JS, ni test).
+- **Trous de test comblés** : coupe-circuit budget séquentiel, échappement CSV, `review_flag`,
+  parsing Serper News / Perplexity (« none found » + hit sans URL) / Firecrawl (markdown vide).
+  Total suite : **142 verts**.
 
 ## ✅ Corrigés le 2026-07-14 (lot gratuit, 0 dépense)
 - **#4** QA sémantique : détecteur de négation/spéculation (`extract.has_negation`) → citations

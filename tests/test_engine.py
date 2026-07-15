@@ -159,6 +159,71 @@ def test_has_negation_substring_safety():
     assert extract.has_negation("The company may acquire a rival.") # real hedge
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Filled test gaps: sequential breaker, CSV escaping, review_flag, source parse
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_budget_circuit_breaker_stops_sequential():
+    """--max-usd 0 must stop the sequential run before the first (paid) company."""
+    from types import SimpleNamespace
+    from pipeline import loader, runner
+    live = EngineConfig(live=True)
+    args = SimpleNamespace(max_usd=0.0, fixture=None, out=None)
+    companies = [loader.LoadedCompany(name="A", sector=None, identity={})]
+    assert runner._run_sequential(live, companies, args, []) == []   # no API call
+
+
+def test_csv_escapes_special_chars(cfg, tmp_path):
+    """Commas / quotes / newlines in a field must round-trip, not corrupt columns."""
+    tricky = 'Comma, "quoted", and\na newline.'
+    r = CompanyResult(name="Weird, Inc.", intelligence_summary=tricky, signals=[])
+    out = tmp_path / "escape.csv"
+    export.write_csv([r], cfg, out)
+    with open(out, encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows[0]["Company Name"] == "Weird, Inc."
+    assert rows[0]["Intelligence Summary"] == tricky
+
+
+def test_review_flag_high_confidence_without_source_or_date(cfg):
+    sig = InterpretedSignal(
+        category="pe_event", what_happened="w", why_it_matters="y", tpdl_relevance="z",
+        confidence="high", signal_strength=5, evidence=[_item(url=None, event_date=None)])
+    flag, reason = score.review_flag([score.score_signal(cfg, sig, TODAY)])
+    assert flag
+    assert "no verifiable source" in reason and "no approximate date" in reason
+
+
+def test_serper_news_parses(monkeypatch):
+    live = EngineConfig(live=True, serper_api_key="k")
+    monkeypatch.setattr(research, "_post_json", lambda *a, **k: {
+        "news": [{"title": "T", "link": "https://x", "snippet": "s", "date": "2026-06-01"}]})
+    docs = research.serper_news(live, "Acme")
+    assert docs and docs[0].source == "serper_news" and docs[0].url == "https://x"
+    assert docs[0].published == date(2026, 6, 1)
+
+
+def test_perplexity_none_found_returns_empty(monkeypatch):
+    live = EngineConfig(live=True, perplexity_api_key="k")
+    monkeypatch.setattr(research, "_post_json", lambda *a, **k: {
+        "choices": [{"message": {"content": "none found"}}]})
+    assert research.perplexity_sonar(live, "Acme") == []
+
+
+def test_perplexity_hit_has_no_url(monkeypatch):
+    live = EngineConfig(live=True, perplexity_api_key="k")
+    monkeypatch.setattr(research, "_post_json", lambda *a, **k: {
+        "choices": [{"message": {"content": "Acme was acquired by X in June 2026."}}]})
+    docs = research.perplexity_sonar(live, "Acme")
+    assert docs and docs[0].url is None          # corroborates but never anchors
+
+
+def test_firecrawl_empty_markdown_returns_empty(monkeypatch):
+    live = EngineConfig(live=True, firecrawl_api_key="k")
+    monkeypatch.setattr(research, "_post_json", lambda *a, **k: {"data": {"markdown": ""}})
+    assert research.firecrawl_fetch(live, "https://x") == []
+
+
 def test_formula_and_strength_clamp(cfg):
     sig = InterpretedSignal(
         category="pe_event", what_happened="w", why_it_matters="y",
