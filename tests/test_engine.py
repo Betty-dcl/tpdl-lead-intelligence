@@ -479,6 +479,23 @@ def test_eu_registry_and_batch_are_gated(cfg):
         batch.score_blocks_batched(cfg, [EvidenceBlock(company_name="X", sector=None)])
 
 
+def test_eu_registry_free_keeps_only_registry_domains(monkeypatch):
+    """Free SERP-based registry source: keep official/registry hits, drop news."""
+    live = EngineConfig(live=True, serper_api_key="k")
+    monkeypatch.setattr(research, "_post_json", lambda url, p, h: {"organic": [
+        {"title": "Acme SA on OpenCorporates", "link": "https://opencorporates.com/companies/fr/123",
+         "snippet": "Acme SA, directors: Jean Dupont; status active."},
+        {"title": "Acme on e-Justice", "link": "https://e-justice.europa.eu/acme",
+         "snippet": "Registered company Acme SA."},
+        {"title": "Acme news", "link": "https://news.example.com/acme",  # not a registry → dropped
+         "snippet": "Acme launches product."},
+    ]})
+    docs = research.eu_registry(live, "Acme SA")
+    assert {d.url for d in docs} == {
+        "https://opencorporates.com/companies/fr/123", "https://e-justice.europa.eu/acme"}
+    assert all(d.source == "eu_registry" for d in docs)
+
+
 def test_resume_reads_existing_rows(cfg, tmp_path):
     """read_existing round-trips written rows so a resume never overwrites them."""
     r = CompanyResult(name="Alpha", sector="Pharma", run_date="2026-07-14")

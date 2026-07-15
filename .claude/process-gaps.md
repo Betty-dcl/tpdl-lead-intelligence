@@ -85,8 +85,11 @@
   « reportedly/considering/no longer… » **flaggées pour revue** ; prompt Opus renforcé (cap
   strength ≤2 sur du spéculatif).
 - **#5** dates : garde-fous (rejet futur / >5 ans) + on garde la **date plausible la plus récente**.
-- **#6 (registres UE)** : source `eu_registry` **câblée** (conditionnelle, gated) — reste à
-  configurer l'endpoint au 1er run live. (Firecrawl était déjà là.)
+- **#6/#18 (registres UE) — GRATUIT & fait** : la doc Neotek confirme qu'ils n'avaient AUCUNE
+  API de registre payante ; leur source était web-publique. Donc `eu_registry` refaite en
+  **gratuit** : recherche sur les **portails publics** (e-Justice/BRIS, OpenCorporates, Companies
+  House…) via le SERP engine déjà payé (SerpAPI/Serper), filtrée aux domaines de registre. Opt-in
+  (`EU_REGISTRY_ENABLED=1`) pour ne pas manger le quota. (Firecrawl était déjà là.)
 - **#8** Batch API : `pipeline/batch.py` (scoring -50 %) + option `--batch`.
 - **#10** garde-fou quota : le run **refuse de démarrer** si le quota SerpAPI est insuffisant (`--force` pour outrepasser).
 - **#11** reprise sur panne : CSV réécrit après chaque société + option `--resume`.
@@ -104,8 +107,8 @@
 > confirmer), #2/#3/#8-qualité, #49 (parité) → tout ça se lève au **cran 1**.
 
 ## 🗂️ BACKLOG « à me redemander » (validé par Betty, à faire plus tard)
-1. **Registres UE** (#13) : source déjà câblée — reste à configurer l'endpoint + activer (faible
-   valeur : 32/492 chez Neotek, sociétés privées non cotées). Après validation du cœur.
+1. ✅ **Registres UE** — FAIT en gratuit (voir « Corrigés »). Reste juste à activer avec
+   `EU_REGISTRY_ENABLED=1` au moment voulu (faible valeur : 32/492, sociétés privées).
 2. **Dédup PipeDrive** (#6 data) : import CSV PipeDrive → Inès marque « déjà dans le CRM ».
 3. **Apollo/Kaspr live** (#20) : câbler le vrai fetch quand la clé arrive (+ ciblage signal→rôle déjà prêt).
 4. **Confirmer le slug Apify** (#9) : au 1er scan live, mettre le bon identifiant d'actor.
@@ -126,7 +129,14 @@
 11. **Prod / hébergement** (bloc #36-38, #40) : déploiement Railway + Postgres/Supabase (déjà
     préparé) + gestion des secrets + monitoring. Seulement quand ça devient multi-utilisateur /
     accessible à Andrés — pas pour construire en local. (Mon avis : pas utile maintenant.)
-> Betty peut demander « donne-moi la liste du backlog » à tout moment.
+12. **Agent Vera (9e, vérification)** (#48) : QA transversale après chaque étape (évidences
+    verbatim+datées, contacts non inventés, messages ancrés sur un vrai signal). Trace dans
+    `activity_log` + page de revue (#47). Démarre en contrôles auto (déjà en partie codés),
+    promu en agent ensuite.
+13. **Page de revue humaine** (#47) : file des sociétés review-flaggées à valider avant d'agir.
+> Le contenu à obtenir d'Andrés (§7) + les KPI (#53) sont consolidés dans
+> `.claude/andres-session.md` (checklist unique, traçable). Betty peut demander
+> « donne-moi la liste du backlog » à tout moment.
 
 ## Décisions prises (2026-07-14, avec Betty)
 - **Dédup PipeDrive (#6 data)** : à faire PLUS TARD. Principe retenu : import CSV PipeDrive →

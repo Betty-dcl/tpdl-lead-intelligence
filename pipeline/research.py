@@ -266,33 +266,43 @@ def perplexity_sonar(cfg: EngineConfig, company: str) -> list[RawDoc]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EU company registries (conditional) — ownership & director changes for private
-# companies without a stock listing. Neotek triggered this for 32/492. There is
-# no single free EU-wide API; we hit a configurable registry endpoint (e.g. an
-# OpenCorporates-style service). Endpoint + key are set on first live use — the
-# gated pattern means dry-run never touches it.
+# EU company registries (conditional, FREE) — ownership & director changes for
+# private companies without a stock listing. Neotek's tech stack had NO paid
+# registry API; the "EU registry" source was public-web based. So we do the same:
+# query the PUBLIC registry portals through the SERP engine we already pay for
+# (SerpAPI/Serper), keeping only results from real registry domains. Zero new cost.
+# Opt-in (eu_registry_enabled) so it doesn't silently eat the SERP quota per run.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Public company-register domains (official portals + open aggregators).
+_REGISTRY_DOMAINS = (
+    "e-justice.europa.eu",          # official EU Business Registers (BRIS)
+    "opencorporates.com",           # open aggregator of national registers
+    "find-and-update.company-information.service.gov.uk",  # UK Companies House
+    "handelsregister.de", "kvk.nl", "companieshouse.gov.uk",
+    "registre-commerce", "registro", "registre",
+)
+
+
 def eu_registry(cfg: EngineConfig, company: str) -> list[RawDoc]:
-    endpoint = getattr(cfg, "eu_registry_endpoint", "") or ""
-    key = getattr(cfg, "eu_registry_key", "") or ""
-    require_live(cfg, key or "unconfigured", "EU registry")
-    if not endpoint:
-        logger.info("[research] EU registry endpoint not configured — skipping")
-        return []
-    from urllib.parse import urlencode
-    data = _get_json(f"{endpoint}?{urlencode({'q': company, 'apikey': key})}")
+    require_live(cfg, cfg.serper_api_key or cfg.serpapi_key,
+                 "EU registry (public web search)")
+    q = (f'"{company}" (company register OR directors OR shareholders OR ownership '
+         f'OR "registre du commerce" OR Handelsregister)')
+    if cfg.serper_api_key:
+        data = _post_json("https://google.serper.dev/search", {"q": q, "num": 8},
+                          {"X-API-KEY": cfg.serper_api_key})
+        items = [(i.get("title", ""), i.get("link"), i.get("snippet", ""))
+                 for i in data.get("organic", [])]
+    else:
+        data = _get_json(_serpapi_url("google", q, cfg.serpapi_key))
+        items = [(i.get("title", ""), i.get("link"), i.get("snippet", ""))
+                 for i in data.get("organic_results", [])]
     docs: list[RawDoc] = []
-    for rec in (data.get("results") or data.get("companies") or []):
-        text = rec.get("summary") or rec.get("description") or ""
-        if text:
-            docs.append(RawDoc(
-                source="eu_registry",
-                url=rec.get("url"),
-                title=rec.get("name", f"EU registry — {company}"),
-                text=text,
-                published=_parse_date(rec.get("date") or rec.get("updated")),
-            ))
+    for title, link, snippet in items:
+        if link and any(d in link.lower() for d in _REGISTRY_DOMAINS) and snippet:
+            docs.append(RawDoc(source="eu_registry", url=link,
+                               title=title or f"Registry — {company}", text=snippet))
     return docs
 
 
@@ -357,7 +367,7 @@ def gather(cfg: EngineConfig, company: str,
     serp_sources = ((serper_news, serper_jobs) if cfg.serper_api_key
                     else (serpapi_news, serpapi_jobs))
     sources = [*serp_sources, exa_search, perplexity_sonar]
-    if cfg.eu_registry_endpoint:          # conditional source, only when configured
+    if cfg.eu_registry_enabled:           # conditional free source, opt-in (saves SERP quota)
         sources.append(eu_registry)
 
     docs: list[RawDoc] = []
