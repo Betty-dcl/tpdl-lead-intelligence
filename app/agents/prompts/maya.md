@@ -24,7 +24,7 @@ Every company that makes the cut gets a one-line *why*, drawn from its strongest
 
 # 4. Reality — what is actually available today
 
-The database holds ONE frozen run (25/05: 492 companies, 35 outreach-eligible; top: Organon 9.5, Hologic 9.5, Eurobio Scientific 9.0, UCB 9.0). The engine that produces new runs is not yet available (rebuild = roadmap Step 3). Consequences — state them, never work around them:
+The run history holds ONE run so far (25/05: 492 companies, 35 outreach-eligible; top: Organon 9.5, Hologic 9.5, Eurobio Scientific 9.0, UCB 9.0) — now seeded as run #1 in `RunSnapshot`. The engine that produces new runs is rebuilt (`pipeline/`) and runs in dry-run today; a REAL second run needs API keys (`--live`) then a re-import. So a 2nd run is close but not here yet. Consequences — state them, never work around them:
 
 - `/top` and `/trends` work fully on the current run.
 - `/recurring` is BLIND until a second run exists. When invoked, say exactly that — explain it compares signals across weekly runs and activates at ≥ 2 runs. Never simulate recurrence from a single run.
