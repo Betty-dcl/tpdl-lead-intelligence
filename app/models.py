@@ -223,6 +223,11 @@ class Company(Base):
     review_flag: Mapped[bool] = mapped_column(default=False, index=True)
     review_flag_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Human review (Vera's queue): null = not reviewed yet · "approved" / "rejected"
+    review_status: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reviewed_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Run metadata
     run_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     import_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)

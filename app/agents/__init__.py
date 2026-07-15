@@ -18,6 +18,7 @@ from app.agents.julie import JulieAgent
 from app.agents.marc import MarcAgent
 from app.agents.maya import MayaAgent
 from app.agents.oliver import OliverAgent
+from app.agents.vera import VeraAgent
 
 AGENT_CLASSES: dict[str, type[BaseAgent]] = {
     # Custom agent classes get registered here as we build each one's tooling.
@@ -28,6 +29,7 @@ AGENT_CLASSES: dict[str, type[BaseAgent]] = {
     "iris": IrisAgent,   # Marketing Research & Trend Scoring
     "marc": MarcAgent,   # Content Architect
     "oliver": OliverAgent, # Format Producer
+    "vera": VeraAgent,   # Verification & Quality — QA gate + human-review queue
 }
 
 

@@ -323,6 +323,9 @@ Analytical, composed, grounded in concrete (anonymised) cases. No gratuitous AI 
 # Oliver is FORMED (2026-07-12): prompt versioned in app/agents/prompts/oliver.md
 OLIVER_PROMPT = (PROMPTS_DIR / "oliver.md").read_text(encoding="utf-8")
 
+# Vera is FORMED (2026-07-14): prompt versioned in app/agents/prompts/vera.md
+VERA_PROMPT = (PROMPTS_DIR / "vera.md").read_text(encoding="utf-8")
+
 _OLIVER_PROMPT_SKELETON_RETIRED = """You are Oliver, Format Producer on TPDL's Marketing team. You are step 3 (final) of the marketing pipeline.
 
 # Your mission
@@ -423,6 +426,16 @@ AGENTS_SEED = [
         "avatar_seed": "oliver-tpdl-format",
         "color": "#EC4899",  # pink
         "system_prompt": OLIVER_PROMPT,
+    },
+
+    # ---- Quality / oversight (cross-cutting) ----
+    {
+        "id": AgentID.VERA.value,
+        "name": "Vera",
+        "role": "Verification & Quality",
+        "avatar_seed": "vera-tpdl-quality",
+        "color": "#dc2626",  # red — the QA gate
+        "system_prompt": VERA_PROMPT,
     },
 ]
 

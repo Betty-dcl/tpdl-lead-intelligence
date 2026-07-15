@@ -103,6 +103,16 @@
 - **#35** mot de passe : défaut passé à `TPDL` (à changer avant tout partage — warning au boot).
 - **#41** DiceBear : avatar de secours local (`static/img/avatar-fallback.svg`) + handler global
   dans base.html → si DiceBear tombe, pas d'image cassée. **Vérifié en navigateur.**
+- **#48 Agent Vera (9e) — FAIT** : agent transversal de QA. `app/agents/vera.py` (+ prompt
+  `vera.md`, enregistré, semé, dans le roster = 9 agents). Commandes `/review` (file),
+  `/audit [société]` (verdict CLEAR/NEEDS REVIEW), `/stats`. Checks déterministes traçables
+  (source absente, haute confiance sans URL, spéculation/négation, boilerplate). Logué dans
+  activity_log comme les autres.
+- **#47 Page de revue humaine — FAITE** : `/review` (nav « Review ») — file des sociétés
+  flaggées, raison, signaux + « ⚠ no source URL », boutons **Approve/Reject** + note. API
+  `GET /api/review` + `POST /api/review/{société}`. Colonnes `review_status/reviewed_at/
+  reviewed_note` (migration additive). **Round-trip vérifié en navigateur** (approve → sort de
+  la file). 108 tests.
 > Tests : **99 verts** (moteur + câblage agents). Reste live-dépendant : #9 (slug Apify à
 > confirmer), #2/#3/#8-qualité, #49 (parité) → tout ça se lève au **cran 1**.
 

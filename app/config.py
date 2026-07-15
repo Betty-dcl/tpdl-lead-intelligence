@@ -19,6 +19,8 @@ class AgentID(str, Enum):
     IRIS = "iris"      # Marketing research + trend scoring (Hugo+Maya mix)
     MARC = "marc"      # Content Architect
     OLIVER = "oliver"  # Format Producer
+    # ── Quality / oversight (cross-cutting, not a pipeline step) ──
+    VERA = "vera"      # Verification — QA at every handoff + human review queue
 
 
 class Settings(BaseSettings):

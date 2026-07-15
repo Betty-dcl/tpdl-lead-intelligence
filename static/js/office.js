@@ -2,7 +2,7 @@
    per-agent drawer chat. All chat state lives in $store.agents.chats so that
    closing and re-opening the drawer never loses a conversation in flight. */
 
-const KNOWN_AGENT_IDS = ["manager", "hugo", "maya", "ines", "julie", "iris", "marc", "oliver"];
+const KNOWN_AGENT_IDS = ["manager", "hugo", "maya", "ines", "julie", "iris", "marc", "oliver", "vera"];
 const INTEL_TEAM     = ["hugo", "maya", "ines", "julie"];
 const MARKETING_TEAM = ["iris", "marc", "oliver"];
 const TEAM_ORDER     = [...INTEL_TEAM, ...MARKETING_TEAM];

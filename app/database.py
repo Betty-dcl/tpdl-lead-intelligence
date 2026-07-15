@@ -41,6 +41,11 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
         ("seniority", "VARCHAR(16)"),
         ("crm_segment", "INTEGER"),
     ],
+    "companies": [
+        ("review_status", "VARCHAR(16)"),  # Vera human-review queue
+        ("reviewed_at", "DATETIME"),
+        ("reviewed_note", "TEXT"),
+    ],
 }
 
 

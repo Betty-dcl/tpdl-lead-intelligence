@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Review — TPDL{% endblock %}
+
+{% block head %}
+<style>
+  .rev-pill { display:inline-flex; align-items:center; padding:3px 10px; border-radius:9999px;
+              font-size:.7rem; font-weight:600; letter-spacing:.03em; }
+  .rev-pending  { background:rgba(224,161,60,.16); color:#9a6a12; }
+  .rev-approved { background:rgba(52,213,145,.16); color:#0c7a4d; }
+  .rev-rejected { background:rgba(220,80,80,.14); color:#b23c3c; }
+  .sig-row { border-left:3px solid var(--tpdl-border); padding-left:10px; }
+  .seg-btn { display:inline-flex; padding:.35rem .7rem; font-size:.75rem; border-radius:9999px;
+             border:1px solid var(--tpdl-border); background:white; cursor:pointer; }
+  .seg-btn.on { background:var(--tpdl-dark-ink); color:white; border-color:var(--tpdl-dark-ink); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="reviewPage()" x-init="init()">
+
+  <section class="mb-8">
+    <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Quality / Vera</p>
+    <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-2xl leading-tight">Review queue</h1>
+    <p class="text-ink-2 max-w-2xl">
+      Companies the pipeline auto-flagged for a human check before TPDL acts on the signal.
+      <strong>Approve</strong> = the signal is real, safe to act. <strong>Reject</strong> = don't
+      use this signal. A ~60-second check each.
+    </p>
+
+    <div class="grid grid-cols-3 gap-4 mt-6 max-w-lg">
+      <div class="tpdl-card p-4">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Flagged</div>
+        <div class="text-2xl font-semibold" x-text="summary.flagged ?? '–'"></div>
+      </div>
+      <div class="tpdl-card p-4">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Pending</div>
+        <div class="text-2xl font-semibold" :class="(summary.pending??0)>0 ? 'text-amber-600':''"
+             x-text="summary.pending ?? '–'"></div>
+      </div>
+      <div class="tpdl-card p-4">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Reviewed</div>
+        <div class="text-2xl font-semibold" x-text="summary.reviewed ?? '–'"></div>
+      </div>
+    </div>
+
+    <div class="flex gap-2 mt-6">
+      <template x-for="f in ['pending','reviewed','all']" :key="f">
+        <button class="seg-btn" :class="filter===f ? 'on':''" @click="filter=f; load()"
+                x-text="f.charAt(0).toUpperCase()+f.slice(1)"></button>
+      </template>
+    </div>
+  </section>
+
+  <section class="space-y-4 mb-16">
+    <template x-if="!loading && items.length===0">
+      <div class="tpdl-card p-8 text-center text-ink-3">Nothing here — queue clear.</div>
+    </template>
+
+    <template x-for="c in items" :key="c.name">
+      <div class="tpdl-card p-5">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div class="font-semibold text-lg" x-text="c.name"></div>
+            <div class="text-xs text-ink-3" x-text="`${c.sector||'—'} · score ${c.score} · ${c.coverage||''}`"></div>
+          </div>
+          <span class="rev-pill"
+                :class="c.review_status==='approved' ? 'rev-approved' : c.review_status==='rejected' ? 'rev-rejected' : 'rev-pending'"
+                x-text="c.review_status || 'pending'"></span>
+        </div>
+
+        <div class="mt-3 text-sm bg-amber-50 border border-amber-100 rounded-md p-2.5 text-amber-900"
+             x-show="c.reason">
+          <span class="font-semibold">Why flagged:</span> <span x-text="c.reason"></span>
+        </div>
+
+        <div class="mt-3 space-y-2">
+          <template x-for="(s,i) in c.signals" :key="i">
+            <div class="sig-row text-sm">
+              <div class="font-medium" x-text="`${s.category} · confidence ${s.confidence||'—'}`"></div>
+              <div class="text-ink-2" x-text="s.what_happened || ''"></div>
+              <div class="text-xs mt-0.5">
+                <template x-if="s.urls">
+                  <a :href="firstUrl(s.urls)" target="_blank" rel="noopener"
+                     class="hover:underline" style="color:var(--tpdl-dark-ink)">Open source ↗</a>
+                </template>
+                <span x-show="!s.urls" class="text-red-600">⚠ no source URL</span>
+              </div>
+            </div>
+          </template>
+          <div x-show="c.signals.length===0" class="text-xs text-ink-3">No signals recorded.</div>
+        </div>
+
+        <div class="mt-4 flex items-center gap-2 flex-wrap">
+          <input type="text" x-model="notes[c.name]" placeholder="Optional note…"
+                 class="flex-1 min-w-[180px] text-sm border rounded-md px-3 py-1.5"
+                 style="border-color:var(--tpdl-border)">
+          <button @click="decide(c.name,'approved')"
+                  class="text-xs font-semibold text-white rounded-md px-3 py-1.5"
+                  style="background:#0c7a4d">Approve</button>
+          <button @click="decide(c.name,'rejected')"
+                  class="text-xs font-semibold text-white rounded-md px-3 py-1.5"
+                  style="background:#b23c3c">Reject</button>
+        </div>
+        <div class="text-xs text-ink-3 mt-1" x-show="c.reviewed_at"
+             x-text="`Reviewed ${(c.reviewed_at||'').slice(0,10)}${c.reviewed_note ? ' · '+c.reviewed_note : ''}`"></div>
+      </div>
+    </template>
+  </section>
+</div>
+
+<script>
+function reviewPage() {
+  return {
+    items: [], summary: {}, notes: {}, filter: 'pending', loading: false,
+    async init() { await this.load(); },
+    async load() {
+      this.loading = true;
+      try {
+        const r = await fetch(`/api/review?status=${this.filter}`);
+        const d = await r.json();
+        this.items = d.items || [];
+        this.summary = d.summary || {};
+      } finally { this.loading = false; }
+    },
+    async decide(name, decision) {
+      const res = await fetch(`/api/review/${encodeURIComponent(name)}`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({decision, note: this.notes[name] || null}),
+      });
+      if (res.ok) await this.load();
+    },
+    firstUrl(urls) { return (urls || '').split(/[;\s]+/).filter(Boolean)[0] || '#'; },
+  };
+}
+</script>
+{% endblock %}

@@ -74,6 +74,15 @@ def credits_page(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/review", response_class=HTMLResponse)
+def review_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "review.html",
+        {"active_page": "review"},
+    )
+
+
 @router.get("/data", response_class=HTMLResponse)
 def data_view(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
