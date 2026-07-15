@@ -3,6 +3,9 @@
 > C'est LE fichier qui bouge le plus. Après chaque session, mettre à jour « Dernière session »
 > et la checklist des blocages. Claude Code doit PROPOSER de le faire.
 
+> 📘 **Mise en production** : chemin clé-en-main ordonné dans `.claude/go-live-runbook.md`
+> (quelle clé débloque quoi, commandes exactes, garde-fous, gate RGPD). Chargé à la demande.
+
 ## Où on en est
 - Phase : **Step 3 (workflow) largement FAIT en code** — le moteur Neotek est reconstruit dans
   `pipeline/` (dry-run 0 coût + `--live` gated, 112 tests verts). Step 2 (formation) terminé côté
