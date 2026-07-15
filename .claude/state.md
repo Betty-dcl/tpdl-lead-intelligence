@@ -4,12 +4,28 @@
 > et la checklist des blocages. Claude Code doit PROPOSER de le faire.
 
 ## Où on en est
-- Phase : Step 2 (formation) **TERMINÉ côté prompts** — les 8 agents formés (Alex + Sales + Marketing),
-  versionnés dans `app/agents/prompts/`. Reste : validation en chat live (bloquée par la clé API).
+- Phase : **Step 3 (workflow) largement FAIT en code** — le moteur Neotek est reconstruit dans
+  `pipeline/` (dry-run 0 coût + `--live` gated, 112 tests verts). Step 2 (formation) terminé côté
+  prompts (9 agents avec Vera). Reste bloqué par l'externe : clés API pour un run LIVE + chat live.
 - Base + mémoire : posées et rapatriées dans le repo.
-- Dernier run Neotek : 25/05 (492 entreprises, 35 éligibles) — FIGÉ (moteur Neotek inaccessible).
+- Dernier run Neotek : 25/05 (492 entreprises, 35 éligibles) — FIGÉ. Amorcé comme run #1 dans
+  `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-15 — **Mémoire recalée + `/recurring` amorcé + branche prête à merger.** La mémoire
+  affirmait encore « pas de pipeline / moteur inaccessible / git non initialisé » : FAUX depuis la
+  reconstruction du moteur. CLAUDE.md + state.md remis d'aplomb. `/recurring` était déjà câblé sur
+  `RunSnapshot` mais l'historique était vide (les 492 sociétés du 25/05 précèdent la table) → ajout
+  de `backfill_snapshots.py` (idempotent) qui amorce le VRAI run 25/05 comme run #1 (pas une
+  simulation). Résultat : 1 run en historique, `/recurring` s'active au 2e import.
+- 2026-07-14/15 — **Moteur Neotek RECONSTRUIT** (`pipeline/`, branche `feat/neotek-engine`, non
+  encore mergée dans `main`). Points clés : money gate `require_live()` (dry-run par défaut =
+  0 réseau/0 coût) ; `--estimate` (pré-vol coût + quota SerpAPI) ; `--live`, `--batch` (-50 %),
+  `--resume` (crash-safe), `--max-usd` (coupe-circuit budget). 8 sources codées (Serper News/Jobs +
+  fallback SerpAPI, Exa Q1/Q2/Q3, Perplexity, registres UE en source web GRATUITE, Firecrawl IR).
+  Vera = 9e agent QA + file de revue humaine (`/review`). Dashboard Usage & crédits (`/credits`).
+  Apollo réel (gated). Brand DNA peuplé (site public + engagements anonymisés) + angles sectoriels.
+  112 tests verts. ⚠️ state.md n'avait PAS été mis à jour pendant ce chantier — dette corrigée le 15.
 - 2026-07-12 — **Renderers d'Oliver connectés.** Découverte : le PDF était DÉJÀ branché (fpdf2 +
   `POST /api/marketing/carousel/export-pdf`) — la mémoire « à connecter » était en partie périmée.
   **PPTX ajouté** : `python-pptx` installé (+ requirements), `app/tools/pptx_export.py` (deck 16:9
@@ -87,7 +103,10 @@
 - [ ] #4 Brand DNA : projects rempli
 - [ ] #5 Kaspr connecté (remplace Apollo)
 - [ ] #6 Token Apify (bonus)
-- [ ] #7 Accès / reconstruction du moteur pipeline (bloque le 2e run et /recurring)
+- [x] #7 Reconstruction du moteur pipeline (`pipeline/`, dry-run + live gated, 112 tests). Reste :
+      lancer un run LIVE réel (dépend des clés API), pas le code.
+- [x] #7c Historique des runs (`RunSnapshot`) + `backfill_snapshots.py` → run 25/05 amorcé (run #1).
+      `/recurring` s'active au 2e import. Reste : un 2e CSV réel à importer.
 - [x] #7b Modèle `Contact` étendu (function / seniority / crm_segment) + `app/tools/segmentation.py`
       + migration additive SQLite dans `init_db` + tests (44 passent). Reste : Apollo pour peupler.
 - [ ] Serper configuré (← SerpAPI + DuckDuckGo)
@@ -95,7 +114,7 @@
 - [ ] Bouncer (au 1er envoi)
 - [ ] Lemlist (séquence Lunch)
 - [ ] n8n (mutualisation Devengo demandée à Andrés ?)
-- [ ] Repo Git initialisé + partagé avec Andrés
+- [x] Repo Git initialisé (local). Reste : remote partagé avec Andrés + `main` protégée.
 - [x] Renderers PDF/PPTX Oliver connectés (PDF fpdf2 + PPTX python-pptx + endpoints export)
 
 ## Calendrier (source transcript 25.06 — à re-confirmer)
@@ -103,7 +122,7 @@
 - Amélioration continue jusqu'en août ; points le mardi après-midi.
 
 ## Questions ouvertes / à confirmer
-- Agent de vérification (9e agent) : l'ajoute-t-on au roster ? (idée du transcript 25.06)
+- ~~Agent de vérification (9e agent)~~ → TRANCHÉ (2026-07-14) : OUI = Vera (QA + file de revue).
 - Segmentation CRM (Segment 1/2/3) : propriétaire = Inès (contacts) ou Maya (analyse) ?
 - Plateformes Lucia / Gaspers : à comparer aux outils actuels ?
 - Moteur pipeline : le reconstruire dans ce repo, ou obtenir l'accès Neotek ? (bloque Step 3)
@@ -112,13 +131,14 @@
 - Base légale RGPD pour l'enrichissement + envoi (UE/CH) avant le 1er envoi.
 
 ## Dernière session
-- Date : 2026-07-12
-- Fait : Step 1 — liste des abonnements Neotek + Firecrawl (2 fichiers Excel : `Neotek_stack_costs.xlsx`,
-  `Neotek_free_vs_paid.xlsx`) ; clarifié free tier vs coût réel. Intégré les 2 transcripts terrain
-  dans `.claude/operational-context.md` (+ maj CLAUDE.md, state.md). Découverte structurelle :
-  les prompts des 8 agents vivent dans `seed.py` (→ DB), pas dans `app/agents/*.py`.
-- Prochaine étape : débloquer l'externe (rien d'autre ne peut avancer sans toi/Andrés) —
-  (1) clé Anthropic réelle dans `.env` → tester les 4 agents en chat live ; (2) clé Apollo → peupler
-  les contacts + segmentation ; (3) Brand DNA (clients/projects) avec Andrés → définir les angles
-  sectoriels de Julie ; (4) trancher le moteur Neotek (reconstruire vs accès). Puis : git init + 1er
-  commit (base + mémoire + 4 agents Sales), et éventuellement former le marketing.
+- Date : 2026-07-15
+- Fait : recalé la mémoire (CLAUDE.md + state.md) qui avait divergé du code pendant le chantier
+  moteur (elle disait encore « pas de pipeline / moteur inaccessible / git non init »). Confirmé
+  que le moteur `pipeline/` tourne (dry-run + estimate), 112 tests verts. Débloqué `/recurring` :
+  ajout de `backfill_snapshots.py` (idempotent) qui amorce le vrai run 25/05 comme run #1 dans
+  `RunSnapshot`. Nettoyage `Marcus/Nina → Marc` dans les mocks marketing.
+- Prochaine étape : (1) merger `feat/neotek-engine` → `main` (local) ; (2) débloquer l'externe —
+  clé Anthropic (→ run LIVE + chat), clés Serper/Exa/Perplexity/Firecrawl (→ recherche réelle),
+  Apollo/Kaspr (→ contacts) ; (3) brancher Kaspr/Bouncer/Lemlist ; (4) créer le remote partagé
+  avec Andrés + protéger `main`. Un run LIVE réel (même petit, ex. `--top 5 --live --max-usd 1`)
+  produit le 2e CSV → `/recurring` s'active.

@@ -1,7 +1,7 @@
 """Marketing Intelligence mocks (Iris).
 
-Iris scrapes LinkedIn + the open web for trends and news that feed Marcus
-(post topics) and Nina (case-study angles). In V1 the scrape results are
+Iris scrapes LinkedIn + the open web for trends and news that feed Marc
+(post topics and case-study angles). In V1 the scrape results are
 hand-curated; V2 will wire up real LinkedIn API + news search.
 """
 from typing import Optional
@@ -88,7 +88,7 @@ NEWS_ITEMS: list[dict] = [
         "summary": "Galderma's new SVP HCP Channel Aurélie Lemaître published her 100-day priorities on LinkedIn. Three pillars: unified prescriber data, omnichannel patient journey, KPI-driven medical affairs.",
         "url": "https://www.businessoffashion.com/news/galderma-svp-hcp",
         "linked_company": "Galderma",
-        "marketing_angle": "Topic for a Marcus post: 'What Galderma's new HCP playbook reveals about the next 18 months of pharma commercial.'",
+        "marketing_angle": "Topic for a Marc post: 'What Galderma's new HCP playbook reveals about the next 18 months of pharma commercial.'",
     },
     {
         "id": "nw-002",
@@ -98,7 +98,7 @@ NEWS_ITEMS: list[dict] = [
         "summary": "Werfen's first-ever Chief Customer Officer Dr. Yannick Dubois posted that his Q1 focus is consolidating CRM + analytics already paid for, not new tooling. 1,200+ reactions in 48h.",
         "url": "https://www.linkedin.com/posts/dubois-werfen-cco",
         "linked_company": "Werfen",
-        "marketing_angle": "Topic for a Marcus post: 'The pharma stack consolidation thesis is now mainstream — what the buyer-side narrative shift means for vendors.'",
+        "marketing_angle": "Topic for a Marc post: 'The pharma stack consolidation thesis is now mainstream — what the buyer-side narrative shift means for vendors.'",
     },
     {
         "id": "nw-003",
@@ -108,7 +108,7 @@ NEWS_ITEMS: list[dict] = [
         "summary": "Roche Diagnostics posted 14 senior commercial digital + CRM positions across its Mannheim and Basel hubs. Signals scale-up of an internal transformation programme.",
         "url": "https://www.reuters.com/business/healthcare/roche-diagnostics-hiring",
         "linked_company": "Roche Diagnostics",
-        "marketing_angle": "Case study angle for Nina: anonymised 'building the commercial-digital function from scratch' playbook.",
+        "marketing_angle": "Case study angle for Marc: anonymised 'building the commercial-digital function from scratch' playbook.",
     },
     {
         "id": "nw-004",
@@ -118,7 +118,7 @@ NEWS_ITEMS: list[dict] = [
         "summary": "Dentsply Sirona reported Q1 with explicit reference to the 24-month Return to Growth restructuring. CFO mentioned 'commercial process redesign' as on plan, customer-centricity pillar receiving investment.",
         "url": "https://finance.yahoo.com/m/dentsply-sirona-q1-2026",
         "linked_company": "Dentsply Sirona",
-        "marketing_angle": "Topic for a Marcus post: 'What the Dentsply Sirona Return to Growth update tells us about turnaround execution at scale in medtech.'",
+        "marketing_angle": "Topic for a Marc post: 'What the Dentsply Sirona Return to Growth update tells us about turnaround execution at scale in medtech.'",
     },
     {
         "id": "nw-005",
@@ -128,7 +128,7 @@ NEWS_ITEMS: list[dict] = [
         "summary": "Details of L'Oréal Dermatological Beauty's 36-month HCP platform consolidation surfaced in trade press. Confirms scope of CRM, content and analytics unification across 4 brand silos.",
         "url": "https://www.beautypackaging.com/news/loreal-hcp-unification",
         "linked_company": "L'Oréal Dermatological Beauty",
-        "marketing_angle": "Case study angle for Nina: 'Multi-brand HCP commercial consolidation — what good looks like in the first 90 days.'",
+        "marketing_angle": "Case study angle for Marc: 'Multi-brand HCP commercial consolidation — what good looks like in the first 90 days.'",
     },
     {
         "id": "nw-006",
@@ -138,7 +138,7 @@ NEWS_ITEMS: list[dict] = [
         "summary": "Straumann's CEO confirmed in Q1 call the new EMEA Regional President structure consolidating 12 direct-sales markets. Mentioned 'harmonised commercial KPIs' as a stated 100-day outcome.",
         "url": "https://www.straumann.com/investors/q1-2026-transcript",
         "linked_company": "Straumann Group",
-        "marketing_angle": "Topic for a Marcus post: 'Multi-country commercial harmonisation in medtech — the operating model debt nobody talks about.'",
+        "marketing_angle": "Topic for a Marc post: 'Multi-country commercial harmonisation in medtech — the operating model debt nobody talks about.'",
     },
 ]
 

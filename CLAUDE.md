@@ -16,20 +16,28 @@
 1. **Ce repo = le DASHBOARD / cockpit + agents de chat.** App FastAPI. Les agents (Hugo, Maya,
    Inès, Julie, Iris, Marc, Oliver + manager) LISENT une base d'entreprises déjà scorée (table
    `companies`) et la restituent / analysent en chat. Ils NE produisent PAS le scoring.
-2. **Le MOTEUR pipeline Neotek** (recherche → extraction → scoring → CSV). **Code NON accessible**
-   (propriété Neotek). On ne possède que les CSV de sortie (run du 25/05 : 492 entreprises, 35
-   éligibles). Pour « alimenter le process », il faudra soit obtenir l'accès, soit RECONSTRUIRE
-   ce moteur ici — c'est le chantier du Step 3.
+2. **Le MOTEUR pipeline Neotek** (recherche → extraction → scoring → CSV). Le code Neotek d'origine
+   reste NON accessible, mais le moteur a été **RECONSTRUIT dans ce repo** (dossier `pipeline/`,
+   2026-07-14/15). Il tourne en dry-run (0 coût) et en `--live` (gated par clés). Le run de
+   référence du 25/05 (492 entreprises, 35 éligibles) reste la donnée figée tant qu'un run live
+   réel n'a pas été lancé (bloqué par les clés API, plus par l'accès moteur).
 
 ## ÉTAT ACTUEL (ce qui tourne vraiment, aujourd'hui)
 - Dashboard FastAPI ; agents de chat sur **Opus 4.8** (un seul modèle, variable `ANTHROPIC_MODEL`).
-- Données : issues du run Neotek du 25/05 (à rafraîchir — mais dépend du moteur inaccessible).
-- Outils câblés dans le code : **SerpAPI**, **Apollo** (partiels/stubs). Clés Exa/Perplexity/Apify vides.
+- **Moteur pipeline RECONSTRUIT** (`pipeline/`) : Load → Tech scan → Research (8 sources) →
+  Extract (Sonnet 5) → Score (Opus 4.8) → Export CSV. Dry-run par défaut (0 coût) ; `--live`
+  gated par clés ; `--estimate`, `--batch` (-50 %), `--resume`, `--max-usd` (coupe-circuit budget),
+  garde-fou quota SerpAPI. 112 tests verts. Réinjection via `import_csv.py`.
+- Données : run Neotek du 25/05 (figé). Historique des runs amorcé (`RunSnapshot`, run #1 réel) →
+  `/recurring` de Maya s'active au 2e import réel.
+- Sources codées (gated) : Serper News/Jobs (+ fallback SerpAPI auto), Exa Q1/Q2/Q3, Perplexity
+  Sonar, registres UE (source web GRATUITE), Firecrawl (IR). Contacts : Apollo réel (gated).
+  Clés externes encore VIDES → tout reste en dry-run tant qu'elles ne sont pas fournies.
 - Outreach/CRM réel (terrain, hors repo) : **PipeDrive** (CRM), **Surf** (LinkedIn→PipeDrive),
   Sales Navigator, **MailChimp** (newsletters). Envoi des messages MANUEL par un SDR en Inde.
   Détail dans `.claude/operational-context.md`.
-- PAS de pipeline d'extraction/scoring dans ce repo.
-- PAS encore de dépôt git initialisé.
+- Git initialisé (local). Branche de travail `feat/neotek-engine`. Pas encore de remote partagé.
+- Encore à brancher : Kaspr (← Apollo), Bouncer, Lemlist.
 
 ## ÉTAT CIBLE (où on va)
 - Pipeline reconstruit, séparation à 2 modèles : **extraction = Sonnet 5**, **interprétation /
@@ -101,11 +109,16 @@ Sortie finale : `scored_results.csv` (38 colonnes). NON implémenté dans ce rep
 ## ÉTAT DE RÉFÉRENCE DES DONNÉES (run du 25/05 — figé, moteur inaccessible)
 492 entreprises scorées, 35 outreach-eligible (≥8).
 Top : Organon 9.5, Hologic 9.5, Eurobio Scientific 9.0, UCB 9.0.
-Maya `/recurring` reste AVEUGLE tant qu'il n'y a qu'un seul run (2e run bloqué par l'accès moteur).
+Maya `/recurring` reste AVEUGLE tant qu'il n'y a qu'un seul run. Le run 25/05 est désormais amorcé
+comme run #1 dans `RunSnapshot` (via `backfill_snapshots.py`, idempotent) ; `/recurring` s'active
+mécaniquement au 2e import (`python import_csv.py <nouveau_run.csv>`). Reste bloqué le 2e run
+LIVE réel (dépend des clés API).
 
-## LES 8 AGENTS (rôle / phase / outils)
-- Hugo — Détection, moteur Neotek (Steps 0-6). Aujourd'hui : LIT seulement la DB scorée.
-  Cible : extraction Sonnet 5. Outils cible : Exa, Perplexity, Serper, Apify.
+## LES 9 AGENTS (rôle / phase / outils)
+- Hugo — Détection, moteur Neotek (Steps 0-6). Le moteur `pipeline/` est reconstruit ; en chat il
+  LIT la DB scorée. Extraction Sonnet 5 / interprétation Opus 4.8. Outils : Exa, Perplexity, Serper, Apify.
+- Vera — **9e agent, QA** (ajouté 2026-07-14). Vérifie les données à chaque étape ; alimente la
+  file de revue humaine (`/review`, `app/routers/review.py`). Idée issue du transcript 25.06, tranchée : OUI.
 - Maya — Analyse, re-scoring (`/top` `/trends` `/recurring`). `/recurring` exige ≥2 runs.
 - Inès — Contacts + vérif email. Cible : Kaspr (← Apollo), Bouncer.
 - Julie — Rédaction voix Andrés. Playbook LinkedIn v2.1 + Brand DNA. Sort vers Lemlist.
@@ -116,8 +129,12 @@ Maya `/recurring` reste AVEUGLE tant qu'il n'y a qu'un seul run (2e run bloqué 
 - Andrés — Humain (fondateur). Voix des messages. Premium 5 = 5 comptes gérés en direct.
 
 ## FICHIERS CLÉS DU REPO (corrigés)
-- `app/config.py` — `anthropic_model` (**Opus 4.8** pour le chat) + Settings. ⚠️ Il n'y a PAS de
-  `pipeline/config.py` (n'existe pas dans ce repo).
+- `app/config.py` — `anthropic_model` (**Opus 4.8** pour le chat) + Settings.
+- `pipeline/` — le moteur reconstruit : `config.py` (money gate + poids), `loader.py`, `techscan.py`,
+  `research.py` (8 sources), `extract.py` (Sonnet 5), `score.py` (Opus 4.8), `batch.py`, `export.py`,
+  `estimate.py`, `runner.py` (CLI `python -m pipeline.runner`). Prompts dans `pipeline/prompts/`.
+- `import_csv.py` — réinjecte un `scored_results.csv` dans la DB + écrit un `RunSnapshot` par run.
+- `backfill_snapshots.py` — amorce l'historique depuis la table `companies` (idempotent, one-shot).
 - `scoring_config.yaml` — poids de scoring (recency/corroboration/seuil 8).
 - `app/agents/` — logique/commandes des 8 agents ; `app/agents/base.py` fait l'appel Anthropic.
 - `seed.py` — sème les prompts système en DB (`python seed.py`, idempotent/upsert).
@@ -139,7 +156,8 @@ Maya `/recurring` reste AVEUGLE tant qu'il n'y a qu'un seul run (2e run bloqué 
 - Orchestration : n8n (mutualiser l'instance Devengo plutôt que payer — à confirmer avec Andrés).
 
 ## CONVENTIONS DE TRAVAIL
-- Git : PAS encore initialisé. À faire (repo partagé avec Andrés, `main` protégée, `.gitignore` .env).
+- Git : initialisé (local, `.gitignore` couvre `.env` + runtime). Branche `feat/neotek-engine`.
+  RESTE À FAIRE : remote partagé avec Andrés + `main` protégée.
 - Committer : CLAUDE.md, `.claude/*`, `.mcp.json`, `scoring_config.yaml`, prompts d'agents.
   JAMAIS les secrets ni le `.env`.
 - Mettre à jour ce fichier + state.md à chaque décision structurante (voir RÈGLE DE MÉMOIRE en haut).
