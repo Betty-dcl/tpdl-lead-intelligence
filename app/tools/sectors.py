@@ -8,17 +8,47 @@ from __future__ import annotations
 
 _PLACEHOLDER = "[TO FILL — TPDL positioning for this sector]"
 
-SECTORS: dict[str, dict] = {
-    "pharma":       {"angle": _PLACEHOLDER, "proof_points": []},
-    "medtech":      {"angle": _PLACEHOLDER, "proof_points": []},
-    "dental":       {"angle": _PLACEHOLDER, "proof_points": []},
-    "diagnostics":  {"angle": _PLACEHOLDER, "proof_points": []},
-    "dermatology":  {"angle": _PLACEHOLDER, "proof_points": []},
-    "surgery":      {"angle": _PLACEHOLDER, "proof_points": []},
-    "healthcare":   {"angle": _PLACEHOLDER, "proof_points": []},
+# Real TPDL positioning (public site + engagements, anonymised). Sector angles
+# where TPDL has direct proof are specific; the rest inherit the cross-sector
+# value line. Results still need Andrés's numbers (see .claude/andres-session.md).
+_PROOF = [
+    "Multi-market B2B loyalty programme for a global dermatology leader (interim → platform)",
+    "Injectable drug launch delivered on Veeva/Salesforce with senior PMO",
+    "350+ country web platforms harmonised; medical-education platform built",
+]
+
+# Cross-sector value — the firm's core, applies wherever there isn't a dedicated angle.
+_GENERIC = {
+    "angle": ("Bridge the gap between strategy and execution in Life Sciences: HCP / "
+              "Sales-Rep / Patient journeys, behavioural-AI market intelligence & "
+              "segmentation, global platform roll-outs & country enablement, and senior "
+              "PMO / fractional teams. Swiss quality, hands-on delivery."),
+    "proof_points": _PROOF,
 }
 
-_DEFAULT = {"angle": _PLACEHOLDER, "proof_points": []}
+SECTORS: dict[str, dict] = {
+    "pharma": {
+        "angle": ("For pharma commercial & medical teams: HCP segmentation and journey "
+                  "mapping, global launch & country enablement, and medical-education / "
+                  "loyalty / medical-affairs platforms — strategy turned into compliant "
+                  "execution, with senior PMO to land it."),
+        "proof_points": _PROOF,
+    },
+    "dermatology": {
+        "angle": ("Deep dermatology track record: designed and rolled out a multi-market "
+                  "B2B loyalty programme (interim-to-platform) and an integrated "
+                  "medical-education platform for a global dermatology leader."),
+        "proof_points": _PROOF,
+    },
+    # No dedicated proof yet in these — inherit the honest cross-sector value line.
+    "medtech":      dict(_GENERIC),
+    "dental":       dict(_GENERIC),
+    "diagnostics":  dict(_GENERIC),
+    "surgery":      dict(_GENERIC),
+    "healthcare":   dict(_GENERIC),
+}
+
+_DEFAULT = dict(_GENERIC)
 
 
 def get_sector_angle(sector_bucket: str | None) -> dict:
