@@ -7,6 +7,7 @@ import re
 from typing import Optional
 
 from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ class TPDLPDF(FPDF):
         self.set_xy(20, 12)
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(*ACCENT)
-        self.cell(0, 5, "THE PHARMA DATA LAB", ln=False)
+        self.cell(0, 5, "THE PHARMA DATA LAB", new_x=XPos.RIGHT, new_y=YPos.TOP)
 
         # Format label right-aligned
         self.set_font("Helvetica", "", 8)
