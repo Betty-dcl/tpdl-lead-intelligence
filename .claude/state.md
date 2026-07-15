@@ -15,6 +15,12 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-15 — **QA mobile (375px) → overflow horizontal corrigé sur Home + Marketing.** Cause :
+  grille `grid-cols-12` avec enfants `col-span-12` → sur mobile les 11 column-gaps de 32px (=352px)
+  dépassent la largeur contenu (~311px), quel que soit le nombre de tracks (prouvé : forcer 1 track
+  ne suffit pas ; column-gap à 0 oui). Fix (patron d'`intel.html`) : `grid-cols-1 md:grid-cols-12`
+  + `gap-y-* md:gap-*`. Vérifié en live : 0px d'overflow. Dark mode = volontairement clair-only
+  (non-bug). Aussi : déprécation fpdf2 `ln=` silencée (API new_x/new_y).
 - 2026-07-15 — **Endpoints d'export d'Oliver (PDF/PPTX) exercés en direct → 2 bugs de crash 500
   corrigés.** (1) `pdf_export.py` : Helvetica de fpdf2 est Latin-1 only → tout `→`/`€`/`≥`/… dans
   le contenu de Marc faisait un 500 (l'ancienne liste ratait la plupart des symboles, dont `→` du
