@@ -1,0 +1,45 @@
+{
+  "_comment": "Dry-run fixture — FICTIONAL company (Probe Diagnostics AG does not exist). Lets the whole engine run end-to-end with zero network and zero cost. Dates chosen relative to a mid-2026 run: one <90d event, one 3-6 month event, one undated claim.",
+  "company": "Probe Diagnostics AG",
+  "sector": "Diagnostics",
+  "website": "https://www.probe-diagnostics.example",
+  "location": "Zug, Switzerland",
+  "revenue": "CHF 120M",
+  "docs": [
+    {
+      "source": "serper_news",
+      "url": "https://news.example/probe-ceo",
+      "title": "Probe Diagnostics names new chief executive",
+      "published": "2026-06-02",
+      "text": "Probe Diagnostics AG announced that Dr. Lena Hartmann has been appointed CEO effective 1 June 2026, succeeding founder Marc Keller who steps down after 18 years. The board said the appointment marks a new commercial chapter for the Zug-based diagnostics group. Hartmann previously led the EMEA commercial organisation of a large medtech company."
+    },
+    {
+      "source": "serper_jobs",
+      "url": "https://jobs.example/probe-crm-lead",
+      "title": "Probe Diagnostics is hiring: Head of CRM & Commercial Data",
+      "published": "2026-03-15",
+      "text": "Probe Diagnostics is hiring a Head of CRM and Commercial Data based in Zug. The job posting lists the build-out of a unified customer data platform among the first-year objectives. Applications close at the end of April."
+    },
+    {
+      "source": "exa_q3",
+      "url": "https://ir.example/probe-expansion",
+      "title": "Probe Diagnostics opens Iberian subsidiary",
+      "published": "2026-05-10",
+      "text": "Probe Diagnostics has completed the acquisition of its Madrid-based distributor Iberia Dx and will operate it as a wholly owned subsidiary. Management described the deal as the first step of a broader southern-European expansion. Integration of the two sales organisations is expected to take twelve months."
+    },
+    {
+      "source": "perplexity",
+      "url": null,
+      "title": "Perplexity Sonar — Probe Diagnostics AG",
+      "published": null,
+      "text": "According to financial press reports, a mid-market private equity fund is said to have acquired a minority stake in Probe Diagnostics. No transaction value was disclosed and no primary source could be identified."
+    },
+    {
+      "source": "exa_q1",
+      "url": "https://news.example/probe-cert",
+      "title": "Probe Diagnostics receives ISO renewal",
+      "published": "2026-04-20",
+      "text": "Probe Diagnostics announced the renewal of its ISO 13485 certification for its Zug manufacturing site. The certificate covers the design and production of in-vitro diagnostic instruments. The company thanked its quality team for the smooth audit."
+    }
+  ]
+}

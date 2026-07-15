@@ -1,0 +1,339 @@
+"""Step 2 — Research: the source clients that feed raw documents to extraction.
+
+Every live client funnels through `require_live()` (the single money gate):
+in dry-run mode nothing here can touch the network or cost a cent.
+
+Target stack (design): Exa Q1/Q2/Q3, Perplexity Sonar (no URLs ⇒ corroboration 0),
+Serper News + Jobs (replaces SerpAPI), EU registries (conditional),
+IR page fetch via Firecrawl (conditional).
+"""
+from __future__ import annotations
+
+import json
+import logging
+import re
+import time
+import urllib.error
+import urllib.request
+from datetime import date, datetime
+from pathlib import Path
+
+from pipeline.config import EngineConfig, require_live
+from pipeline.types import RawDoc
+
+logger = logging.getLogger(__name__)
+
+_TIMEOUT = 30       # seconds
+_RETRIES = 3        # attempts per call
+_BACKOFF = 1.5      # seconds, doubled each retry
+
+
+def _urlopen_json(url: str, payload: dict, headers: dict) -> dict:
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json", **headers},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+        return json.loads(resp.read().decode())
+
+
+def _urlopen_get_json(url: str) -> dict:
+    req = urllib.request.Request(url, method="GET")
+    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+        return json.loads(resp.read().decode())
+
+
+def _with_retry(fn, *args, what: str = "request"):
+    """Retry + exponential backoff on transient failures (429/5xx/network)."""
+    delay = _BACKOFF
+    for attempt in range(1, _RETRIES + 1):
+        try:
+            return fn(*args)
+        except urllib.error.HTTPError as exc:
+            transient = exc.code == 429 or exc.code >= 500
+            if not transient or attempt == _RETRIES:
+                raise
+            logger.info("[research] HTTP %s (%s) — retry %d/%d in %.1fs",
+                        exc.code, what, attempt, _RETRIES, delay)
+        except urllib.error.URLError as exc:
+            if attempt == _RETRIES:
+                raise
+            logger.info("[research] network error (%s, %s) — retry %d/%d in %.1fs",
+                        exc.reason, what, attempt, _RETRIES, delay)
+        time.sleep(delay)
+        delay *= 2
+    raise RuntimeError("unreachable")
+
+
+def _post_json(url: str, payload: dict, headers: dict) -> dict:
+    return _with_retry(_urlopen_json, url, payload, headers, what=url)
+
+
+def _get_json(url: str) -> dict:
+    return _with_retry(_urlopen_get_json, url, what=url.split("?")[0])
+
+
+def dedupe(docs: list[RawDoc]) -> list[RawDoc]:
+    """Drop duplicate documents: same URL, or same normalised title.
+
+    Two engines returning the same article must not count twice — neither in
+    evidence volume nor (later) in corroboration.
+    """
+    seen_urls: set[str] = set()
+    seen_titles: set[str] = set()
+    unique: list[RawDoc] = []
+    for d in docs:
+        url_key = (d.url or "").rstrip("/").lower()
+        title_key = re.sub(r"\W+", " ", d.title).strip().lower()
+        if url_key and url_key in seen_urls:
+            continue
+        if title_key and title_key in seen_titles:
+            continue
+        if url_key:
+            seen_urls.add(url_key)
+        if title_key:
+            seen_titles.add(title_key)
+        unique.append(d)
+    return unique
+
+
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value.strip(), fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Serper (target SERP engine — replaces SerpAPI)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def serper_news(cfg: EngineConfig, company: str, num: int = 10) -> list[RawDoc]:
+    """Serper Google News — regional/trade press. https://serper.dev"""
+    require_live(cfg, cfg.serper_api_key, "Serper News")
+    data = _post_json(
+        "https://google.serper.dev/news",
+        {"q": f'"{company}"', "num": num},
+        {"X-API-KEY": cfg.serper_api_key},
+    )
+    return [
+        RawDoc(
+            source="serper_news",
+            url=item.get("link"),
+            title=item.get("title", ""),
+            text=item.get("snippet", ""),
+            published=_parse_date(item.get("date")),
+        )
+        for item in data.get("news", [])
+    ]
+
+
+def serper_jobs(cfg: EngineConfig, company: str, num: int = 10) -> list[RawDoc]:
+    """Serper Google search scoped to job postings — direct hiring-signal proxy."""
+    require_live(cfg, cfg.serper_api_key, "Serper Jobs")
+    data = _post_json(
+        "https://google.serper.dev/search",
+        {"q": f'"{company}" (hiring OR jobs OR careers) commercial digital CRM', "num": num},
+        {"X-API-KEY": cfg.serper_api_key},
+    )
+    return [
+        RawDoc(
+            source="serper_jobs",
+            url=item.get("link"),
+            title=item.get("title", ""),
+            text=item.get("snippet", ""),
+        )
+        for item in data.get("organic", [])
+    ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SerpAPI — transition SERP engine (we already pay for it; Serper stays the
+# target once subscribed — gather() prefers Serper automatically when its key
+# lands in .env, no code change needed).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _serpapi_url(engine: str, query: str, key: str) -> str:
+    from urllib.parse import urlencode
+    return "https://serpapi.com/search.json?" + urlencode(
+        {"engine": engine, "q": query, "api_key": key})
+
+
+def serpapi_news(cfg: EngineConfig, company: str) -> list[RawDoc]:
+    """SerpAPI Google News — same role as serper_news."""
+    require_live(cfg, cfg.serpapi_key, "SerpAPI News")
+    data = _get_json(_serpapi_url("google_news", f'"{company}"', cfg.serpapi_key))
+    return [
+        RawDoc(
+            source="serpapi_news",
+            url=item.get("link"),
+            title=item.get("title", ""),
+            text=item.get("snippet", "") or item.get("title", ""),
+            published=_parse_date(item.get("date", "").split(",")[0].strip() or None),
+        )
+        for item in data.get("news_results", [])
+    ]
+
+
+def serpapi_jobs(cfg: EngineConfig, company: str) -> list[RawDoc]:
+    """SerpAPI Google Jobs — direct hiring-signal proxy (same role as serper_jobs)."""
+    require_live(cfg, cfg.serpapi_key, "SerpAPI Jobs")
+    data = _get_json(_serpapi_url(
+        "google_jobs", f"{company} commercial digital CRM data", cfg.serpapi_key))
+    docs = []
+    for item in data.get("jobs_results", []):
+        # Only keep postings actually at the target company
+        if company.lower() not in (item.get("company_name", "") or "").lower():
+            continue
+        docs.append(RawDoc(
+            source="serpapi_jobs",
+            url=item.get("share_link"),
+            title=item.get("title", ""),
+            text=(item.get("description", "") or "")[:2000],
+        ))
+    return docs
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Exa — neural search, 3 query families (Q1 news / Q2 leadership / Q3 M&A)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_EXA_QUERIES = {
+    "exa_q1": "{company} recent company news announcement",
+    "exa_q2": "{company} new CEO leadership appointment executive hiring",
+    "exa_q3": "{company} acquisition merger expansion investment",
+}
+
+
+def exa_search(cfg: EngineConfig, company: str, num: int = 5) -> list[RawDoc]:
+    """Exa neural search — finds semantically close, not keyword-matched."""
+    require_live(cfg, cfg.exa_api_key, "Exa")
+    docs: list[RawDoc] = []
+    for source, template in _EXA_QUERIES.items():
+        data = _post_json(
+            "https://api.exa.ai/search",
+            {
+                "query": template.format(company=company),
+                "numResults": num,
+                "contents": {"text": {"maxCharacters": 2000}},
+            },
+            {"x-api-key": cfg.exa_api_key},
+        )
+        for item in data.get("results", []):
+            docs.append(RawDoc(
+                source=source,
+                url=item.get("url"),
+                title=item.get("title") or "",
+                text=(item.get("text") or ""),
+                published=_parse_date(item.get("publishedDate")),
+            ))
+    return docs
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Perplexity Sonar — financial press. Returns NO stable URLs ⇒ any signal
+# corroborated ONLY by Perplexity gets corroboration = 0 (design rule).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def perplexity_sonar(cfg: EngineConfig, company: str) -> list[RawDoc]:
+    require_live(cfg, cfg.perplexity_api_key, "Perplexity Sonar")
+    data = _post_json(
+        "https://api.perplexity.ai/chat/completions",
+        {
+            "model": "sonar",
+            "messages": [{
+                "role": "user",
+                "content": (
+                    f"Recent private-equity, M&A, leadership or restructuring news "
+                    f"about {company}. Report only dated facts from the financial "
+                    f"press (Reuters, FT, Bloomberg). If none, say 'none found'."
+                ),
+            }],
+        },
+        {"Authorization": f"Bearer {cfg.perplexity_api_key}"},
+    )
+    text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    if not text or "none found" in text.lower():
+        return []
+    # url=None on purpose: Perplexity corroborates but never anchors.
+    return [RawDoc(source="perplexity", url=None, title=f"Perplexity Sonar — {company}", text=text)]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Firecrawl — IR page fetch (conditional step)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def firecrawl_fetch(cfg: EngineConfig, url: str) -> list[RawDoc]:
+    require_live(cfg, cfg.firecrawl_api_key, "Firecrawl")
+    data = _post_json(
+        "https://api.firecrawl.dev/v2/scrape",
+        {"url": url, "formats": ["markdown"]},
+        {"Authorization": f"Bearer {cfg.firecrawl_api_key}"},
+    )
+    md = (data.get("data") or {}).get("markdown", "")
+    if not md:
+        return []
+    return [RawDoc(source="ir_fetch", url=url, title=f"IR page — {url}", text=md[:20000])]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fixtures — the dry-run source (zero network, zero cost)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def fixture_docs(path: Path) -> list[RawDoc]:
+    """Load raw docs from a local JSON fixture (see pipeline/fixtures/)."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return [
+        RawDoc(
+            source=d.get("source", "fixture"),
+            url=d.get("url"),
+            title=d.get("title", ""),
+            text=d["text"],
+            published=_parse_date(d.get("published")),
+        )
+        for d in payload["docs"]
+    ]
+
+
+def gather(cfg: EngineConfig, company: str,
+           fixture: Path | None = None,
+           use_cache: bool = True) -> list[RawDoc]:
+    """Run every available source; skip cleanly what is offline.
+
+    Dry-run + no fixture ⇒ empty research (valid: company scores 0).
+    Live results are cached on disk (data/cache/research/) so steps 3-4 can
+    be re-run — new prompts, new weights — without re-paying for research.
+    """
+    if fixture is not None:
+        return dedupe(fixture_docs(fixture))
+
+    from pipeline import cache as research_cache
+
+    if use_cache:
+        cached = research_cache.load(company)
+        if cached is not None:
+            logger.info("[research] %s: %d docs from cache (no API spend)",
+                        company, len(cached))
+            return dedupe(cached)
+
+    # SERP engine: Serper (target) when its key exists, else SerpAPI (current sub)
+    serp_sources = ((serper_news, serper_jobs) if cfg.serper_api_key
+                    else (serpapi_news, serpapi_jobs))
+
+    docs: list[RawDoc] = []
+    for fn in (*serp_sources, exa_search, perplexity_sonar):
+        try:
+            docs.extend(fn(cfg, company))
+        except Exception as exc:  # EngineOffline or network error: skip, never crash
+            logger.info("[research] %s skipped: %s", fn.__name__, exc)
+
+    docs = dedupe(docs)
+    if docs and cfg.live:  # only cache real research, never empty dry-runs
+        research_cache.save(company, docs)
+    return docs
