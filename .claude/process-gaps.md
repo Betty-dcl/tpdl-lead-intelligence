@@ -108,6 +108,11 @@
   `/audit [société]` (verdict CLEAR/NEEDS REVIEW), `/stats`. Checks déterministes traçables
   (source absente, haute confiance sans URL, spéculation/négation, boilerplate). Logué dans
   activity_log comme les autres.
+- **#20 Apollo — code réel écrit (verrouillé)** : `apollo.fetch_contacts` fait le vrai appel
+  `mixed_people/search` (titres pilotés par le signal), dégrade proprement sur erreur. Ne tourne
+  qu'avec `APOLLO_API_KEY` dans `.env` → **plug-and-play dès la clé**.
+- **#44 Coupe-circuit budget — FAIT** : `--max-usd` stoppe un run avant de dépasser le plafond
+  (séquentiel : stop avant la société de trop ; batch : rogne la liste en amont). Live only.
 - **#47 Page de revue humaine — FAITE** : `/review` (nav « Review ») — file des sociétés
   flaggées, raison, signaux + « ⚠ no source URL », boutons **Approve/Reject** + note. API
   `GET /api/review` + `POST /api/review/{société}`. Colonnes `review_status/reviewed_at/

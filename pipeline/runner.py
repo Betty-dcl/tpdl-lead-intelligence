@@ -174,6 +174,9 @@ def main() -> None:
                         help="Skip companies already in --out (recover a crashed run)")
     parser.add_argument("--force", action="store_true",
                         help="Run even if the SerpAPI quota looks insufficient")
+    parser.add_argument("--max-usd", type=float, default=None,
+                        help="Hard budget cap (USD): stop the run before the estimated "
+                             "model spend would exceed this. Live runs only.")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = parser.parse_args()
 
@@ -233,11 +236,25 @@ def main() -> None:
 
 
 def _run_sequential(cfg, companies, args, existing_rows):
-    """Score one company at a time; rewrite the CSV after each (crash-safe)."""
-    results = []
+    """Score one company at a time; rewrite the CSV after each (crash-safe).
+
+    Budget circuit-breaker (#44): in live mode, stop BEFORE the estimated model
+    spend would exceed --max-usd, so a run can never silently overshoot.
+    """
+    from pipeline import estimate as est_mod
+    per_company = est_mod.estimate_run(1).per_company_usd
+    cap = args.max_usd if (cfg.live and args.max_usd) else None
+
+    results, spent = [], 0.0
     for c in companies:
+        if cap is not None and spent + per_company > cap:
+            logger.warning("[budget] STOP: next company (~$%.2f) would exceed the $%.2f cap "
+                           "(spent ~$%.2f on %d companies). Raise --max-usd to continue.",
+                           per_company, cap, spent, len(results))
+            break
         results.append(run_company(cfg, c.name, c.sector,
                                    fixture=args.fixture, identity=c.identity))
+        spent += per_company
         export.write_csv(results, cfg, args.out, existing_rows)   # crash-safe snapshot
     return results
 
@@ -245,6 +262,21 @@ def _run_sequential(cfg, companies, args, existing_rows):
 def _run_batched(cfg, companies, args):
     """Research+extract every company, then score them all in one -50% batch."""
     from pipeline import batch as batch_mod
+    from pipeline import estimate as est_mod
+
+    # Budget circuit-breaker (#44): a batch is submitted at once, so cap by
+    # trimming the company list up front rather than mid-run.
+    if cfg.live and args.max_usd:
+        per = est_mod.estimate_run(1).model_cost_batch_usd  # batch is -50%
+        affordable = int(args.max_usd // per) if per else len(companies)
+        if affordable < len(companies):
+            logger.warning("[budget] $%.2f cap ≈ %d companies at ~$%.3f each (batch); "
+                           "trimming from %d. Raise --max-usd for the full set.",
+                           args.max_usd, affordable, per, len(companies))
+            companies = companies[:max(0, affordable)]
+        if not companies:
+            logger.error("[budget] cap too low to score even one company.")
+            return []
 
     prepared, blocks = [], []
     for c in companies:

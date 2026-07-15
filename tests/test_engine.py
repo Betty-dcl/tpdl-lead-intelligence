@@ -510,6 +510,18 @@ def test_resume_reads_existing_rows(cfg, tmp_path):
     assert names == {"Alpha", "Beta"}
 
 
+def test_budget_circuit_breaker_trims_batch():
+    """A cap below one company's batch cost trims the run to nothing — the
+    Batch API is never called (circuit-breaker, #44)."""
+    from types import SimpleNamespace
+    from pipeline import loader, runner
+    live = EngineConfig(live=True)
+    args = SimpleNamespace(max_usd=0.001, fixture=None)
+    companies = [loader.LoadedCompany(name="A", sector=None, identity={}),
+                 loader.LoadedCompany(name="B", sector=None, identity={})]
+    assert runner._run_batched(live, companies, args) == []
+
+
 def test_boilerplate_flags_three_identical_rationales(cfg):
     def one(name):
         sig = InterpretedSignal(

@@ -43,6 +43,51 @@ def test_ines_contacts_uses_signal_driven_titles(client):
     assert any(t in meta["augmented_message"] for t in expected)
 
 
+# ── #20 Apollo real fetch (gated; parsing verified offline) ─────────────────
+
+def test_apollo_not_configured(monkeypatch):
+    from app.tools import apollo
+    monkeypatch.setattr(apollo.settings, "apollo_api_key", "")
+    with pytest.raises(apollo.ApolloNotConfigured):
+        apollo.fetch_contacts("Acme")
+
+
+def test_apollo_fetch_parses_people(monkeypatch):
+    import json
+    import urllib.request
+    from app.tools import apollo
+    monkeypatch.setattr(apollo.settings, "apollo_api_key", "test-key")
+
+    class FakeResp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self):
+            return json.dumps({"people": [
+                {"name": "Jane Roe", "title": "Chief Digital Officer",
+                 "email": "jane@acme.com", "linkedin_url": "https://linkedin.com/in/jane",
+                 "city": "Zurich", "country": "Switzerland"},
+                {"first_name": "Marc", "last_name": "Dubois", "title": "CFO"},
+            ]}).encode()
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=30: FakeResp())
+    out = apollo.fetch_contacts("Acme", ("Chief Digital Officer", "CFO"))
+    assert [p["full_name"] for p in out] == ["Jane Roe", "Marc Dubois"]
+    assert out[0]["location"] == "Zurich, Switzerland"
+    assert out[1]["email"] is None                       # missing fields → None, no crash
+
+
+def test_apollo_fetch_degrades_on_http_error(monkeypatch):
+    import urllib.error
+    import urllib.request
+    from app.tools import apollo
+    monkeypatch.setattr(apollo.settings, "apollo_api_key", "test-key")
+
+    def boom(req, timeout=30):
+        raise urllib.error.HTTPError("url", 429, "Too Many Requests", {}, None)
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    assert apollo.fetch_contacts("Acme") == []           # never crashes the caller
+
+
 # ── #17 Julie writes TO Inès's stored contact ──────────────────────────────
 
 def test_julie_draft_addresses_stored_contact(client):

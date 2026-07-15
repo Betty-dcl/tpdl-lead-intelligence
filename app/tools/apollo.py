@@ -54,15 +54,61 @@ def is_configured() -> bool:
 def fetch_contacts(company_name: str, titles: tuple[str, ...] = DEFAULT_TITLES) -> list[dict]:
     """Return [{full_name, title, email, linkedin_url, location}] for a company.
 
-    Raises ApolloNotConfigured when no key is set — the caller decides how to
-    surface that. The live Apollo `people/search` request is wired here once the
-    key arrives (POST https://api.apollo.io/v1/mixed_people/search, header
-    X-Api-Key, filter on organization name + person_titles).
+    Raises ApolloNotConfigured when no key is set (the money/availability gate).
+    Live call: POST https://api.apollo.io/v1/mixed_people/search with the
+    X-Api-Key header, filtered on the organisation name + the signal-driven
+    person_titles. Never raises on an API error — returns [] so Inès degrades
+    gracefully rather than crashing a batch.
+
+    NOTE (confirm on first live use): Apollo's search may return an
+    email-unlocked placeholder ("email_not_unlocked@domain.com") on some plans;
+    revealing the real email can need a separate enrichment call / plan tier.
+    Inès stores whatever comes back and flags missing emails downstream.
     """
     if not is_configured():
         raise ApolloNotConfigured(
             "APOLLO_API_KEY is not set — add it to .env to enable contact pulls."
         )
-    # TODO(form-ines): real Apollo people/search call once the key is provided.
-    logger.warning("[apollo] key present but live fetch not yet implemented")
-    return []
+    import json
+    import urllib.error
+    import urllib.request
+
+    payload = {
+        "organization_names": [company_name],
+        "person_titles": list(titles),
+        "per_page": 10,
+    }
+    req = urllib.request.Request(
+        "https://api.apollo.io/v1/mixed_people/search",
+        data=json.dumps(payload).encode(),
+        headers={
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            "X-Api-Key": settings.apollo_api_key,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        logger.warning("[apollo] %s search failed: HTTP %s", company_name, exc.code)
+        return []
+    except Exception as exc:  # network / parse — never crash the caller
+        logger.warning("[apollo] %s search error: %s", company_name, exc)
+        return []
+
+    return [_person(p) for p in (data.get("people") or [])]
+
+
+def _person(p: dict) -> dict:
+    name = p.get("name") or " ".join(
+        x for x in (p.get("first_name"), p.get("last_name")) if x).strip()
+    location = ", ".join(x for x in (p.get("city"), p.get("state"), p.get("country")) if x)
+    return {
+        "full_name": name or "Unknown",
+        "title": p.get("title"),
+        "email": p.get("email"),
+        "linkedin_url": p.get("linkedin_url"),
+        "location": location or None,
+    }
