@@ -37,7 +37,8 @@
   Sales Navigator, **MailChimp** (newsletters). Envoi des messages MANUEL par un SDR en Inde.
   Détail dans `.claude/operational-context.md`.
 - Git initialisé (local). Branche de travail `feat/neotek-engine`. Pas encore de remote partagé.
-- Encore à brancher : Kaspr (← Apollo), Bouncer, Lemlist.
+- Kaspr / Bouncer / Lemlist : CÂBLÉS en connecteurs gated (`app/tools/`), dormants tant que les
+  clés sont vides. Ne fabriquent jamais de données (fail-closed). Reste : fournir les clés.
 
 ## ÉTAT CIBLE (où on va)
 - Pipeline reconstruit, séparation à 2 modèles : **extraction = Sonnet 5**, **interprétation /
@@ -120,8 +121,10 @@ LIVE réel (dépend des clés API).
 - Vera — **9e agent, QA** (ajouté 2026-07-14). Vérifie les données à chaque étape ; alimente la
   file de revue humaine (`/review`, `app/routers/review.py`). Idée issue du transcript 25.06, tranchée : OUI.
 - Maya — Analyse, re-scoring (`/top` `/trends` `/recurring`). `/recurring` exige ≥2 runs.
-- Inès — Contacts + vérif email. Cible : Kaspr (← Apollo), Bouncer.
-- Julie — Rédaction voix Andrés. Playbook LinkedIn v2.1 + Brand DNA. Sort vers Lemlist.
+- Inès — Contacts + vérif email. Kaspr (`app/tools/kaspr.py`, préféré ← Apollo) + Bouncer
+  (`app/tools/bouncer.py`) CÂBLÉS mais gated (clés vides) ; Inès choisit Kaspr si `KASPR_API_KEY`.
+- Julie — Rédaction voix Andrés. Playbook LinkedIn v2.1 + Brand DNA. Lemlist (`app/tools/lemlist.py`)
+  CÂBLÉ mais gated ; l'ajout d'un lead = action SORTANTE, jamais automatique (humain après validation).
 - Iris — Recherche/scoring sujets marketing. Outil cible : Serper (← DuckDuckGo).
 - Marc — Architecte de contenu. Dépend du Brand DNA.
 - Oliver — Producteur de formats (A4/carousel/PPT/web/**newsletter**), branding #094752 / #34D591.

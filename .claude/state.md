@@ -12,6 +12,14 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-15 — **Connecteurs Kaspr / Bouncer / Lemlist câblés (gated, dormants).** Écrits sur le
+  patron Apollo (`is_configured()` + exception dédiée, jamais de fabrication, fail-closed).
+  `app/tools/kaspr.py` = drop-in d'Apollo (même contrat de retour) ; Inès le PRÉFÈRE quand
+  `KASPR_API_KEY` est set (sinon Apollo). `app/tools/bouncer.py` = vérif email, `deliverable`
+  seulement si status == deliverable, erreur → `unknown`/False (fail-closed). `app/tools/lemlist.py`
+  = séquences ; `add_lead_to_campaign` = action SORTANTE, jamais appelée automatiquement (humain
+  après validation + email deliverable). 3 clés ajoutées à `config.py` + `.env.example`. Prompts
+  Inès/Julie réalignés. `tests/test_connectors.py` (10). Suite : 123 verts. Reste : fournir les clés.
 - 2026-07-15 — **Oliver : 5e format `newsletter` supporté.** Le prompt le décrivait comme « prévu,
   pas encore supporté ». Ajouté à `FORMAT_SPECS` + alias `/newsletter` dans `app/agents/oliver.py`,
   pondération FIXE 70/10/20 (audience CRM / tendances LinkedIn / forces & cas TPDL), destinée à
@@ -108,7 +116,7 @@
 - [ ] #3 Clé Perplexity
 - [x] #4 Brand DNA : angles sectoriels peuplés (`app/tools/sectors.py`, positionnement réel
       anonymisé). Reste : les CHIFFRES/résultats clients précis d'Andrés pour durcir les proof points.
-- [ ] #5 Kaspr connecté (remplace Apollo)
+- [~] #5 Kaspr : connecteur CODÉ + gated (`app/tools/kaspr.py`, préféré par Inès). Reste : `KASPR_API_KEY`.
 - [ ] #6 Token Apify (bonus)
 - [x] #7 Reconstruction du moteur pipeline (`pipeline/`, dry-run + live gated, 112 tests). Reste :
       lancer un run LIVE réel (dépend des clés API), pas le code.
@@ -118,8 +126,8 @@
       + migration additive SQLite dans `init_db` + tests (44 passent). Reste : Apollo pour peupler.
 - [ ] Serper configuré (← SerpAPI + DuckDuckGo)
 - [ ] Firecrawl configuré
-- [ ] Bouncer (au 1er envoi)
-- [ ] Lemlist (séquence Lunch)
+- [~] Bouncer : connecteur CODÉ + gated (`app/tools/bouncer.py`, fail-closed). Reste : `BOUNCER_API_KEY`.
+- [~] Lemlist : connecteur CODÉ + gated (`app/tools/lemlist.py`, sortant/humain). Reste : `LEMLIST_API_KEY`.
 - [ ] n8n (mutualisation Devengo demandée à Andrés ?)
 - [x] Repo Git initialisé (local). Reste : remote partagé avec Andrés + `main` protégée.
 - [x] Renderers PDF/PPTX Oliver connectés (PDF fpdf2 + PPTX python-pptx + endpoints export)
@@ -139,11 +147,13 @@
 
 ## Dernière session
 - Date : 2026-07-15
-- Fait : recalé la mémoire (CLAUDE.md + state.md) qui avait divergé du code pendant le chantier
-  moteur (elle disait encore « pas de pipeline / moteur inaccessible / git non init »). Confirmé
-  que le moteur `pipeline/` tourne (dry-run + estimate), 112 tests verts. Débloqué `/recurring` :
-  ajout de `backfill_snapshots.py` (idempotent) qui amorce le vrai run 25/05 comme run #1 dans
-  `RunSnapshot`. Nettoyage `Marcus/Nina → Marc` dans les mocks marketing.
+- Fait : (1) recalé la mémoire (CLAUDE.md + state.md + prompts Hugo/Maya/manager) qui affirmait
+  encore « pas de pipeline / moteur inaccessible / git non init » ; (2) débloqué `/recurring` via
+  `backfill_snapshots.py` (amorce le vrai run 25/05 = run #1) ; (3) mergé `feat/neotek-engine` →
+  `main` (local, ff) ; (4) Oliver : 5e format `newsletter` (70/10/20) ; (5) corrigé le docstring
+  périmé de `sectors.py` (angles peuplés) ; (6) **connecteurs Kaspr/Bouncer/Lemlist câblés en gated
+  dormants** (jamais de fabrication, fail-closed, Kaspr préféré par Inès) + `tests/test_connectors.py`.
+  Suite : 123 verts. Tout mergé dans `main`.
 - Prochaine étape : (1) merger `feat/neotek-engine` → `main` (local) ; (2) débloquer l'externe —
   clé Anthropic (→ run LIVE + chat), clés Serper/Exa/Perplexity/Firecrawl (→ recherche réelle),
   Apollo/Kaspr (→ contacts) ; (3) brancher Kaspr/Bouncer/Lemlist ; (4) créer le remote partagé

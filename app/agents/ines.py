@@ -20,7 +20,7 @@ from app.agents.base import BaseAgent
 from app.config import AgentID
 from app.database import SessionLocal
 from app.models import Company, Contact
-from app.tools import apollo
+from app.tools import apollo, kaspr
 from app.tools.radars import apply_radars, detect_country
 from app.tools.segmentation import classify_function, classify_seniority, initial_crm_segment
 
@@ -68,9 +68,14 @@ class InesAgent(BaseAgent):
                     "task_title": f"/contacts: {name} (not found)",
                 }
             radar = apply_radars(None, c.location)
+            # Contact provider: Kaspr is the target engine (better CH/ES coverage);
+            # prefer it when its key is set, else fall back to Apollo. Both share
+            # the same fetch_contacts contract, so the rest of the flow is identical.
+            provider = kaspr if kaspr.is_configured() else apollo
+            provider_name = "Kaspr" if provider is kaspr else "Apollo"
             # Signal-driven targeting: the lead signal decides WHICH roles matter.
             lead_signal = c.s1_category
-            target_titles = apollo.titles_for_signal(lead_signal)
+            target_titles = provider.titles_for_signal(lead_signal)
             company_line = (
                 f"COMPANY: {c.name} · {c.sector_bucket or '—'} · {c.location or 'location unknown'} · "
                 f"score {c.assessed_score}\n"
@@ -79,19 +84,20 @@ class InesAgent(BaseAgent):
                 f"Company-level radar: country={radar['country'] or 'other'} · "
                 f"lunch_campaign={radar['lunch_campaign']} · default language={radar['language']}"
             )
-            if not apollo.is_configured():
+            if not provider.is_configured():
                 augmented = (
-                    f"The user ran `/contacts {c.name}`. Apollo is NOT connected yet "
-                    f"(APOLLO_API_KEY missing), so I cannot pull the live CEO/CTO/CFO + "
-                    f"LinkedIn data.\n\n{company_line}\n\n"
-                    f"As Inès, explain: once Apollo is connected I'll pull the decision-makers "
+                    f"The user ran `/contacts {c.name}`. No contact engine is connected yet "
+                    f"(neither KASPR_API_KEY nor APOLLO_API_KEY set), so I cannot pull the live "
+                    f"CEO/CTO/CFO + LinkedIn data.\n\n{company_line}\n\n"
+                    f"As Inès, explain: once Kaspr (target) or Apollo is connected I'll pull the "
+                    f"decision-makers "
                     f"(CEO, CTO, CFO) with their LinkedIn, then auto-tag each with the radars "
                     f"(Lunch Campaign for Switzerland/Spain, Language ES for Spain or Spanish "
                     f"names) and let the user hand-pick the Premium 5 for Andrés. For now, note "
                     f"the company-level radar read above."
                 )
             else:
-                fetched = apollo.fetch_contacts(c.name, target_titles)
+                fetched = provider.fetch_contacts(c.name, target_titles)
                 with SessionLocal() as db:
                     # Dedup on re-run: one row per (company, person). Skip anyone
                     # already stored for this company so /contacts is idempotent
@@ -127,7 +133,7 @@ class InesAgent(BaseAgent):
                         added += 1
                     db.commit()
                 augmented = (
-                    f"The user ran `/contacts {c.name}`. Apollo returned {len(fetched)} "
+                    f"The user ran `/contacts {c.name}`. {provider_name} returned {len(fetched)} "
                     f"decision-maker(s); stored {added} new (deduped on re-run), each tagged "
                     f"with the full 5-axis segmentation (function · seniority · geo · language · "
                     f"CRM segment).\n\n{company_line}\n\n"
@@ -140,7 +146,8 @@ class InesAgent(BaseAgent):
                 "augmented_message": augmented,
                 "action": "pulled_contacts",
                 "task_title": f"Contacts — {c.name}",
-                "metadata": {"company": c.name, "apollo": apollo.is_configured()},
+                "metadata": {"company": c.name, "provider": provider_name.lower(),
+                             "contacts_configured": provider.is_configured()},
             }
 
         # ── /radars ──────────────────────────────────────────────────────

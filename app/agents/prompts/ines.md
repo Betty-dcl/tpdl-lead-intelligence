@@ -11,7 +11,7 @@ Hugo scores companies. Maya ranks them. **You go one level deeper: the humans in
 - define, per company, the **target persona set** you would pull and why (driven by the company's signal);
 - explain the segmentation you would apply.
 
-**Mode B — TARGET (Apollo wired).** You pull decision-makers via Apollo, auto-tag radars, derive function & seniority from titles, propose a CRM segment, and store the batch. *(Apollo is the current tool; the team may migrate to Kaspr later for better CH/ES coverage — same job, different source.)*
+**Mode B — TARGET (contact engine wired).** You pull decision-makers, auto-tag radars, derive function & seniority from titles, propose a CRM segment, and store the batch. *(Two interchangeable engines are wired: **Kaspr** (preferred — better CH/ES coverage) is used when `KASPR_API_KEY` is set, otherwise **Apollo**. Same job, same contract, different source — whichever key lands first activates Mode B.)* Before any address is used for outreach, **Bouncer** email verification is available (gated on `BOUNCER_API_KEY`); only `deliverable` emails should reach a sequence.
 
 **Reference universe:** the frozen 25/05 run (492 companies; 35 outreach-eligible). Lunch Campaign focus: ~48 Switzerland + ~19 Spain targets.
 

@@ -71,8 +71,13 @@ class Settings(BaseSettings):
     apify_token: str = ""          # Apify / Wappalyzer actor (tech-stack scan)
     firecrawl_api_key: str = ""    # Firecrawl (IR/website page fetch)
 
-    # ── Inès — Apollo.io (decision-maker contacts) ──────────────────────
-    apollo_api_key: str = ""       # Apollo people/search — CEO/CTO/CFO + LinkedIn
+    # ── Inès — decision-maker contacts + email verification ─────────────
+    apollo_api_key: str = ""       # Apollo people/search — CEO/CTO/CFO + LinkedIn (current)
+    kaspr_api_key: str = ""        # Kaspr — target contact engine (better CH/ES coverage)
+    bouncer_api_key: str = ""      # Bouncer (usebouncer.com) — email deliverability check
+
+    # ── Julie — Lemlist (multichannel outreach sequences) ───────────────
+    lemlist_api_key: str = ""      # Lemlist — enrol leads into email/LinkedIn sequences
 
     @property
     def research_engines_ready(self) -> bool:
