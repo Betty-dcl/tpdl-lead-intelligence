@@ -151,3 +151,28 @@ def test_carousel_generate_validates_formats(client):
     r = client.post("/api/marketing/carousel/generate-async",
                     json={"subject": "  ", "formats": ["linkedin"]})
     assert r.status_code == 422
+
+
+def test_pdf_export_handles_unicode(client):
+    """Unicode in subject (→ HTTP header filename) and content (→ Helvetica) must
+    not 500 the export — both used to crash separately."""
+    r = client.post("/api/marketing/carousel/export-pdf", json={
+        "subject": "Stack consolidation → 2026",
+        "content": "TITLE: X\nSECTION 1 — Why\n- 50% ↑, ≥ €10M, café – done."})
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content[:5] == b"%PDF-"
+
+
+def test_pptx_export_handles_unicode(client):
+    r = client.post("/api/marketing/deck/export-pptx", json={
+        "subject": "Q3 medtech → review",
+        "content": "TITLE: Q3\nSLIDE 1: Momentum / M&A ↑ 20%"})
+    assert r.status_code == 200
+    assert r.content[:2] == b"PK"          # valid .pptx (zip) container
+
+
+def test_export_rejects_empty_content(client):
+    for path in ("/api/marketing/carousel/export-pdf", "/api/marketing/deck/export-pptx"):
+        r = client.post(path, json={"subject": "x", "content": "   "})
+        assert r.status_code == 422

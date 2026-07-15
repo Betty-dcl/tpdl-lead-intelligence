@@ -603,7 +603,10 @@ def export_carousel_pdf(req: CarouselExportPDFRequest) -> object:
         logger.exception("[pdf_export] generation failed")
         raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
 
-    slug = req.subject[:40].replace(" ", "_").replace("/", "-")
+    # Filename goes into the Content-Disposition HTTP header, which must be
+    # Latin-1 — strip non-ASCII so a Unicode subject (e.g. "→") can't 500 the export.
+    slug = (req.subject[:40].replace(" ", "_").replace("/", "-")
+            .encode("ascii", "ignore").decode() or "export")
     filename = f"TPDL_{slug}.pdf"
     return Response(
         content=pdf_bytes,
@@ -631,7 +634,10 @@ def export_deck_pptx(req: DeckExportPPTXRequest) -> object:
         logger.exception("[pptx_export] generation failed")
         raise HTTPException(status_code=500, detail=f"PPTX generation failed: {exc}")
 
-    slug = req.subject[:40].replace(" ", "_").replace("/", "-")
+    # Filename goes into the Content-Disposition HTTP header, which must be
+    # Latin-1 — strip non-ASCII so a Unicode subject (e.g. "→") can't 500 the export.
+    slug = (req.subject[:40].replace(" ", "_").replace("/", "-")
+            .encode("ascii", "ignore").decode() or "export")
     filename = f"TPDL_{slug}.pptx"
     return Response(
         content=pptx_bytes,

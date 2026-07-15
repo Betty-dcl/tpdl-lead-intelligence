@@ -24,6 +24,26 @@ def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
 
+# fpdf2's core fonts (Helvetica) only support Latin-1. Any other codepoint —
+# arrows, em-dashes, curly quotes, €, ≥, … — raises and 500s the export. Map the
+# common ones to ASCII, then guarantee the rest can't crash via a final encode.
+_UNICODE_MAP = {
+    "—": " - ", "–": "-", "‘": "'", "’": "'", "“": '"', "”": '"',
+    "•": "*", "…": "...", "→": "->", "←": "<-", "↑": "^", "↓": "v",
+    "≥": ">=", "≤": "<=", "≈": "~", "×": "x", "÷": "/", "™": "(TM)",
+    "®": "(R)", "©": "(C)", "€": "EUR", "£": "GBP", "°": " deg",
+    " ": " ", " ": " ", " ": " ", "–": "-", "—": " - ",
+}
+
+
+def _latin1_safe(text: str) -> str:
+    """Make text safe for fpdf2's core font — never raises, worst case '?'."""
+    for uni, ascii_ in _UNICODE_MAP.items():
+        text = text.replace(uni, ascii_)
+    # Safety net: anything still outside Latin-1 becomes '?' instead of crashing.
+    return text.encode("latin-1", "replace").decode("latin-1")
+
+
 def generate_pdf(
     subject: str,
     content: str,
@@ -39,8 +59,10 @@ def generate_pdf(
 class TPDLPDF(FPDF):
     def __init__(self, subject: str, format_label: str):
         super().__init__(orientation="P", unit="mm", format="A4")
-        self.subject = subject
-        self.format_label = format_label
+        # subject + format_label flow into header/footer cells — sanitise them too,
+        # or a Unicode char in the title crashes every page render.
+        self.subject = _latin1_safe(subject)
+        self.format_label = _latin1_safe(format_label)
         self.set_auto_page_break(auto=True, margin=20)
         self.set_margins(20, 28, 20)
 
@@ -81,12 +103,8 @@ class TPDLPDF(FPDF):
     # ── Content renderer ──────────────────────────────────────────────────────
 
     def render_content(self, content: str) -> None:
-        # Sanitise unicode chars unsupported by core Helvetica
-        content = (content
-                   .replace("—", " - ").replace("–", "-")
-                   .replace("‘", "'").replace("’", "'")
-                   .replace("“", '"').replace("”", '"')
-                   .replace("•", "*").replace("…", "..."))
+        # Sanitise unicode chars unsupported by core Helvetica (never crashes).
+        content = _latin1_safe(content)
         lines = content.splitlines()
         i = 0
         while i < len(lines):
