@@ -4,9 +4,10 @@ Oliver takes Marc's content and renders the final format, brand-consistent.
 He owns form, not substance.
 
 Slash commands:
-  - /format [type] [theme]  → produce a format. type ∈ a4 | carousel | ppt | website.
+  - /format [type] [theme]  → produce a format. type ∈ a4 | carousel | ppt | website | newsletter.
   - /carousel [theme]        → shortcut for the LinkedIn carousel.
   - /article [theme]         → shortcut for the A4 long-form article.
+  - /newsletter [theme]      → shortcut for the MailChimp newsletter (70/10/20 mix).
 
 Per-format structures are first drafts; exact TPDL templates + the lead-capture
 carousel get refined as we form Oliver further.
@@ -38,8 +39,15 @@ FORMAT_SPECS: dict[str, str] = {
         "WEBSITE ARTICLE — clean, structured, SEO-aware. H1 + H2s, short scannable paragraphs, "
         "a meta description, and a CTA block."
     ),
+    "newsletter": (
+        "EMAIL NEWSLETTER — feeds MailChimp for Inès's Segment 3 (nurture). Content weighting is "
+        "FIXED at ~70% existing-CRM-audience relevance / ~10% LinkedIn trends / ~20% TPDL "
+        "strengths & case studies. Structure: 'SUBJECT: <line>' + a one-line preheader, a short "
+        "editorial intro, then sections that honour the 70/10/20 mix (label each section with its "
+        "bucket, e.g. '[CRM audience]'), and one clear CTA. Scannable, senior tone, no hype."
+    ),
 }
-_ALIASES = {"/carousel": "carousel", "/article": "a4"}
+_ALIASES = {"/carousel": "carousel", "/article": "a4", "/newsletter": "newsletter"}
 
 
 class OliverAgent(BaseAgent):
@@ -65,7 +73,7 @@ class OliverAgent(BaseAgent):
                 return {
                     "augmented_message": (
                         "The user ran `/format` with no type. Ask which format: "
-                        "a4, carousel, ppt, or website — and for which theme."
+                        "a4, carousel, ppt, website, or newsletter — and for which theme."
                     ),
                     "action": "produced_format",
                     "task_title": "/format (no type)",
@@ -80,7 +88,7 @@ class OliverAgent(BaseAgent):
             return {
                 "augmented_message": (
                     f"The user asked for format '{fmt}', which isn't supported. Valid: "
-                    f"a4, carousel, ppt, website. Ask them to pick one."
+                    f"a4, carousel, ppt, website, newsletter. Ask them to pick one."
                 ),
                 "action": "produced_format",
                 "task_title": f"/format {fmt} (invalid)",

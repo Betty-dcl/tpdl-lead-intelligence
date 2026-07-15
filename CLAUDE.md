@@ -124,8 +124,10 @@ LIVE réel (dépend des clés API).
 - Julie — Rédaction voix Andrés. Playbook LinkedIn v2.1 + Brand DNA. Sort vers Lemlist.
 - Iris — Recherche/scoring sujets marketing. Outil cible : Serper (← DuckDuckGo).
 - Marc — Architecte de contenu. Dépend du Brand DNA.
-- Oliver — Producteur de formats (A4/carousel/PPT/web), branding #094752 / #34D591.
+- Oliver — Producteur de formats (A4/carousel/PPT/web/**newsletter**), branding #094752 / #34D591.
   Renderers PDF (fpdf2) + PPTX (python-pptx) CONNECTÉS (endpoints export dans `marketing.py`).
+  Newsletter = texte structuré 70/10/20 (audience CRM / tendances LinkedIn / forces TPDL) pour
+  MailChimp (Segment 3 d'Inès) ; pas de renderer fichier.
 - Andrés — Humain (fondateur). Voix des messages. Premium 5 = 5 comptes gérés en direct.
 
 ## FICHIERS CLÉS DU REPO (corrigés)

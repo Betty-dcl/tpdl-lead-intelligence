@@ -12,6 +12,12 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-15 — **Oliver : 5e format `newsletter` supporté.** Le prompt le décrivait comme « prévu,
+  pas encore supporté ». Ajouté à `FORMAT_SPECS` + alias `/newsletter` dans `app/agents/oliver.py`,
+  pondération FIXE 70/10/20 (audience CRM / tendances LinkedIn / forces & cas TPDL), destinée à
+  MailChimp (Segment 3 d'Inès). Sortie = texte structuré (SUBJECT + preheader + sections + CTA), pas
+  de renderer fichier. Prompt `oliver.md` mis à jour + re-seed. Test `test_oliver_newsletter_is_supported`.
+  Suite : 113 verts.
 - 2026-07-15 — **Mémoire recalée + `/recurring` amorcé + branche prête à merger.** La mémoire
   affirmait encore « pas de pipeline / moteur inaccessible / git non initialisé » : FAUX depuis la
   reconstruction du moteur. CLAUDE.md + state.md remis d'aplomb. `/recurring` était déjà câblé sur

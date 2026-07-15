@@ -118,6 +118,30 @@ def test_julie_draft_addresses_stored_contact(client):
             db.commit()
 
 
+# ── Oliver newsletter format (70/10/20 mix, feeds MailChimp) ────────────────
+
+def test_oliver_newsletter_is_supported(client):
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        oliver = AGENT_CLASSES["oliver"].load(db, "oliver")
+
+        # /newsletter shortcut resolves to the newsletter format
+        meta = oliver._dispatch_command("/newsletter pharma commercial trends")
+        assert meta["metadata"]["format"] == "newsletter"
+        aug = meta["augmented_message"]
+        assert "70%" in aug and "10%" in aug and "20%" in aug   # fixed mix carried
+        assert "MailChimp" in aug                               # channel stated
+
+        # /format newsletter <theme> resolves the same way
+        meta2 = oliver._dispatch_command("/format newsletter Q3 medtech")
+        assert meta2["metadata"]["format"] == "newsletter"
+
+        # newsletter now listed among valid formats on an invalid type
+        bad = oliver._dispatch_command("/format podcast some theme")
+        assert "newsletter" in bad["augmented_message"]
+
+
 # ── #16 Maya /recurring on real run history ─────────────────────────────────
 
 def test_maya_recurring_uses_run_snapshots(client):
