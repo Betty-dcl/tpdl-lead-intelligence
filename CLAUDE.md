@@ -147,7 +147,9 @@ LIVE réel (dépend des clés API).
 - `app/agents/playbooks/andres_linkedin.md` — playbook LinkedIn v2.1.
 - `app/tools/` — outils actuels : `apollo.py`, `web_search.py`, `radars.py`, `pdf_export.py`, etc.
 - `.env` (JAMAIS commité) / `.env.example` (commité, noms de variables sans valeurs).
-- Brand DNA : `history` rempli ; `clients` et `projects` VIDES → À REMPLIR.
+- Brand DNA : angles sectoriels PEUPLÉS dans `app/tools/sectors.py` (positionnement réel anonymisé —
+  pharma + dermatology dédiés, 5 autres = valeur cross-sector). Reste à obtenir d'Andrés : les
+  CHIFFRES/résultats clients précis pour durcir les proof points (`.claude/andres-session.md`).
 
 ## STACK + BUDGET (à re-vérifier avant de payer — RÉVISÉ)
 - ⚠️ Le budget « Anthropic ~5-15 $/mois » n'est PLUS valable : l'extraction sur Sonnet 5 (au lieu

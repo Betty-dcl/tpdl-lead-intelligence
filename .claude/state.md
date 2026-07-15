@@ -63,7 +63,8 @@
   LinkedIn `/linkedin` en voix Andrés via le playbook v2.1, source de vérité non dupliquée) ; message
   adapté aux 5 tags d'Inès (langue/lunch/fonction/séniorité/segment) ; ancrage signal Hugo + preuve
   Brand DNA ; interdiction absolue d'inventer un client/résultat/signal ; segment 3 = nurture, Premium 5
-  = Andrés. 7 secteurs réels (placeholders jusqu'au Brand DNA). Versionnée `app/agents/prompts/julie.md`.
+  = Andrés. 7 secteurs — angles désormais peuplés (`app/tools/sectors.py`, positionnement réel
+  anonymisé ; il ne manque que les chiffres d'Andrés). Versionnée `app/agents/prompts/julie.md`.
 - 2026-07-12 — **Inès FORMÉE** (3e agent, le gros morceau « aller plus loin »). Génération de contacts
   pilotée par le signal Hugo ; **matrice de segmentation 5 axes** (fonction commercial/data/digital ×
   séniorité × géo × langue × **segment CRM 1/2/3**) ; radars Lunch CH/ES + langue ES ; Premium 5 → Andrés.
@@ -105,8 +106,8 @@
 - [x] #1b IDs de modèles fixés : Sonnet 5 (extraction) + Opus 4.8 (interprétation/chat)
 - [ ] #2 Clé Exa
 - [ ] #3 Clé Perplexity
-- [ ] #4 Brand DNA : clients rempli
-- [ ] #4 Brand DNA : projects rempli
+- [x] #4 Brand DNA : angles sectoriels peuplés (`app/tools/sectors.py`, positionnement réel
+      anonymisé). Reste : les CHIFFRES/résultats clients précis d'Andrés pour durcir les proof points.
 - [ ] #5 Kaspr connecté (remplace Apollo)
 - [ ] #6 Token Apify (bonus)
 - [x] #7 Reconstruction du moteur pipeline (`pipeline/`, dry-run + live gated, 112 tests). Reste :

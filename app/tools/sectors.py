@@ -1,8 +1,12 @@
 """Sector segmentation for Julie's outreach.
 
-Each sector gets a messaging angle + proof points. These are PLACEHOLDERS —
-TPDL fills them in with the real positioning per sector (the "content I'll give
-you later"). Keys match Company.sector_bucket (lowercased).
+Each sector gets a messaging angle + proof points. These are now POPULATED with
+TPDL's real positioning (public site + anonymised engagements): pharma and
+dermatology have dedicated angles; the other five inherit the honest cross-sector
+value line. Still pending from Andrés: the specific client NUMBERS/results to
+harden the proof points (see .claude/andres-session.md). The `_PLACEHOLDER`
+sentinel + `is_defined()` remain so any future sector added blank is caught.
+Keys match Company.sector_bucket (lowercased).
 """
 from __future__ import annotations
 
