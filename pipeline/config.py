@@ -82,6 +82,8 @@ class EngineConfig:
     perplexity_api_key: str = ""
     firecrawl_api_key: str = ""
     apify_token: str = ""
+    eu_registry_endpoint: str = ""       # conditional source (private co. ownership)
+    eu_registry_key: str = ""
 
     # ── scoring weights (from scoring_config.yaml) ──────────────────────
     recency: dict = field(default_factory=lambda: {
@@ -109,6 +111,8 @@ class EngineConfig:
         cfg.perplexity_api_key = os.environ.get("PERPLEXITY_API_KEY", "")
         cfg.firecrawl_api_key = os.environ.get("FIRECRAWL_API_KEY", "")
         cfg.apify_token = os.environ.get("APIFY_TOKEN", "")
+        cfg.eu_registry_endpoint = os.environ.get("EU_REGISTRY_ENDPOINT", "")
+        cfg.eu_registry_key = os.environ.get("EU_REGISTRY_KEY", "")
         cfg.extraction_model = os.environ.get("EXTRACTION_MODEL", DEFAULT_EXTRACTION_MODEL)
         cfg.interpretation_model = os.environ.get(
             "INTERPRETATION_MODEL", DEFAULT_INTERPRETATION_MODEL)

@@ -240,6 +240,28 @@ def import_csv(path: Path) -> None:
     with SessionLocal() as db:
         sync_signals_from_companies(db)
 
+    # Append a per-run score snapshot (append-only history — the `companies`
+    # table is overwritten in place, so this is what lets Maya compare runs).
+    from sqlalchemy import func as sql_func
+    from app.models import RunSnapshot
+    with SessionLocal() as db:
+        for c in db.query(Company).filter(Company.import_run_id == run_id).all():
+            db.add(RunSnapshot(
+                import_run_id=run_id,
+                company_name=c.name,
+                assessed_score=c.assessed_score,
+                coverage=c.coverage,
+                outreach_eligible=c.outreach_eligible,
+                signals_found=c.signals_found,
+                run_date=c.run_date,
+            ))
+        db.commit()
+        snap_runs = db.query(
+            sql_func.count(sql_func.distinct(RunSnapshot.import_run_id))
+        ).scalar() or 0
+    logger.info("Run snapshot saved (run_id=%s). Distinct runs in history: %d",
+                run_id, snap_runs)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

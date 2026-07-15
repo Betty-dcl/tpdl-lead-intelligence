@@ -1,0 +1,114 @@
+# Liste maîtresse — toutes les failles, trous et risques du process
+
+> Audit adversarial du 2026-07-14 (le plus exigeant). Tout ce qui manque, tout ce qui
+> peut casser, tout ce qui reste à décider. Sévérité : 🔴 bloquant · 🟠 câblage · 🟡 contenu
+> vide · ⚪ risque/qualité · ⚖️ légal · 💰 coût · 🔧 prod/sécu.
+
+## A. Fondation de données
+1. 🔴 Données **figées au 25/05** (7 semaines) — un « nouveau CEO » peut être une vieille nouvelle. Agir sur un signal périmé = outreach gênant.
+2. 🟠 **Un seul run** → pas de tendance, pas de `/recurring`, pas de delta de fraîcheur.
+3. 🟡 **361/492 secteurs = « Unknown »** → segmentation sectorielle aveugle sur ~73 %.
+4. ⚪ **212/492 hors-cible (ICP-flag)** → seulement ~280 réellement dans le périmètre.
+5. ⚪ Seulement **35 éligibles** → set actionnable minuscule, et probablement déjà contactés / périmés.
+6. 🔴 **Aucune dédup contre PipeDrive** → risque de contacter à froid des relations existantes.
+7. ⚪ On a le CSV Neotek mais **pas les blocs d'évidence** (`evidence_blocks.json`) → impossible d'auditer d'où vient chaque score ; les review flags ne sont pas re-vérifiés.
+
+## B. Le moteur (je suis dur avec mon propre code)
+8. 🔴 **Jamais tourné en live** → qualité extraction (Sonnet) / interprétation (Opus) **inconnue**.
+9. ⚪ Le **verrou verbatim vérifie que la phrase existe, PAS que la catégorie/le sens sont justes** — un modèle peut citer une vraie phrase mais mal la classer, ou ignorer une négation (« ne va PAS nommer »). QA structurelle, pas sémantique.
+10. ⚪ `date_in_text` peut attraper **la mauvaise date** d'une phrase (« depuis 2019 … nommé en juin ») → recency faussée.
+11. ⚪ Ma **corroboration par domaine** diverge du comptage par source de Neotek → parité non prouvée.
+12. ⚪ Le **dry-run donne des scores factices** (mock) → ne prouve que la plomberie, jamais la qualité.
+13. 🟠 **Batch API (Step 5) non implémenté** → run en volume à coût ×2 + risque de troncature (Neotek en a eu 13).
+14. ⚪ Le **slug de l'actor Apify** (`apify~wappalyzer`) est une supposition → 1er scan live peut faire 404.
+15. ⚪ Pas de **garde-fou quota à l'exécution** → un run peut épuiser les 250 SerpAPI en cours de route et ne remplir qu'à moitié.
+16. 🟠 **Pas de reprise sur panne** — si un run meurt à 60/125, pas de resume ; risque de re-dépenser.
+17. ⚪ Schémas de réponse Exa/Perplexity **supposés** — si l'API change, résultats vides silencieux (une société scorée 0 peut être un **bug de parsing**, pas une absence de signal).
+18. 🟠 **Source « registres UE » non implémentée** (Neotek l'utilisait, 32/492).
+19. ⚪ **Aucune gestion multilingue** — actus FR/DE/ES ; prompt d'extraction anglocentré → citations non-anglaises mal classées.
+
+## C. Câblage entre agents
+20. 🔴 **Apollo est un stub vide** → Inès ne tire **aucun** contact réel. Moitié « contacts→messages » morte.
+21. 🟠 **`/recurring` de Maya impossible même à 2 runs** : `import_csv.py` **écrase** les lignes → aucun historique conservé.
+22. 🟠 **Julie ne lit pas la table `Contact`** → nom, rôle, langue ES, séniorité, segment CRM d'Inès **perdus** dans l'email.
+23. 🟠 **Ciblage signal→rôle seulement dans le prompt d'Inès**, pas dans le code de fetch (liste figée CEO/CTO/CFO).
+24. 🟠 **Le moteur est un CLI non relié au dashboard** — boucle run→import→agents **manuelle** (2 commandes).
+25. 🟠 **Aucun agent ne peut DÉCLENCHER le moteur** — Hugo « possède » les steps 0-6 sur le papier, sans chemin de code pour lancer un run.
+
+## D. Pipeline marketing
+26. 🟠 **Iris tourne sur DuckDuckGo** (qualité basse, lib dépréciée `ddgs`) ; cible Serper non branchée.
+27. ⚪ Marc marque `[STAT TO VERIFY]` mais **aucune étape de vérification** n'existe → stats non vérifiées peuvent partir.
+28. 🟡 **Newsletter (pondération 70/10/20) notée mais PAS un format supporté** par Oliver.
+29. 🔴 **Le marketing n'a aucun accès à l'audience CRM** → les « 70 % audience CRM existante » sont impossibles (pas de données CRM dans l'app).
+30. 🟡 **Brand DNA clients/projets vide** → Marc/Oliver sans preuve sociale réelle.
+
+## E. Opérations d'outreach (le monde réel)
+31. 🔴 **AUCUNE intégration réelle** : PipeDrive, Surf, MailChimp, Sales Nav, Bouncer, Lemlist, Kaspr, n8n **absents du code**. Le dashboard produit des brouillons ; l'envoi est **manuel (SDR en Inde)**. Copier-coller manuel entre les deux mondes.
+32. 🔴 **Aucune boucle de feedback** : réponses/conversions du terrain ne reviennent jamais nourrir le scoring (la « boucle d'amélioration » de la roadmap n'est pas construite).
+33. ⚪ **Limites LinkedIn** (~200 connexions/sem, ~30 % acceptées) non modélisées → le process ne peut pas se cadencer.
+34. ⚪ **Contradiction stratégique** : les transcripts disent « le cold outreach est mort », mais `/draft` écrit… des emails à froid.
+
+## F. Sécurité / production / ops
+35. 🔧 **Mot de passe par défaut « tpdl »** si `TPDL_TEAM_PASSWORD` non défini → faible si déployé.
+36. 🔧 **Aucun déploiement** : tourne en local sur le Mac de Betty (`localhost:8000`). Andrés/l'équipe **n'y ont pas accès**.
+37. 🔧 **SQLite mono-fichier** → pas de multi-utilisateur concurrent, pas de sauvegarde auto.
+38. 🔧 **Secrets dans `.env` sur une seule machine** — pas de gestion de secrets, clés partagées à la main.
+39. 🔧 **Git sans remote** → le code n'existe **que sur le disque de Betty**. Point de défaillance unique.
+40. 🔧 **Aucun monitoring** — serveur lancé via `nohup` ; s'il crashe, silence.
+41. 🔧 **Avatars DiceBear = dépendance externe non épinglée**.
+
+## G. Coût / échelle
+42. 💰 **5 $ de crédits Anthropic** → run complet impossible ; même tester le chat les grignote.
+43. 💰 **SerpAPI free = 250/mois ≈ 125 sociétés** → run 492 impossible sans payer.
+44. 💰 **Pas de coupe-circuit budget** en cours de run (juste l'estimation pré-vol).
+45. 💰 **Batch API non branché** → coût modèle ×2.
+
+## H. Qualité / tests / validation
+46. ⚪ Tests **unit/dry-run uniquement** — **zéro test d'intégration** contre les vraies API.
+47. ⚪ **Aucune étape de QA humaine** sur les évidences extraites avant scoring.
+48. ⚪ **Pas d'agent de vérification** (la 9e idée des transcripts) — qualité non contrôlée à chaque étape.
+49. ⚪ **Parité vs Neotek non mesurée** (harnais prêt, jamais exécuté en live).
+
+## I. Légal / contractuel
+50. ⚖️ **RGPD** : aucune base légale, aucun opt-out, aucune politique de rétention avant d'enrichir/contacter des personnes UE/CH. **Risque réel.**
+51. ⚖️ Données Neotek marquées **« Confidential »** → réutilisation/redistribution à cadrer contractuellement.
+
+## J. Process / conceptuel
+52. 🔴 **Le trou de fond** : c'est un **cockpit qui lit des scores + rédige**, PAS une machine d'outreach de bout en bout. Les deux moitiés (intelligence ↔ envoi réel) ne sont **pas connectées**.
+53. ⚪ **Aucune définition de « réussi »** câblée (objectif de taux de réponse non fixé).
+54. ⚪ **Dépendances humaines** : Brand DNA, angles sectoriels, Premium 5, budget, décision moteur — le process ne peut pas être « fini » sans plusieurs inputs d'Andrés.
+
+---
+
+## ✅ Corrigés le 2026-07-14 (lot gratuit, 0 dépense)
+- **#4** QA sémantique : détecteur de négation/spéculation (`extract.has_negation`) → citations
+  « reportedly/considering/no longer… » **flaggées pour revue** ; prompt Opus renforcé (cap
+  strength ≤2 sur du spéculatif).
+- **#5** dates : garde-fous (rejet futur / >5 ans) + on garde la **date plausible la plus récente**.
+- **#6 (registres UE)** : source `eu_registry` **câblée** (conditionnelle, gated) — reste à
+  configurer l'endpoint au 1er run live. (Firecrawl était déjà là.)
+- **#8** Batch API : `pipeline/batch.py` (scoring -50 %) + option `--batch`.
+- **#10** garde-fou quota : le run **refuse de démarrer** si le quota SerpAPI est insuffisant (`--force` pour outrepasser).
+- **#11** reprise sur panne : CSV réécrit après chaque société + option `--resume`.
+- **#12** canari anti-bug : log quand une source live renvoie 0 (bug de parsing potentiel).
+- **#16** historique de runs : table `run_snapshots` (append-only) → **Maya `/recurring` marche
+  vraiment** (compare les scores entre runs, RISING/FADING).
+- **#17** Julie lit les contacts d'Inès : `/draft` s'adresse à **la personne** (nom, rôle,
+  langue ES, séniorité, segment).
+- **#18** ciblage signal→rôle **dans le code** (`apollo.titles_for_signal`) — prêt pour Apollo.
+- **#29** `/draft` réorienté : **fini le cold pitch** — note courte, humaine, sans CTA agressif.
+> Tests : **99 verts** (moteur + câblage agents). Reste live-dépendant : #9 (slug Apify à
+> confirmer), #2/#3/#8-qualité, #49 (parité) → tout ça se lève au **cran 1**.
+
+## Décisions prises (2026-07-14, avec Betty)
+- **Dédup PipeDrive (#6 data)** : à faire PLUS TARD. Principe retenu : import CSV PipeDrive →
+  Inès marque « déjà dans le CRM » (= Segment 1, jamais approché à froid).
+- **Multilingue** : abandonné — **anglais uniquement**.
+- **Marketing (Iris/Marc/Oliver, newsletter, audience CRM)** : reporté (équipe marketing plus tard).
+- **Apollo** : à connecter (clé à venir). Ciblage signal→rôle à coder au même moment.
+- **Sécu/prod** : plus tard, SAUF remote git + mot de passe → à faire tôt.
+
+**Lecture rapide** : 🔴 bloquants = #1, 6, 8, 20, 29, 31, 32, 52. Le cerveau (scoring/prompts)
+est prêt ; la chaîne humaine (contacts→message→envoi) et la connexion au terrain sont les
+gros manques. À ne PAS lancer en campagne complète. Lançable : le **cran 1 du moteur** (1
+société), qui lève les inconnues #8/#12/#49.

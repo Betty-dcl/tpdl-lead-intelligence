@@ -68,9 +68,14 @@ class InesAgent(BaseAgent):
                     "task_title": f"/contacts: {name} (not found)",
                 }
             radar = apply_radars(None, c.location)
+            # Signal-driven targeting: the lead signal decides WHICH roles matter.
+            lead_signal = c.s1_category
+            target_titles = apollo.titles_for_signal(lead_signal)
             company_line = (
                 f"COMPANY: {c.name} · {c.sector_bucket or '—'} · {c.location or 'location unknown'} · "
                 f"score {c.assessed_score}\n"
+                f"Lead signal: {lead_signal or 'none evidenced'} → prioritise these roles: "
+                f"{', '.join(target_titles)}\n"
                 f"Company-level radar: country={radar['country'] or 'other'} · "
                 f"lunch_campaign={radar['lunch_campaign']} · default language={radar['language']}"
             )
@@ -86,7 +91,7 @@ class InesAgent(BaseAgent):
                     f"the company-level radar read above."
                 )
             else:
-                fetched = apollo.fetch_contacts(c.name)
+                fetched = apollo.fetch_contacts(c.name, target_titles)
                 with SessionLocal() as db:
                     # Dedup on re-run: one row per (company, person). Skip anyone
                     # already stored for this company so /contacts is idempotent

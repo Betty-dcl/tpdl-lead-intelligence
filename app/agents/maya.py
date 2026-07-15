@@ -183,28 +183,52 @@ class MayaAgent(BaseAgent):
 
         # ── /recurring ───────────────────────────────────────────────────
         if low == "/recurring" or low.startswith("/recurring"):
+            from app.models import RunSnapshot
             with SessionLocal() as db:
-                runs = db.query(func.count(func.distinct(Company.import_run_id))).scalar() or 0
-            if runs <= 1:
-                augmented = (
-                    "The user ran `/recurring`. There is currently only ONE pipeline run "
-                    "in the database, so week-over-week recurrence cannot be computed yet. "
-                    "As Maya, explain that this view tracks companies whose signals persist "
-                    "or re-appear across weekly runs (a strong prioritisation cue), and that "
-                    "it activates automatically once Hugo imports the next weekly run."
-                )
-            else:
-                augmented = (
-                    f"The user ran `/recurring`. There are {runs} pipeline runs in the "
-                    f"database. As Maya, identify companies that appear across multiple runs "
-                    f"(persistent signal = higher priority) and rank them. "
-                    f"[NOTE: per-run membership wiring to be completed — flag if data is missing.]"
-                )
+                runs = (db.query(func.count(func.distinct(RunSnapshot.import_run_id)))
+                        .scalar() or 0)
+                if runs <= 1:
+                    augmented = (
+                        "The user ran `/recurring`. The run-history table holds only ONE "
+                        "run so far, so week-over-week recurrence cannot be computed yet. "
+                        "As Maya, explain this view tracks companies whose signals persist "
+                        "or re-appear across weekly runs (a strong prioritisation cue), and "
+                        "that it activates automatically from the second imported run."
+                    )
+                    meta = {"runs": runs}
+                else:
+                    # Companies appearing in ≥2 runs, with their score trajectory.
+                    rows = (
+                        db.query(
+                            RunSnapshot.company_name,
+                            func.count(func.distinct(RunSnapshot.import_run_id)).label("n"),
+                            func.min(RunSnapshot.assessed_score).label("lo"),
+                            func.max(RunSnapshot.assessed_score).label("hi"),
+                        )
+                        .group_by(RunSnapshot.company_name)
+                        .having(func.count(func.distinct(RunSnapshot.import_run_id)) >= 2)
+                        .order_by(func.count(func.distinct(RunSnapshot.import_run_id)).desc(),
+                                  func.max(RunSnapshot.assessed_score).desc())
+                        .limit(40).all()
+                    )
+                    listing = "\n".join(
+                        f"  - {r.company_name}: seen in {r.n} runs · score {r.lo}→{r.hi}"
+                        f"{' ↑' if r.hi > r.lo else ' ↓' if r.hi < r.lo else ' ='}"
+                        for r in rows
+                    ) or "  (no company appears in 2+ runs yet)"
+                    augmented = (
+                        f"The user ran `/recurring`. Across {runs} runs in the history, the "
+                        f"companies whose signals persist (appear in ≥2 runs) are:\n\n{listing}"
+                        f"\n\nAs Maya, rank the persistent ones (recurrence = higher priority), "
+                        f"call out who is RISING vs FADING by score trajectory, and flag the "
+                        f"top persistent names for Inès."
+                    )
+                    meta = {"runs": runs, "recurring": len(rows)}
             return {
                 "augmented_message": augmented,
                 "action": "recurring_analysis",
                 "task_title": "Recurring companies",
-                "metadata": {"runs": runs},
+                "metadata": meta,
             }
 
         return None

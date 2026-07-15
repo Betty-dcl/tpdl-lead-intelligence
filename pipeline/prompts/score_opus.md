@@ -17,6 +17,17 @@ of facts. There is nothing else to know.
 7. `signal_strength` is your ONLY scoring output. No discretionary bonuses.
    Recency and corroboration are computed by code, not by you.
 
+## SPECULATION & NEGATION — do not score a rumour as a fact
+Before scoring a signal, check what the quote actually asserts:
+- If the quote is speculative or unconfirmed ("in talks", "considering", "may",
+  "reportedly", "expected to", "explores") → the event has NOT happened. Cap
+  `signal_strength` at 2 and set `confidence` to "low".
+- If the quote NEGATES or reverses the event ("no longer", "denied", "stepped
+  back from") → do not treat it as a positive signal; explain the reversal.
+- Only a quote that states a completed, dated fact earns `signal_strength` ≥ 3.
+Your `what_happened` must be justified by the literal words of a quote — if you
+cannot point to a quote that says it plainly, lower the strength.
+
 ## signal_strength SCALE (0-6) — commercial relevance ONLY
 - 0 no relevance · 1-2 weak/indirect · 3 clear relevance, standard case
 - 4 strong, direct TPDL service-area alignment

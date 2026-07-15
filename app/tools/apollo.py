@@ -18,6 +18,30 @@ DEFAULT_TITLES = ("CEO", "Chief Executive Officer",
                   "CTO", "Chief Technology Officer",
                   "CFO", "Chief Financial Officer")
 
+# Signal-driven targeting (Inès prompt §3): the company's lead signal points at
+# WHICH decision-makers matter — not a generic CEO/CTO/CFO pull for everyone.
+SIGNAL_TITLES: dict[str, tuple[str, ...]] = {
+    "leadership_change": ("CEO", "COO", "CMO", "Chief Commercial Officer"),
+    "hiring":            ("VP Sales", "Head of Digital", "Head of Data",
+                          "Chief Commercial Officer"),
+    "ma_expansion":      ("COO", "CIO", "CTO", "Head of Commercial Operations"),
+    "pe_event":          ("CEO", "CFO"),
+    "digital_initiative": ("Chief Digital Officer", "CTO", "CIO",
+                           "Head of Transformation"),
+    "org_restructuring": ("COO", "CTO", "Chief Commercial Officer"),
+}
+
+
+def titles_for_signal(lead_signal: str | None) -> tuple[str, ...]:
+    """Which titles to prioritise given the company's lead signal category.
+
+    Falls back to the baseline C-suite when the signal is unknown. Used both
+    to describe the target persona set (Mode A) and to parametrise the live
+    Apollo people/search (Mode B) once the key is wired."""
+    if lead_signal and lead_signal in SIGNAL_TITLES:
+        return SIGNAL_TITLES[lead_signal]
+    return DEFAULT_TITLES
+
 
 class ApolloNotConfigured(RuntimeError):
     pass

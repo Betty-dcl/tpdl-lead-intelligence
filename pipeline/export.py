@@ -73,11 +73,23 @@ def result_row(result: CompanyResult, cfg: EngineConfig) -> dict[str, str]:
     return row
 
 
-def write_csv(results: list[CompanyResult], cfg: EngineConfig, path: Path) -> Path:
+def read_existing(path: Path) -> list[dict]:
+    """Existing data rows of an output CSV (for --resume). [] if absent."""
+    if not path.exists():
+        return []
+    with open(path, encoding="utf-8", newline="") as f:
+        return [row for row in csv.DictReader(f) if row.get("Company Name", "").strip()]
+
+
+def write_csv(results: list[CompanyResult], cfg: EngineConfig, path: Path,
+              existing_rows: list[dict] | None = None) -> Path:
+    """Write header + any preserved existing rows (resume) + the new results."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
         writer.writeheader()
+        for row in (existing_rows or []):
+            writer.writerow({h: row.get(h, "") for h in CSV_HEADERS})
         for r in results:
             writer.writerow(result_row(r, cfg))
     return path

@@ -147,29 +147,54 @@ _DATE_PATTERNS = (
 )
 
 
-def date_in_text(text: str) -> date | None:
-    """First date stated in the text, or None. Never guesses a missing year."""
+def _date_from_match(pattern, groups) -> date | None:
+    try:
+        if pattern is _DATE_PATTERNS[0]:
+            return date(int(groups[0]), int(groups[1]), int(groups[2]))
+        if pattern is _DATE_PATTERNS[1]:
+            month = _MONTHS.get(groups[1].lower()[:3])
+            return date(int(groups[2]), month, int(groups[0])) if month else None
+        if pattern is _DATE_PATTERNS[2]:
+            month = _MONTHS.get(groups[0].lower()[:3])
+            return date(int(groups[2]), month, int(groups[1])) if month else None
+        month = _MONTHS.get(groups[0].lower()[:3])
+        return date(int(groups[1]), month, 1) if month else None
+    except ValueError:
+        return None
+
+
+def date_in_text(text: str, today: date | None = None) -> date | None:
+    """Best plausible date stated in the text, or None. Never guesses a year.
+
+    Guardrails (fix for the "wrong date" risk): dates in the future or older
+    than 5 years are discarded; among the rest the MOST RECENT is returned
+    (an event date like "appointed June 2026" beats stale context like
+    "founded in 2019 ... appointed June 2026").
+    """
+    today = today or date.today()
+    cands: list[date] = []
     for pattern in _DATE_PATTERNS:
         for m in pattern.finditer(text):
-            groups = m.groups()
-            try:
-                if pattern is _DATE_PATTERNS[0]:
-                    return date(int(groups[0]), int(groups[1]), int(groups[2]))
-                if pattern is _DATE_PATTERNS[1]:
-                    month = _MONTHS.get(groups[1].lower()[:3])
-                    if month:
-                        return date(int(groups[2]), month, int(groups[0]))
-                elif pattern is _DATE_PATTERNS[2]:
-                    month = _MONTHS.get(groups[0].lower()[:3])
-                    if month:
-                        return date(int(groups[2]), month, int(groups[1]))
-                else:
-                    month = _MONTHS.get(groups[0].lower()[:3])
-                    if month:
-                        return date(int(groups[1]), month, 1)
-            except ValueError:
-                continue
-    return None
+            d = _date_from_match(pattern, m.groups())
+            if d and d <= today and (today - d).days <= 365 * 5:
+                cands.append(d)
+    return max(cands) if cands else None
+
+
+# Speculation / negation / rumour markers — a quote containing one of these is
+# kept but FLAGGED for review: the verbatim lock proves the sentence is real,
+# not that the event actually happened (fix for the "sense not checked" gap).
+_NEGATION_MARKERS = (
+    "not ", "no longer", "denied", "denies", "deny", "rumour", "rumor",
+    "reportedly", "allegedly", "considering", "may ", "might ", "could ",
+    "would ", "plans to", "planning to", "expected to", "is set to",
+    "in talks", "explores", "exploring", "potential", "speculation",
+)
+
+
+def has_negation(text: str) -> bool:
+    low = " " + text.lower() + " "
+    return any(marker in low for marker in _NEGATION_MARKERS)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -228,18 +253,30 @@ def mock_extract(company: str, docs: list[RawDoc]) -> list[EvidenceItem]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def extract(cfg: EngineConfig, company: str, sector: str | None,
-            docs: list[RawDoc], tech_stack: str | None = None) -> tuple[EvidenceBlock, list[str]]:
-    """Docs → QA-checked EvidenceBlock (+ the violation list, for review flags)."""
+            docs: list[RawDoc], tech_stack: str | None = None
+            ) -> tuple[EvidenceBlock, list[str], list[str]]:
+    """Docs → QA-checked EvidenceBlock, verbatim violations, and review flags.
+
+    Returns (block, violations, flags):
+      - violations: quotes DROPPED because they were not verbatim.
+      - flags: kept quotes that contain speculation/negation markers → the
+        company is review-flagged so a human checks the event really happened.
+    """
     raw_items = (live_extract(cfg, company, docs) if cfg.live
                  else mock_extract(company, docs))
     accepted, violations = verbatim_qa(raw_items, docs)
     if violations:
         logger.warning("[extract] %s: %d verbatim violations dropped",
                        company, len(violations))
+    flags = [f"speculative/negated evidence [{it.category}]: {it.quote[:80]}"
+             for it in accepted if has_negation(it.quote)]
+    if flags:
+        logger.info("[extract] %s: %d quote(s) flagged for review (negation/speculation)",
+                    company, len(flags))
     block = EvidenceBlock(
         company_name=company,
         sector=sector,
         items=accepted,
         tech_stack_summary=tech_stack,
     )
-    return block, violations
+    return block, violations, flags

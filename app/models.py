@@ -251,6 +251,27 @@ class Signal(Base):
     urls: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class RunSnapshot(Base):
+    """Per-run score snapshot — one row per (import_run_id, company).
+
+    `companies` is overwritten in place on each import (only the latest run
+    survives there). This APPEND-ONLY table keeps the history so Maya's
+    `/recurring` and week-over-week trends can compare runs. Written by
+    import_csv.py after each import; never updated.
+    """
+    __tablename__ = "run_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    import_run_id: Mapped[str] = mapped_column(String(64), index=True)
+    company_name: Mapped[str] = mapped_column(String(256), index=True)
+    assessed_score: Mapped[float] = mapped_column(default=0.0)
+    coverage: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    outreach_eligible: Mapped[bool] = mapped_column(default=False)
+    signals_found: Mapped[int] = mapped_column(default=0)
+    run_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    imported_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Contact(Base):
     """Decision-maker contacts (CEO/CTO/CFO…) pulled via Apollo for shortlisted
     companies, with Inès's radar tags. One row per (company, person)."""

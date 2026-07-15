@@ -443,6 +443,56 @@ def test_runner_populates_tech_stack_summary(cfg):
     assert "digital gap" in result.tech_stack_summary.lower()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# New robustness: date guardrails, negation flags, EU registry, batch gate
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_date_in_text_guardrails():
+    today = date(2026, 7, 14)
+    assert extract.date_in_text("deal closes January 2030", today) is None      # future
+    assert extract.date_in_text("listed since January 2010", today) is None     # >5y
+    # most-recent plausible date wins over stale context in the same sentence
+    assert extract.date_in_text(
+        "founded January 2019, new CEO appointed June 2026", today) == date(2026, 6, 1)
+
+
+def test_has_negation_flags_speculation():
+    assert extract.has_negation("The group is reportedly considering a sale.")
+    assert extract.has_negation("She is no longer the CEO.")
+    assert extract.has_negation("The company may acquire a rival.")
+    assert not extract.has_negation("Anna Roe was appointed CEO on 1 June 2026.")
+
+
+def test_extract_flags_speculative_quote(cfg):
+    docs = [RawDoc(source="serper_news", url="https://x.com/a", title="T",
+                   text="The group is reportedly considering an acquisition of a rival.")]
+    block, violations, flags = extract.extract(cfg, "X", None, docs)
+    assert block.items and not violations
+    assert flags and "speculative" in flags[0]           # kept but flagged for review
+
+
+def test_eu_registry_and_batch_are_gated(cfg):
+    from pipeline import batch
+    with pytest.raises(EngineOffline):
+        research.eu_registry(cfg, "X")                   # dry-run blocks
+    with pytest.raises(EngineOffline):
+        batch.score_blocks_batched(cfg, [EvidenceBlock(company_name="X", sector=None)])
+
+
+def test_resume_reads_existing_rows(cfg, tmp_path):
+    """read_existing round-trips written rows so a resume never overwrites them."""
+    r = CompanyResult(name="Alpha", sector="Pharma", run_date="2026-07-14")
+    out = tmp_path / "run.csv"
+    export.write_csv([r], cfg, out)
+    rows = export.read_existing(out)
+    assert len(rows) == 1 and rows[0]["Company Name"] == "Alpha"
+    # writing a second company while preserving the first
+    r2 = CompanyResult(name="Beta", run_date="2026-07-14")
+    export.write_csv([r2], cfg, out, existing_rows=rows)
+    names = {row["Company Name"] for row in export.read_existing(out)}
+    assert names == {"Alpha", "Beta"}
+
+
 def test_boilerplate_flags_three_identical_rationales(cfg):
     def one(name):
         sig = InterpretedSignal(

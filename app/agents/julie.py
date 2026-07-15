@@ -19,7 +19,7 @@ from typing import Optional
 from app.agents.base import BaseAgent
 from app.config import AgentID
 from app.database import SessionLocal
-from app.models import Company
+from app.models import Company, Contact
 from app.tools import sectors as sector_tool
 from app.tools.memory import get_brand_dna_block, get_brand_voice_block
 
@@ -58,6 +58,23 @@ def _strongest_signal(c: Company) -> Optional[dict]:
                 "tpdl_relevance": getattr(c, f"s{i}_tpdl_relevance"),
             }
     return None
+
+
+def _primary_contact(company_name: str) -> Optional[Contact]:
+    """The best stored contact to address (Inès's batch): prefer active segment,
+    senior, right-function — so Julie writes TO a person, not a company."""
+    _rank_sen = {"c_level": 0, "vp": 1, "director": 2, "other": 3}
+    with SessionLocal() as db:
+        contacts = (db.query(Contact)
+                    .filter(Contact.company_name == company_name,
+                            Contact.premium.is_(False))  # Premium 5 go to Andrés
+                    .all())
+    if not contacts:
+        return None
+    return sorted(contacts, key=lambda c: (
+        0 if c.crm_segment == 2 else 1,
+        _rank_sen.get(c.seniority or "other", 3),
+    ))[0]
 
 
 class JulieAgent(BaseAgent):
@@ -176,26 +193,48 @@ class JulieAgent(BaseAgent):
                 f"{sig['category']} — {sig['what_happened']} (TPDL relevance: {sig['tpdl_relevance']})"
                 if sig else "no evidenced signal — keep it light and curiosity-led"
             )
+            # #17 — address Inès's actual contact, not just the company.
+            contact = _primary_contact(c.name)
+            if contact:
+                recipient_line = (
+                    f"RECIPIENT: {contact.full_name} · {contact.title or '—'} · "
+                    f"function={contact.function or '—'} · seniority={contact.seniority or '—'} · "
+                    f"language={contact.language or 'en'} · CRM segment {contact.crm_segment or '—'}"
+                )
+                lang_note = ("Write the message in SPANISH (recipient language=es)."
+                             if contact.language == "es" else
+                             "Write in English.")
+            else:
+                recipient_line = ("RECIPIENT: no contact pulled yet (Apollo not connected) — "
+                                  "address the likely decision-maker for this signal generically.")
+                lang_note = "Write in English."
             augmented = (
-                f"The user ran `/draft {c.name}`. Write a segmented outbound email.\n\n"
+                f"The user ran `/draft {c.name}`. Write ONE outreach message.\n\n"
                 f"COMPANY: {c.name} · sector: {c.sector_bucket or '—'} · {c.location or '—'} · "
                 f"score {c.assessed_score}\n"
+                f"{recipient_line}\n"
                 f"STRONGEST SIGNAL: {sig_str}\n"
                 f"SECTOR ANGLE ({c.sector_bucket or 'n/a'}): {cfg['angle']}\n\n"
                 f"{get_brand_dna_block()}\n\n"
                 f"{get_brand_voice_block()}\n\n"
-                f"As Julie, write: Subject (4-6 words tied to the signal) + Body (120-150 words). "
-                f"First sentence MUST cite the specific signal. Segment the framing to the sector. "
-                f"Ground it in TPDL's brand voice. Light CTA (20-min call). Sign 'TPDL'. "
-                f"If the sector angle is a placeholder, write a strong generic-but-sector-aware "
-                f"version and note one line about what sector content would sharpen it."
+                f"OUTREACH PHILOSOPHY (non-negotiable — TPDL's hard-won lesson): direct cold "
+                f"pitching is DEAD. Do NOT write a salesy pitch. Write a short, human, peer-to-"
+                f"peer note (≤90 words) that: opens on the specific signal as a genuine "
+                f"observation (not flattery), shows you understand the pressure it creates, and "
+                f"offers a relevant perspective — NOT a demo, NOT a hard CTA. The goal is a "
+                f"conversation, not a sale. If a close is needed, make it soft and optional "
+                f"('happy to share what we've seen others do, no agenda'). Personalise to the "
+                f"recipient's role. {lang_note} Ground every claim in a REAL Brand DNA case; if "
+                f"clients/projects are still empty, keep it experience-led and never invent a "
+                f"client or result. Output: a subject line (only if it's an email) + the body."
             )
             return {
                 "augmented_message": augmented,
                 "action": "drafted_outreach",
                 "task_title": f"Outreach draft — {c.name}",
                 "metadata": {"company": c.name, "sector": c.sector_bucket,
-                             "sector_defined": sector_tool.is_defined(c.sector_bucket)},
+                             "sector_defined": sector_tool.is_defined(c.sector_bucket),
+                             "recipient": contact.full_name if contact else None},
             }
 
         return None

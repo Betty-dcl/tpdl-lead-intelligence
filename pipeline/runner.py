@@ -4,13 +4,19 @@
         python -m pipeline.runner --fixture pipeline/fixtures/probe_diagnostics.json
     LIVE (spends money — requires keys + explicit flag):
         python -m pipeline.runner --company "Straumann Group" --live
+    VOLUME (many companies, -50% via Batch API):
+        python -m pipeline.runner --top 100 --live --batch
+    RESUME a crashed run (skips companies already in --out):
+        python -m pipeline.runner --top 100 --live --resume
 
 Output: a scored_results-compatible CSV (default data/csv/engine_run.csv),
-re-importable via `python import_csv.py <path>`.
+re-importable via `python import_csv.py <path>`. The CSV is rewritten after
+every company, so a crash still leaves a valid partial file.
 """
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import logging
 from collections import Counter
@@ -19,7 +25,7 @@ from pathlib import Path
 
 from pipeline import export, extract, research, score, techscan
 from pipeline.config import EngineConfig
-from pipeline.types import CompanyResult
+from pipeline.types import CompanyResult, EvidenceBlock
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] [%(name)s] %(message)s")
 logger = logging.getLogger("pipeline.runner")
@@ -27,44 +33,47 @@ logger = logging.getLogger("pipeline.runner")
 DEFAULT_OUT = Path("data/csv/engine_run.csv")
 
 
-def run_company(cfg: EngineConfig, name: str, sector: str | None = None,
-                fixture: Path | None = None,
-                identity: dict | None = None) -> CompanyResult:
-    """Steps 1→5 for a single company. (Step 0 = caller supplies the identity;
-    step 5 Batch API comes with milestone M7 — sequential calls until then.)"""
-    identity = identity or {}
-
-    # Step 1 — tech scan (Apify/Wappalyzer). A pre-supplied summary wins;
-    # otherwise scan the domain (live) or mock it (dry-run). no_tech_detected
-    # and scan_blocked are themselves commercial signals (Neotek spec §8).
+def _prepare(cfg: EngineConfig, name: str, sector: str | None,
+             fixture: Path | None, identity: dict
+             ) -> tuple[EvidenceBlock, str | None, list[str], list[str]]:
+    """Steps 1-3: tech scan → research → extraction (+ QA). No scoring yet."""
+    # Step 1 — tech scan (Apify/Wappalyzer). Pre-supplied summary wins; else scan.
     tech_stack = identity.get("tech_stack_summary")
     if not tech_stack:
-        domain = identity.get("website")
-        ts = techscan.scan(cfg, domain, identity.get("technologies"))
+        ts = techscan.scan(cfg, identity.get("website"), identity.get("technologies"))
         tech_stack = ts.summary()
         logger.info("[%s] tech scan: %s", name,
                     "digital gap (no CRM)" if ts.is_digital_gap()
                     else "blocked" if ts.scan_blocked
                     else "no domain" if ts.domain_missing else "stack detected")
 
-    # Step 2 — research: raw docs (fixture in dry-run, live sources otherwise)
+    # Step 2 — research
     docs = research.gather(cfg, name, fixture=fixture)
     logger.info("[%s] research: %d raw docs", name, len(docs))
 
-    # Step 3 — extraction (Sonnet 5) + verbatim QA in code
-    block, violations = extract.extract(cfg, name, sector, docs, tech_stack)
-    logger.info("[%s] extraction: %d evidence items (%d verbatim violations dropped)",
-                name, len(block.items), len(violations))
+    # Step 3 — extraction (Sonnet 5) + verbatim QA + speculation flags
+    block, violations, flags = extract.extract(cfg, name, sector, docs, tech_stack)
+    logger.info("[%s] extraction: %d evidence items (%d dropped, %d flagged)",
+                name, len(block.items), len(violations), len(flags))
+    return block, tech_stack, violations, flags
 
-    # Step 4 — interpretation (Opus 4.8) + deterministic scoring
-    scored, not_evidenced, summary = score.interpret_and_score(cfg, block)
-    flag, reason = score.review_flag(scored)
+
+def _assemble(cfg: EngineConfig, name: str, sector: str | None, identity: dict,
+              tech_stack: str | None, violations: list[str], flags: list[str],
+              scored, not_evidenced, summary) -> CompanyResult:
+    """Step 4 assembly: attach deterministic scores + review flags."""
+    review, reason = score.review_flag(scored)
+    extra = []
     if violations:
-        flag, reason = True, "; ".join(filter(None, [reason, f"{len(violations)} extraction QA violations"]))
+        extra.append(f"{len(violations)} extraction QA violations")
+    if flags:
+        extra.append(f"{len(flags)} speculative/negated quote(s) — verify event happened")
+    if extra:
+        review = True
+        reason = "; ".join(filter(None, [reason, *extra]))
 
     result = CompanyResult(
-        name=name,
-        sector=sector,
+        name=name, sector=sector,
         website=identity.get("website"),
         location=identity.get("location"),
         revenue=identity.get("revenue"),
@@ -74,13 +83,24 @@ def run_company(cfg: EngineConfig, name: str, sector: str | None = None,
         tech_stack_summary=tech_stack,
         historical_context=identity.get("historical_context"),
         icp_flag=bool(identity.get("icp_flag", False)),
-        review_flag=flag,
+        review_flag=review,
         review_flag_reason=reason,
         run_date=datetime.now(timezone.utc).isoformat(),
     )
     logger.info("[%s] scored: %.1f (%s) — outreach %s", name, result.assessed_score,
                 result.coverage, result.outreach_eligible(cfg.outreach_threshold))
     return result
+
+
+def run_company(cfg: EngineConfig, name: str, sector: str | None = None,
+                fixture: Path | None = None,
+                identity: dict | None = None) -> CompanyResult:
+    """Synchronous single-company run (steps 1-4). Used for cran 1 + dry-run."""
+    identity = identity or {}
+    block, tech_stack, violations, flags = _prepare(cfg, name, sector, fixture, identity)
+    scored, not_evidenced, summary = score.interpret_and_score(cfg, block)
+    return _assemble(cfg, name, sector, identity, tech_stack, violations, flags,
+                     scored, not_evidenced, summary)
 
 
 def flag_boilerplate(results: list[CompanyResult]) -> None:
@@ -101,8 +121,7 @@ def flag_boilerplate(results: list[CompanyResult]) -> None:
 
 
 def _select_companies(args) -> list:
-    """Resolve the run's company list (Step 0). Fixture/--company stay
-    standalone; --top/--lunch/--names read the dashboard DB."""
+    """Resolve the run's company list (Step 0)."""
     from pipeline import loader
 
     if args.fixture:
@@ -125,26 +144,36 @@ def _select_companies(args) -> list:
     return []
 
 
+def _done_names(out: Path) -> set[str]:
+    """Company names already present in an existing output CSV (for --resume)."""
+    if not out.exists():
+        return set()
+    with open(out, encoding="utf-8", newline="") as f:
+        return {row["Company Name"].strip() for row in csv.DictReader(f)
+                if row.get("Company Name", "").strip()}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="TPDL Lead Intelligence engine")
     # ── company selection (Step 0) ──
     parser.add_argument("--company", help="Single company name")
     parser.add_argument("--sector", default=None)
-    parser.add_argument("--fixture", type=Path, default=None,
-                        help="JSON fixture → dry-run research for that company")
-    parser.add_argument("--top", type=int, default=0,
-                        help="Top N companies from the DB (by assessed_score)")
-    parser.add_argument("--lunch", action="store_true",
-                        help="Lunch Campaign pool (Switzerland + Spain radar)")
-    parser.add_argument("--names", default=None,
-                        help='Explicit list from the DB: --names "UCB; Straumann Group"')
-    parser.add_argument("--min-score", type=float, default=0.0,
-                        help="Filter for --top/--lunch (e.g. 8.0 = outreach-eligible)")
+    parser.add_argument("--fixture", type=Path, default=None)
+    parser.add_argument("--top", type=int, default=0)
+    parser.add_argument("--lunch", action="store_true")
+    parser.add_argument("--names", default=None)
+    parser.add_argument("--min-score", type=float, default=0.0)
     # ── modes ──
     parser.add_argument("--estimate", action="store_true",
                         help="Print the pre-flight cost estimate and exit (spends nothing)")
     parser.add_argument("--live", action="store_true",
                         help="SPENDS MONEY: enable real API calls (needs keys in .env)")
+    parser.add_argument("--batch", action="store_true",
+                        help="Score via the Anthropic Batch API (-50%%, up to 24h)")
+    parser.add_argument("--resume", action="store_true",
+                        help="Skip companies already in --out (recover a crashed run)")
+    parser.add_argument("--force", action="store_true",
+                        help="Run even if the SerpAPI quota looks insufficient")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = parser.parse_args()
 
@@ -152,30 +181,83 @@ def main() -> None:
     if not companies:
         parser.error("select companies: --company / --fixture / --top N / --lunch / --names")
 
+    from pipeline import estimate as est_mod
+    est = est_mod.estimate_run(len(companies))
+
     # ── pre-flight estimate: cost preview + live SerpAPI quota check ──
     if args.estimate:
-        from pipeline import estimate as est_mod
-        est = est_mod.estimate_run(len(companies))
         print(f"Selected companies ({len(companies)}): "
               + ", ".join(c.name for c in companies[:8])
               + ("…" if len(companies) > 8 else ""))
         print(est_mod.render(est, est_mod.serp_quota_check(est)))
         return
 
+    # ── resume: drop companies already scored in the output file ──
+    if args.resume:
+        done = _done_names(args.out)
+        before = len(companies)
+        companies = [c for c in companies if c.name not in done]
+        logger.info("Resume: %d already done, %d remaining", before - len(companies),
+                    len(companies))
+        if not companies:
+            logger.info("Nothing to do — all selected companies already in %s", args.out)
+            return
+
     cfg = EngineConfig.load(live=args.live)
     mode = "LIVE (spending enabled)" if cfg.live else "DRY-RUN (zero cost)"
     logger.info("Engine mode: %s · extraction=%s · interpretation=%s",
                 mode, cfg.extraction_model, cfg.interpretation_model)
 
-    results = [
-        run_company(cfg, c.name, c.sector, fixture=args.fixture, identity=c.identity)
-        for c in companies
-    ]
+    # ── quota guardrail (#10): stop before blowing the monthly SerpAPI quota ──
+    if cfg.live and not args.force:
+        verdict = est_mod.serp_quota_check(est)
+        if verdict and "INSUFFICIENT" in verdict:
+            logger.error(verdict)
+            logger.error("Refusing to start (would half-finish). Shrink the run "
+                         "(--top N), wait for reset, or override with --force.")
+            return
+
+    # On resume, preserve the rows already written (never overwrite prior work).
+    existing_rows = export.read_existing(args.out) if args.resume else []
+
+    if args.batch and cfg.live and len(companies) > 1:
+        results = _run_batched(cfg, companies, args)
+        export.write_csv(results, cfg, args.out, existing_rows)
+    else:
+        results = _run_sequential(cfg, companies, args, existing_rows)
 
     flag_boilerplate(results)
-    out = export.write_csv(results, cfg, args.out)
-    logger.info("Wrote %s (%d companies) — re-import with: python import_csv.py %s",
-                out, len(results), out)
+    export.write_csv(results, cfg, args.out, existing_rows)
+    logger.info("Wrote %s (%d new + %d preserved) — re-import: python import_csv.py %s",
+                args.out, len(results), len(existing_rows), args.out)
+
+
+def _run_sequential(cfg, companies, args, existing_rows):
+    """Score one company at a time; rewrite the CSV after each (crash-safe)."""
+    results = []
+    for c in companies:
+        results.append(run_company(cfg, c.name, c.sector,
+                                   fixture=args.fixture, identity=c.identity))
+        export.write_csv(results, cfg, args.out, existing_rows)   # crash-safe snapshot
+    return results
+
+
+def _run_batched(cfg, companies, args):
+    """Research+extract every company, then score them all in one -50% batch."""
+    from pipeline import batch as batch_mod
+
+    prepared, blocks = [], []
+    for c in companies:
+        block, tech, viol, flags = _prepare(cfg, c.name, c.sector, args.fixture, c.identity)
+        prepared.append((c, tech, viol, flags))
+        blocks.append(block)
+    scored_by_company = batch_mod.score_blocks_batched(cfg, blocks)
+    results = []
+    for c, tech, viol, flags in prepared:
+        scored, not_ev, summary = scored_by_company.get(c.name, ([], [], ""))
+        results.append(_assemble(cfg, c.name, c.sector, c.identity, tech, viol, flags,
+                                 scored, not_ev, summary))
+    return results
 
 
 if __name__ == "__main__":

@@ -266,6 +266,37 @@ def perplexity_sonar(cfg: EngineConfig, company: str) -> list[RawDoc]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# EU company registries (conditional) — ownership & director changes for private
+# companies without a stock listing. Neotek triggered this for 32/492. There is
+# no single free EU-wide API; we hit a configurable registry endpoint (e.g. an
+# OpenCorporates-style service). Endpoint + key are set on first live use — the
+# gated pattern means dry-run never touches it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def eu_registry(cfg: EngineConfig, company: str) -> list[RawDoc]:
+    endpoint = getattr(cfg, "eu_registry_endpoint", "") or ""
+    key = getattr(cfg, "eu_registry_key", "") or ""
+    require_live(cfg, key or "unconfigured", "EU registry")
+    if not endpoint:
+        logger.info("[research] EU registry endpoint not configured — skipping")
+        return []
+    from urllib.parse import urlencode
+    data = _get_json(f"{endpoint}?{urlencode({'q': company, 'apikey': key})}")
+    docs: list[RawDoc] = []
+    for rec in (data.get("results") or data.get("companies") or []):
+        text = rec.get("summary") or rec.get("description") or ""
+        if text:
+            docs.append(RawDoc(
+                source="eu_registry",
+                url=rec.get("url"),
+                title=rec.get("name", f"EU registry — {company}"),
+                text=text,
+                published=_parse_date(rec.get("date") or rec.get("updated")),
+            ))
+    return docs
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Firecrawl — IR page fetch (conditional step)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -325,11 +356,21 @@ def gather(cfg: EngineConfig, company: str,
     # SERP engine: Serper (target) when its key exists, else SerpAPI (current sub)
     serp_sources = ((serper_news, serper_jobs) if cfg.serper_api_key
                     else (serpapi_news, serpapi_jobs))
+    sources = [*serp_sources, exa_search, perplexity_sonar]
+    if cfg.eu_registry_endpoint:          # conditional source, only when configured
+        sources.append(eu_registry)
 
     docs: list[RawDoc] = []
-    for fn in (*serp_sources, exa_search, perplexity_sonar):
+    for fn in sources:
         try:
-            docs.extend(fn(cfg, company))
+            got = fn(cfg, company)
+            # Parse-bug canary: a LIVE source returning nothing may be a schema
+            # mismatch, not a true absence of signal — make it visible.
+            if cfg.live and not got:
+                logger.info("[research] %s returned 0 docs for %s "
+                            "(real absence, or a parsing/schema issue?)",
+                            fn.__name__, company)
+            docs.extend(got)
         except Exception as exc:  # EngineOffline or network error: skip, never crash
             logger.info("[research] %s skipped: %s", fn.__name__, exc)
 
