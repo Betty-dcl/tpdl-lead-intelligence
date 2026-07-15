@@ -21,7 +21,7 @@ from app.models import User
 logger = logging.getLogger(__name__)
 
 
-TEAM_PASSWORD: str = os.environ.get("TPDL_TEAM_PASSWORD", "tpdl")
+TEAM_PASSWORD: str = os.environ.get("TPDL_TEAM_PASSWORD", "TPDL")
 
 
 def _load_session_secret() -> str:
@@ -53,10 +53,10 @@ SESSION_SECRET: str = _load_session_secret()
 # Gate toggle — default OFF so the demo link works for anyone.
 AUTH_GATE_ENABLED: bool = os.environ.get("TPDL_AUTH_GATE", "off").lower() == "on"
 
-if AUTH_GATE_ENABLED and TEAM_PASSWORD == "tpdl":
+if AUTH_GATE_ENABLED and TEAM_PASSWORD == "TPDL":
     logger.warning(
         "[auth] Auth gate is ON but TPDL_TEAM_PASSWORD is still the default "
-        "('tpdl'). Set a real password in .env before sharing the link."
+        "('TPDL'). Set a real password in .env before sharing the link."
     )
 
 GUEST_USERNAME = "guest"

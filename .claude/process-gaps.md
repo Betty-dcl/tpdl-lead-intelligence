@@ -97,8 +97,36 @@
   langue ES, séniorité, segment).
 - **#18** ciblage signal→rôle **dans le code** (`apollo.titles_for_signal`) — prêt pour Apollo.
 - **#29** `/draft` réorienté : **fini le cold pitch** — note courte, humaine, sans CTA agressif.
+- **#35** mot de passe : défaut passé à `TPDL` (à changer avant tout partage — warning au boot).
+- **#41** DiceBear : avatar de secours local (`static/img/avatar-fallback.svg`) + handler global
+  dans base.html → si DiceBear tombe, pas d'image cassée. **Vérifié en navigateur.**
 > Tests : **99 verts** (moteur + câblage agents). Reste live-dépendant : #9 (slug Apify à
 > confirmer), #2/#3/#8-qualité, #49 (parité) → tout ça se lève au **cran 1**.
+
+## 🗂️ BACKLOG « à me redemander » (validé par Betty, à faire plus tard)
+1. **Registres UE** (#13) : source déjà câblée — reste à configurer l'endpoint + activer (faible
+   valeur : 32/492 chez Neotek, sociétés privées non cotées). Après validation du cœur.
+2. **Dédup PipeDrive** (#6 data) : import CSV PipeDrive → Inès marque « déjà dans le CRM ».
+3. **Apollo/Kaspr live** (#20) : câbler le vrai fetch quand la clé arrive (+ ciblage signal→rôle déjà prêt).
+4. **Confirmer le slug Apify** (#9) : au 1er scan live, mettre le bon identifiant d'actor.
+5. **Intégrations terrain** (#31) : exports propres vers PipeDrive/Lemlist/Bouncer, puis n8n.
+6. **Boucle de feedback** (#32) : réponses/conversions → Maya + scoring_config.
+7. **Contenu à obtenir d'Andrés/Betty** (#25 + #29 — débloque Julie/Marc, ~30-45 min) :
+   - **3 à 6 cas clients réels** (même anonymisés) : secteur · le problème · ce que TPDL a fait · **le résultat chiffré**.
+   - **2 à 4 projets phares**.
+   - **Positionnement par secteur** (pharma / medtech / dental / diagnostics / dermatology / surgery / healthcare) : pourquoi ils devraient écouter + quelle preuve.
+   - **3 à 5 exemples de messages gagnants d'Andrés** (le ton/voix qui a VRAIMENT généré des réponses) — pour calibrer `/draft` et Julie.
+   - **UVP / propositions de valeur** cœur de TPDL.
+   - **KPI de succès** (objectif de taux de réponse, nb de rdv…) + **base légale RGPD** avant envoi.
+8. **Déploiement** (#36) : héberger pour qu'Andrés accède (Railway + Postgres/Supabase).
+9. **Bouton « Lancer le pipeline » / commande `/rerun` de Hugo** (#19+#20) : déclencher le
+   moteur depuis l'UI en tâche de fond + import auto. APRÈS validation du moteur (cran 1).
+10. **Remote git** (#39) : Betty crée un dépôt **GitHub privé** → je branche le remote + push
+    (je ne peux pas créer de compte). En attendant : bundle de sauvegarde local fait.
+11. **Prod / hébergement** (bloc #36-38, #40) : déploiement Railway + Postgres/Supabase (déjà
+    préparé) + gestion des secrets + monitoring. Seulement quand ça devient multi-utilisateur /
+    accessible à Andrés — pas pour construire en local. (Mon avis : pas utile maintenant.)
+> Betty peut demander « donne-moi la liste du backlog » à tout moment.
 
 ## Décisions prises (2026-07-14, avec Betty)
 - **Dédup PipeDrive (#6 data)** : à faire PLUS TARD. Principe retenu : import CSV PipeDrive →
