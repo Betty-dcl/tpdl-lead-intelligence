@@ -15,6 +15,12 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-15 — **Revue navigateur des 9 pages du dashboard (aucune erreur console).** Vérifié en
+  live que le fix des bandes de score somme à 492 (35+275+67+115). Corrigé 3 copies périmées :
+  home « Seven specialists » → « Eight… + Vera » (Vera jamais reflétée dans le hero) ; Usage
+  « 8 dashboard agents » → « 9 (Alex + 8) » ; « (via Apollo) » → « (Kaspr/Apollo) » depuis le
+  câblage Kaspr. Toutes les pages rendent bien (Sales, Today, Marketing, Contacts, Performance,
+  Review, Usage, Data, Home).
 - 2026-07-15 — **2e audit adversarial du code → 11 bugs corrigés + 12 tests (135 verts).** Deux
   passes parallèles (moteur + app), chaque finding vérifié à la main. Corrigés : crash JSON qui
   jetait le batch payant, double-comptage de catégories, corroboration sur-créditée, dates SERP
