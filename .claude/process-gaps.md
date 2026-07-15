@@ -80,6 +80,36 @@
 
 ---
 
+## ✅ Corrigés le 2026-07-15 (2e audit adversarial du code — 0 dépense)
+> Audit de tout le code (moteur + app) par 2 passes parallèles, chaque finding vérifié à la main.
+> 11 vrais bugs corrigés + 12 tests de régression. Suite : **135 verts**. Tout mergé dans `main`.
+- **Moteur `score.py`** : (1) `json.loads` de l'interprétation Opus non gardé → un JSON malformé
+  crashait la société ET **jetait tout le batch payant** ; désormais try/except (comme `extract`).
+  (2) **double-comptage** : 2 signaux de même catégorie gonflaient `assessed_score` (coverage
+  dédupliquait déjà) → dédup. (3) `signal_strength` non-entier (« high »/null) → coercition sûre.
+  (4) **corroboration** : tout item sans URL (Exa/Serper au lieu de Perplexity seul) bumpait à 2 →
+  restreint à Perplexity.
+- **Moteur `research.py`** : `_parse_date` n'acceptait que l'ISO → **toutes les dates SERP
+  (MM/DD/YYYY + « 3 days ago ») tombaient à None** = recency 0 silencieuse. Ajouté.
+- **Moteur `extract.py`** : (1) le QA verbatim acceptait via `all_text` → une citation mal
+  attribuée passait (gonflait la corroboration) ; désormais check sur la source déclarée +
+  flag SOURCE MISMATCH. (2) `corpus = {d.source: …}` **écrasait** les docs de même source
+  (2 `serper_news` → 1 seul) → concaténation. (3) `has_negation` : « cannot » déclenchait
+  « not », « Mayer » déclenchait « may » → frontières de mot.
+- **Moteur `runner.py`** : `--max-usd 0` (= ne rien dépenser) **désactivait** le coupe-circuit
+  (0.0 falsy) au lieu de bloquer → `is not None`.
+- **App `import_csv.py`** : `run_id` dérivé du **hash du contenu** → réimporter le MÊME CSV est
+  idempotent (plus de fausse récurrence pour Maya `/recurring`) ; un run différent crée bien un
+  2e run. Vérifié en DB temporaire (2 sens).
+- **App `maya.py`** : `/top5` (collé) tombait sur le défaut 50 → résout N=5.
+- **App `intel.py`** : bandes de score non contiguës (trous 0<x<1, 4.999<x<5, 7.999<x<8) →
+  contiguës, plus aucune société perdue du graphe.
+- **App `ines.py`** : `/premium add` sur un déjà-Premium recomptait « +1 » à tort + match par
+  sous-chaîne prenait le mauvais homonyme → court-circuit + désambiguïsation.
+- Docstrings : Julie `/linkedin`, Vera `/qa` documentés ; note « placeholder » de Julie corrigée.
+> ⏳ NON fait (destructif, à valider) : supprimer 3 mocks morts (~1216 lignes — `app/mocks/intel.py`,
+> `marketing_intel.py`, `companies.py`, importés nulle part). Proposé à Betty, pas exécuté seul.
+
 ## ✅ Corrigés le 2026-07-14 (lot gratuit, 0 dépense)
 - **#4** QA sémantique : détecteur de négation/spéculation (`extract.has_negation`) → citations
   « reportedly/considering/no longer… » **flaggées pour revue** ; prompt Opus renforcé (cap

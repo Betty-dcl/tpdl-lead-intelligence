@@ -15,6 +15,14 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-15 — **2e audit adversarial du code → 11 bugs corrigés + 12 tests (135 verts).** Deux
+  passes parallèles (moteur + app), chaque finding vérifié à la main. Corrigés : crash JSON qui
+  jetait le batch payant, double-comptage de catégories, corroboration sur-créditée, dates SERP
+  jamais parsées (recency 0 silencieuse), QA verbatim contournable + collapse de source, négation
+  par sous-chaîne, `--max-usd 0` qui désactivait le coupe-circuit, `RunSnapshot` non idempotent
+  (fausse récurrence), `/top5` collé, bandes de score à trous, `/premium add` recomptant à tort.
+  Détail dans `.claude/process-gaps.md` (§ Corrigés 2026-07-15). NON fait (destructif, à valider) :
+  suppression de 3 mocks morts (~1216 lignes).
 - 2026-07-15 — **Connecteurs Kaspr / Bouncer / Lemlist câblés (gated, dormants).** Écrits sur le
   patron Apollo (`is_configured()` + exception dédiée, jamais de fabrication, fail-closed).
   `app/tools/kaspr.py` = drop-in d'Apollo (même contrat de retour) ; Inès le PRÉFÈRE quand
@@ -156,7 +164,10 @@
   `main` (local, ff) ; (4) Oliver : 5e format `newsletter` (70/10/20) ; (5) corrigé le docstring
   périmé de `sectors.py` (angles peuplés) ; (6) **connecteurs Kaspr/Bouncer/Lemlist câblés en gated
   dormants** (jamais de fabrication, fail-closed, Kaspr préféré par Inès) + `tests/test_connectors.py`.
-  Suite : 123 verts. Tout mergé dans `main`.
+  Suite : 123 verts. Tout mergé dans `main`. (7) **2e audit adversarial** → 11 bugs corrigés
+  (crash batch, double-comptage, dates SERP, corroboration, QA verbatim, négation, `--max-usd 0`,
+  RunSnapshot idempotent, `/top5`, bandes de score, `/premium`) + 12 tests → **135 verts**.
+  Runbook de mise en prod ajouté (`.claude/go-live-runbook.md`).
 - Prochaine étape : (1) merger `feat/neotek-engine` → `main` (local) ; (2) débloquer l'externe —
   clé Anthropic (→ run LIVE + chat), clés Serper/Exa/Perplexity/Firecrawl (→ recherche réelle),
   Apollo/Kaspr (→ contacts) ; (3) brancher Kaspr/Bouncer/Lemlist ; (4) créer le remote partagé
