@@ -168,7 +168,7 @@ def perplexity_panel() -> dict:
 def anthropic_panel(db: Session) -> dict:
     """LOCAL tally from activity_log (each agent call logs its token usage)."""
     base = dict(provider="anthropic", label="Anthropic (Claude)",
-                role="The 8 dashboard agents (Opus 4.8) + the engine (Sonnet 5 / Opus 4.8)",
+                role="The 9 dashboard agents — Alex + 8 specialists (Opus 4.8) — plus the engine (Sonnet 5 / Opus 4.8)",
                 dashboard_url="https://console.anthropic.com/settings/usage")
     if not settings.anthropic_api_key or settings.anthropic_api_key == "not-set":
         return _panel(**base, configured=False, ok=False)
