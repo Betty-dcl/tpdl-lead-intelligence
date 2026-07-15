@@ -15,6 +15,15 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-15 — **Endpoints d'export d'Oliver (PDF/PPTX) exercés en direct → 2 bugs de crash 500
+  corrigés.** (1) `pdf_export.py` : Helvetica de fpdf2 est Latin-1 only → tout `→`/`€`/`≥`/… dans
+  le contenu de Marc faisait un 500 (l'ancienne liste ratait la plupart des symboles, dont `→` du
+  CTA). Remplacé par `_latin1_safe()` (map étendue + filet `encode('latin-1','replace')`), appliqué
+  au contenu ET à subject/format_label (header/footer). (2) `marketing.py` : les 2 endpoints
+  mettaient `subject` dans l'en-tête HTTP `Content-Disposition` (Latin-1 obligatoire) → un sujet
+  Unicode levait `UnicodeEncodeError` HORS du try/except → 500 brut. Slug réduit en ASCII. Vérifié
+  en live (fichiers %PDF/PPTX valides qui s'ouvrent) + 3 tests d'endpoint. Suite : 146 verts.
+  Note : warning déprécation fpdf2 `ln=False` (pré-existant, non bloquant).
 - 2026-07-15 — **Revue navigateur des 9 pages du dashboard (aucune erreur console).** Vérifié en
   live que le fix des bandes de score somme à 492 (35+275+67+115). Corrigé 3 copies périmées :
   home « Seven specialists » → « Eight… + Vera » (Vera jamais reflétée dans le hero) ; Usage
