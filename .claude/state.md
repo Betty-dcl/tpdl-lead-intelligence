@@ -15,6 +15,12 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-15 — **Passe accessibilité des 9 pages.** `aria-label` sur les inputs placeholder-seul
+  (chat Alex + drawer agent, note review, note intel, filtre OneDrive, sujets/contexte marketing) ;
+  `aria-label` sur les 3 `<select>` d'intel (filtre secteur/signal + statut par société, ~280 rendus
+  sans nom) ; `alt=""` sur les avatars DiceBear décoratifs (brouillons/légende marketing, activité
+  Today, Performance) car le nom d'agent est toujours adjacent. Login déjà OK (`<label for=pw>`).
+  Vérifié en live : chaque page = 0 champ sans label / 0 bouton anonyme / 0 image sans alt. 146 verts.
 - 2026-07-15 — **QA mobile (375px) → overflow horizontal corrigé sur Home + Marketing.** Cause :
   grille `grid-cols-12` avec enfants `col-span-12` → sur mobile les 11 column-gaps de 32px (=352px)
   dépassent la largeur contenu (~311px), quel que soit le nombre de tracks (prouvé : forcer 1 track
