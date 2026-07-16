@@ -45,7 +45,9 @@
   --tpdl-shadow-xs:   0 1px 2px rgba(9, 71, 82, 0.04);
   --tpdl-shadow-sm:   0 1px 2px rgba(9, 71, 82, 0.05), 0 2px 8px rgba(9, 71, 82, 0.04);
   --tpdl-shadow-md:   0 2px 4px rgba(9, 71, 82, 0.05), 0 8px 24px rgba(9, 71, 82, 0.07);
-  --tpdl-shadow-glow: 0 0 0 3px rgba(52, 213, 145, 0.22);
+  /* Two-layer focus ring: brand-green inner + dark-teal halo for ≥3:1 contrast
+     against the light bg (WCAG 2.4.7 / 2.4.11). Was a faint 0.22 green (~1.2:1). */
+  --tpdl-shadow-glow: 0 0 0 2px rgba(52, 213, 145, 0.9), 0 0 0 4px rgba(9, 71, 82, 0.55);
 
   /* Type */
   --tpdl-font-display: 'Space Grotesk', 'Inter', sans-serif;
