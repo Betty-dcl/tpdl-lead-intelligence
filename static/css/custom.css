@@ -17,7 +17,7 @@
   /* Text */
   --tpdl-text:        #111110;
   --tpdl-text-muted:  #5c5c5c;
-  --tpdl-text-faint:  #8a8a8a;
+  --tpdl-text-faint:  #6f6f6f;   /* WCAG AA (4.5:1) on light bg — was #8a8a8a (3.3:1) */
   --tpdl-text-on-dark:#ffffff;
 
   /* Lines */
