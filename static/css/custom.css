@@ -2,7 +2,7 @@
    TPDL design system — v2 "studio grade"
    Palette from www.thepharmadatalab.com — warm off-white, deep teal, signature
    mint-green. Type: Space Grotesk (display) · Inter (body) · JetBrains Mono
-   (labels & data). Pixel-art avatars via DiceBear.
+   (labels & data). Pixel-art avatars: local set from scripts/gen_avatars.py.
    ============================================================================ */
 
 :root {
@@ -278,14 +278,15 @@ a:hover .tpdl-logo-mark span { animation: tpdl-pix 0.5s ease; }
 
 /* ----------------------------- Avatars -------------------------------------- */
 
-/* Pixel avatars sit on a soft accent tile instead of a plain grey circle */
-img[src*="dicebear"] {
+/* Pixel avatars (local set from scripts/gen_avatars.py) sit on a soft accent
+   tile; each SVG also carries its own per-persona pastel backdrop. */
+img[src*="/static/img/avatar"] {
   background: linear-gradient(160deg, var(--tpdl-accent-soft) 0%, #f0f9f4 100%);
   border: 1px solid var(--tpdl-border);
   image-rendering: pixelated;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
 }
-img[src*="dicebear"]:hover {
+img[src*="/static/img/avatar"]:hover {
   transform: scale(1.12) rotate(-3deg);
   box-shadow: var(--tpdl-shadow-md);
 }
