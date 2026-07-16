@@ -213,7 +213,7 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-3 mb-4">
-      <select x-model="filters.sector_bucket"
+      <select x-model="filters.sector_bucket" aria-label="Filter by sector"
               class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink">
         <option value="">All sectors</option>
         <template x-for="v in distinctBuckets()" :key="v">
@@ -221,7 +221,7 @@
         </template>
       </select>
 
-      <select x-model="filters.signal_type"
+      <select x-model="filters.signal_type" aria-label="Filter by signal type"
               class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink">
         <option value="">Any signal</option>
         <option value="leadership_change">Leadership change</option>
@@ -351,6 +351,7 @@
                             x-text="statusLabel(workspace(c.name).status?.value || 'new')"></span>
                       <select @change="setStatus(c.name, $event.target.value)"
                               :value="workspace(c.name).status?.value || 'new'"
+                              :aria-label="`Status for ${c.name}`"
                               class="text-xs border border-line rounded px-2 py-1 bg-white">
                         <option value="new">New</option>
                         <option value="in_review">In review</option>
@@ -389,6 +390,7 @@
                     <form @submit.prevent="postComment(c.name)" class="flex gap-2">
                       <input type="text"
                              x-model="commentDrafts[c.name]"
+                             aria-label="Team note for this company"
                              placeholder="Leave a note for the team..."
                              class="flex-1 text-xs px-3 py-2 border border-line rounded focus:border-ink focus:outline-none">
                       <button type="submit"

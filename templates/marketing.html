@@ -191,7 +191,7 @@
           </template>
           <template x-for="draft in drafts" :key="draft.id">
             <div class="px-6 py-4 flex items-start gap-4">
-              <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content"
+              <img alt="" src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content"
                    class="w-10 h-10 rounded-full bg-bg-2 shrink-0">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
@@ -237,7 +237,7 @@
           </template>
           <template x-for="cs in caseStudies" :key="cs.id">
             <div class="px-6 py-4 flex items-start gap-4">
-              <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content"
+              <img alt="" src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content"
                    class="w-10 h-10 rounded-full bg-bg-2 shrink-0">
               <div class="flex-1 min-w-0">
                 <div class="text-sm font-medium" x-text="cs.title"></div>
@@ -320,7 +320,7 @@
             </template>
             <template x-for="em in outreach.pipeline" :key="em.id">
               <div class="px-6 py-3 flex items-center gap-4">
-                <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=julie-tpdl-outreach"
+                <img alt="" src="https://api.dicebear.com/9.x/pixel-art/svg?seed=julie-tpdl-outreach"
                      class="w-8 h-8 rounded-full bg-bg-2 shrink-0">
                 <div class="flex-1 min-w-0">
                   <div class="text-sm font-medium truncate" x-text="em.subject"></div>
@@ -361,17 +361,17 @@
       <!-- Pipeline diagram -->
       <div class="flex items-center gap-2 mb-6 flex-wrap">
         <div class="tpdl-card px-4 py-2 text-sm font-medium flex items-center gap-2">
-          <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=iris-tpdl-marketing-intel" class="w-6 h-6 rounded-full">
+          <img alt="" src="https://api.dicebear.com/9.x/pixel-art/svg?seed=iris-tpdl-marketing-intel" class="w-6 h-6 rounded-full">
           Iris — finds subject
         </div>
         <span class="text-ink-3">→</span>
         <div class="tpdl-card px-4 py-2 text-sm font-medium flex items-center gap-2">
-          <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content" class="w-6 h-6 rounded-full">
+          <img alt="" src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content" class="w-6 h-6 rounded-full">
           Marc — writes content
         </div>
         <span class="text-ink-3">→</span>
         <div class="tpdl-card px-4 py-2 text-sm font-medium flex items-center gap-2">
-          <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=oliver-tpdl-format" class="w-6 h-6 rounded-full">
+          <img alt="" src="https://api.dicebear.com/9.x/pixel-art/svg?seed=oliver-tpdl-format" class="w-6 h-6 rounded-full">
           Oliver — produces formats
         </div>
         <span class="text-ink-3">→</span>
@@ -387,6 +387,7 @@
             Subject <span class="font-normal normal-case">(leave empty — Iris picks from live trends)</span>
           </label>
           <input x-model="pipeline.subject" type="text"
+                 aria-label="Pipeline subject"
                  placeholder="e.g. AI in clinical trial recruitment — or leave empty"
                  class="w-full border border-line rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[color:var(--tpdl-accent-ink)] bg-white">
         </div>
@@ -518,7 +519,7 @@
     <section x-show="!loading && section === 'carousel'">
       <div class="flex items-start justify-between mb-1">
         <h2 class="text-xl font-semibold">Carousel Studio</h2>
-        <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content"
+        <img alt="" src="https://api.dicebear.com/9.x/pixel-art/svg?seed=marc-tpdl-content"
              class="w-10 h-10 rounded-full bg-bg-2">
       </div>
       <p class="text-sm text-ink-3 mb-6">
@@ -530,6 +531,7 @@
         <div class="mb-4">
           <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-2">Subject / Topic</label>
           <input x-model="carousel.subject" type="text"
+                 aria-label="Carousel subject"
                  placeholder="e.g. AI in medical education for pharma sales reps"
                  class="w-full border border-line rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[color:var(--tpdl-accent-ink)] bg-white">
         </div>
@@ -537,6 +539,7 @@
         <div class="mb-4">
           <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-2">Context <span class="font-normal normal-case">(optional — sector, audience, angle)</span></label>
           <textarea x-model="carousel.context" rows="2"
+                    aria-label="Carousel context"
                     placeholder="e.g. Focus on European pharma, medical education directors, data showing AI adoption gap"
                     class="w-full border border-line rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[color:var(--tpdl-accent-ink)] bg-white resize-none"></textarea>
         </div>

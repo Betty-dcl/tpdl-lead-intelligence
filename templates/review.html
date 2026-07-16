@@ -91,7 +91,7 @@
         </div>
 
         <div class="mt-4 flex items-center gap-2 flex-wrap">
-          <input type="text" x-model="notes[c.name]" placeholder="Optional note…"
+          <input type="text" x-model="notes[c.name]" aria-label="Review note" placeholder="Optional note…"
                  class="flex-1 min-w-[180px] text-sm border rounded-md px-3 py-1.5"
                  style="border-color:var(--tpdl-border)">
           <button @click="decide(c.name,'approved')"

@@ -143,6 +143,7 @@
           <input type="text"
                  x-model="$store.agents.chats.manager.input"
                  :disabled="$store.agents.chats.manager.sending"
+                 aria-label="Message to Alex, the team manager"
                  placeholder="What do you need?"
                  class="flex-1 px-3 py-2 text-sm rounded-md border border-line focus:border-ink focus:outline-none transition-colors">
           <button type="submit"
@@ -376,6 +377,7 @@
               <input type="text"
                      x-model="$store.agents.chats[$store.drawer.agentId].input"
                      :disabled="$store.agents.chats[$store.drawer.agentId].sending"
+                     :aria-label="`Message to ${$store.agents.byId[$store.drawer.agentId].name}`"
                      :placeholder="`Talk to ${$store.agents.byId[$store.drawer.agentId].name}...`"
                      class="flex-1 px-3 py-2 text-sm rounded-md border border-line bg-white focus:border-ink focus:outline-none transition-colors">
               <button type="submit"
