@@ -72,7 +72,7 @@
         <div class="ml-3 pl-3 border-l border-line" x-data="userBadge()">
           <template x-if="me">
             <div class="flex items-center gap-2">
-              <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${me.avatar_seed}`"
+              <img :src="`/static/img/avatars/${me.avatar_seed}.svg`"
                    class="w-8 h-8 rounded-full bg-bg-2 border border-line" :alt="me.display_name">
               <span class="text-sm font-medium" x-text="me.display_name"></span>
               <button @click="logout"
@@ -104,13 +104,13 @@
 </footer>
 
 <script>
-  // Resilience: DiceBear is an external service. If any avatar fails to load
-  // (service down / network), swap it once to a local fallback so the UI never
+  // Resilience: avatars are local pixel-art SVGs (scripts/gen_avatars.py). If a
+  // seed has no generated file (404), swap once to the fallback so the UI never
   // shows broken images. Capture-phase listener covers Alpine-bound :src too.
   document.addEventListener("error", function (e) {
     var el = e.target;
     if (el && el.tagName === "IMG" && !el.dataset.fallbackApplied &&
-        /dicebear\.com/.test(el.src || "")) {
+        /\/static\/img\/avatars\//.test(el.src || "")) {
       el.dataset.fallbackApplied = "1";
       el.src = "/static/img/avatar-fallback.svg";
     }

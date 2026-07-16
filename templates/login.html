@@ -25,7 +25,7 @@
                 @click="username = '{{ u.username }}'"
                 :class="username === '{{ u.username }}' ? 'border-ink bg-bg-2' : 'border-line'"
                 class="border-2 rounded-lg p-2 text-center transition-colors hover:border-ink">
-          <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed={{ u.avatar_seed }}"
+          <img src="/static/img/avatars/{{ u.avatar_seed }}.svg"
                class="w-12 h-12 rounded-full bg-bg-2 mx-auto" alt="{{ u.display_name }}">
           <div class="text-xs mt-1 font-medium">{{ u.display_name }}</div>
         </button>

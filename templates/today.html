@@ -149,7 +149,7 @@
           <div class="divide-y divide-line">
             <template x-for="(a, i) in data.recent_activity || []" :key="i">
               <div class="px-6 py-2.5 flex items-center gap-3">
-                <img alt="" :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${a.avatar_seed}`"
+                <img alt="" :src="`/static/img/avatars/${a.avatar_seed}.svg`"
                      class="w-7 h-7 rounded-full bg-bg-2 shrink-0">
                 <div class="flex-1 min-w-0 text-xs">
                   <span class="font-medium" x-text="a.agent"></span>

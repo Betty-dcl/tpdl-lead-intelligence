@@ -129,7 +129,7 @@
       <div class="flex gap-2 overflow-x-auto pb-2">
         <template x-for="a in activity.slice(0, 8)" :key="a.id">
           <div class="flex items-center gap-2 bg-white border border-line rounded-full px-3 py-1.5 text-xs shrink-0">
-            <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${a.user.avatar_seed}`"
+            <img :src="`/static/img/avatars/${a.user.avatar_seed}.svg`"
                  class="w-5 h-5 rounded-full bg-bg-2">
             <span class="font-medium" x-text="a.user.display_name"></span>
             <span class="text-ink-3" x-text="actionVerb(a.action)"></span>
@@ -329,7 +329,7 @@
                     </template>
                     <template x-if="workspace(c.name).assignment?.user">
                       <div class="flex items-center gap-2">
-                        <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${workspace(c.name).assignment.user.avatar_seed}`"
+                        <img :src="`/static/img/avatars/${workspace(c.name.svg).assignment.user.avatar_seed}`"
                              class="w-7 h-7 rounded-full bg-bg-2 border border-line">
                         <div class="text-sm">
                           <span class="font-medium" x-text="workspace(c.name).assignment.user.display_name"></span>
@@ -372,7 +372,7 @@
                     <div class="space-y-2 max-h-48 overflow-y-auto mb-3">
                       <template x-for="cm in workspace(c.name).comments" :key="cm.id">
                         <div class="flex gap-2 text-xs">
-                          <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${cm.author.avatar_seed}`"
+                          <img :src="`/static/img/avatars/${cm.author.avatar_seed}.svg`"
                                class="w-6 h-6 rounded-full bg-bg-2 shrink-0">
                           <div class="flex-1">
                             <div class="flex items-baseline gap-2">
@@ -495,7 +495,7 @@
                           <div class="mt-4 pt-4 border-t border-line"
                                x-data="{ b: getBrief(c.name, specialistFor(sig.category)) }">
                             <div class="flex items-center gap-2 mb-3">
-                              <img :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${b.agent.avatar_seed}`"
+                              <img :src="`/static/img/avatars/${b.agent.avatar_seed}.svg`"
                                    class="w-8 h-8 rounded-full bg-bg-2 border border-line">
                               <div class="flex-1">
                                 <div class="text-sm font-semibold" x-text="`${b.agent.name}'s brief`"></div>

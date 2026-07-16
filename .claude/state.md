@@ -15,6 +15,15 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-16 — **Avatars pixel-art custom « consulting » + suppression de DiceBear.** Nouveau
+  générateur versionné `scripts/gen_avatars.py` → 15 SVG locaux (`static/img/avatars/<seed>.svg`,
+  grille 20×20 crispEdges) : tenues consulting (costumes/blazers/cols roulés), accents TPDL
+  (#094752/#34D591 — cravates, épingles, micro-casque d'Inès), lunettes fines (Hugo, Vera), signes
+  distinctifs par persona (chignon+mèche argent Vera, barbe Marc, queue de cheval Iris…). Les 22
+  URL DiceBear des templates remplacées par les fichiers locaux (⚠️ les 2 cas Jinja `{{ seed }}`
+  ont dû être repris à la main après le regex) ; handler de fallback de base.html repointé.
+  Dépendance externe DiceBear (risque #41) SUPPRIMÉE. Micro-interaction : anneau menthe sur
+  l'avatar au survol des tuiles agents. Vérifié en live (home, tuiles, login). 146 verts.
 - 2026-07-15 — **Passe accessibilité des 9 pages.** `aria-label` sur les inputs placeholder-seul
   (chat Alex + drawer agent, note review, note intel, filtre OneDrive, sujets/contexte marketing) ;
   `aria-label` sur les 3 `<select>` d'intel (filtre secteur/signal + statut par société, ~280 rendus

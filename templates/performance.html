@@ -109,7 +109,7 @@
           <div class="divide-y divide-line">
             <template x-for="agent in agentStats" :key="agent.id">
               <div class="px-6 py-3 flex items-center gap-4">
-                <img alt="" :src="`https://api.dicebear.com/9.x/pixel-art/svg?seed=${agent.avatar_seed}`"
+                <img alt="" :src="`/static/img/avatars/${agent.avatar_seed}.svg`"
                      class="w-9 h-9 rounded-full bg-bg-2 shrink-0">
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
