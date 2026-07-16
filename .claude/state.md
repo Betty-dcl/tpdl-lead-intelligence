@@ -21,6 +21,9 @@
   sans nom) ; `alt=""` sur les avatars DiceBear décoratifs (brouillons/légende marketing, activité
   Today, Performance) car le nom d'agent est toujours adjacent. Login déjà OK (`<label for=pw>`).
   Vérifié en live : chaque page = 0 champ sans label / 0 bouton anonyme / 0 image sans alt. 146 verts.
+  Puis **contraste WCAG AA** : `ink-3`/`--tpdl-text-faint` #8a8a8a (3.3:1, sous le seuil 4.5) →
+  #6f6f6f (4.8:1), hiérarchie préservée. `ink`/`ink-2` OK ; accent-texte utilise `--tpdl-accent-ink`
+  #0a3a26 (12:1). Cache custom.css bumpé v=3. Vérifié en live (eyebrow 4.81:1, design intact).
 - 2026-07-15 — **QA mobile (375px) → overflow horizontal corrigé sur Home + Marketing.** Cause :
   grille `grid-cols-12` avec enfants `col-span-12` → sur mobile les 11 column-gaps de 32px (=352px)
   dépassent la largeur contenu (~311px), quel que soit le nombre de tracks (prouvé : forcer 1 track
