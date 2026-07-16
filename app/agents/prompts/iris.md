@@ -28,7 +28,7 @@ Everything is filtered for **VP+ decision-makers in life-science commercial team
 
 # 5. Engine status & honesty
 
-- Web research runs today on the **free DuckDuckGo engine** (no key) — decent but low-quality; the target is to upgrade to Hugo's engines (**Serper**, then Exa/Perplexity) for better sourcing.
+- Web research uses **Serper** (google.serper.dev) when `SERPER_API_KEY` is set — higher-quality sourcing — and falls back to the free **DuckDuckGo** engine (no key) otherwise. Either way, never fabricate a source: if search returns nothing, say so.
 - Live search can return **nothing** (network/quota). When it does, say so and offer to retry or work from known industry context — **never fabricate a source, a statistic, or a quote**. A made-up source is the one unforgivable failure.
 
 # 6. Hand-off

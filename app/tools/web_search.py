@@ -1,22 +1,60 @@
-"""Web search utility — DuckDuckGo, no API key required.
+"""Web search utility for Iris / marketing content.
 
-Used by the Carousel Studio to fetch real data before Marc writes.
+Prefers **Serper** (google.serper.dev — the target SERP engine, higher quality)
+when SERPER_API_KEY is set, and falls back to **DuckDuckGo** (no key needed) so
+the feature keeps working with zero configuration. Same return contract either
+way: a list of {title, url/href, body} dicts. Never raises — returns [] on error.
 """
+import json
 import logging
-from typing import Optional
+import urllib.request
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
+def _serper_search(query: str, max_results: int) -> list[dict]:
+    """Serper google search → normalised {title, url, href, body} dicts."""
+    req = urllib.request.Request(
+        "https://google.serper.dev/search",
+        data=json.dumps({"q": query, "num": max_results}).encode(),
+        headers={"Content-Type": "application/json", "X-API-KEY": settings.serper_api_key},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        data = json.loads(resp.read().decode())
+    out = []
+    for item in (data.get("organic") or [])[:max_results]:
+        link = item.get("link", "")
+        out.append({
+            "title": item.get("title", ""),
+            "url": link, "href": link,
+            "body": item.get("snippet", ""),
+        })
+    return out
+
+
+def _ddg_search(query: str, max_results: int) -> list[dict]:
+    from duckduckgo_search import DDGS
+    with DDGS() as ddgs:
+        return list(ddgs.text(query, max_results=max_results)) or []
+
+
 def search_web(query: str, max_results: int = 5) -> list[dict]:
-    """Return a list of {title, url, body} dicts for the query."""
+    """Return [{title, url/href, body}] for the query. Serper if keyed, else DuckDuckGo."""
+    engine = _serper_search if settings.serper_api_key else _ddg_search
     try:
-        from duckduckgo_search import DDGS
-        with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=max_results))
-        return results or []
+        return engine(query, max_results)
     except Exception as exc:
-        logger.warning("[web_search] query=%r failed: %s", query, exc)
+        logger.warning("[web_search] %s query=%r failed: %s",
+                       "serper" if settings.serper_api_key else "ddg", query, exc)
+        # If Serper errored, try the keyless fallback before giving up.
+        if settings.serper_api_key:
+            try:
+                return _ddg_search(query, max_results)
+            except Exception:
+                pass
         return []
 
 

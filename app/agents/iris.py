@@ -9,7 +9,8 @@ Slash commands:
   - /trends [sector?]   → research + score the week's most content-worthy themes.
   - /themes             → the scored theme shortlist to hand to Marc.
 
-Web research uses the free DuckDuckGo engine (no key). Theme scoring is done by
+Web research uses Serper when SERPER_API_KEY is set, else the free DuckDuckGo
+engine (no key). Theme scoring is done by
 Claude. Live re-runs can later be upgraded to the same engines as Hugo (Exa,
 Perplexity) once keys are set.
 """

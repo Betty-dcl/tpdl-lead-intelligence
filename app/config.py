@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     exa_api_key: str = ""          # Exa neural search (Steps: general/leadership/M&A)
     perplexity_api_key: str = ""   # Perplexity Sonar (financial press: M&A/PE)
     serpapi_key: str = ""          # SerpAPI (Google News + Google Jobs)
+    serper_api_key: str = ""       # Serper (target SERP; also powers Iris/marketing web search)
     apify_token: str = ""          # Apify / Wappalyzer actor (tech-stack scan)
     firecrawl_api_key: str = ""    # Firecrawl (IR/website page fetch)
 

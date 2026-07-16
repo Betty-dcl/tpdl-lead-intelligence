@@ -15,6 +15,11 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-16 — **Iris/marketing : migration DuckDuckGo → Serper (gap #26).** `app/tools/web_search.py`
+  préfère Serper (`google.serper.dev`) quand `SERPER_API_KEY` est set (meilleure qualité), fallback
+  DuckDuckGo keyless sinon — même contrat de retour, ne lève jamais. `serper_api_key` ajoutée à
+  `app/config.py` ; si Serper erreure, retombe sur DuckDuckGo avant d'abandonner. Prompt+docstring
+  Iris réalignés. `tests/test_connectors.py` +3. Suite : 149 verts. Reste : fournir la clé Serper.
 - 2026-07-16 — **Avatars pixel-art custom « consulting » + suppression de DiceBear.** Nouveau
   générateur versionné `scripts/gen_avatars.py` → 15 SVG locaux (`static/img/avatars/<seed>.svg`,
   grille 20×20 crispEdges) : tenues consulting (costumes/blazers/cols roulés), accents TPDL

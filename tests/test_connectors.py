@@ -134,3 +134,38 @@ def test_lemlist_add_lead_ok(monkeypatch):
                         lambda req, timeout=30: _FakeResp({"_id": "lead1"}))
     out = lemlist.add_lead_to_campaign("cmp1", "jane@acme.com", first_name="Jane")
     assert out["ok"] is True and out["email"] == "jane@acme.com"
+
+
+# ── web_search: Serper preferred, DuckDuckGo fallback (Iris / marketing) ────
+
+def test_web_search_prefers_serper_when_keyed(monkeypatch):
+    from app.tools import web_search as ws
+    monkeypatch.setattr(ws.settings, "serper_api_key", "k")
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda req, timeout=20: _FakeResp({"organic": [
+                            {"title": "T", "link": "https://x", "snippet": "s"}]}))
+    out = ws.search_web("pharma CRM", 3)
+    assert out and out[0]["url"] == "https://x" and out[0]["href"] == "https://x"
+    assert out[0]["title"] == "T" and out[0]["body"] == "s"
+
+
+def test_web_search_falls_back_to_ddg_without_key(monkeypatch):
+    from app.tools import web_search as ws
+    monkeypatch.setattr(ws.settings, "serper_api_key", "")
+    monkeypatch.setattr(ws, "_ddg_search",
+                        lambda q, n: [{"title": "D", "href": "https://d", "body": "b"}])
+    out = ws.search_web("pharma CRM", 3)
+    assert out and out[0]["href"] == "https://d"
+
+
+def test_web_search_serper_error_falls_back_to_ddg(monkeypatch):
+    from app.tools import web_search as ws
+    monkeypatch.setattr(ws.settings, "serper_api_key", "k")
+
+    def boom(req, timeout=20):
+        raise urllib.error.HTTPError("url", 500, "err", {}, None)
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    monkeypatch.setattr(ws, "_ddg_search",
+                        lambda q, n: [{"title": "D", "href": "https://d", "body": "b"}])
+    out = ws.search_web("x", 3)
+    assert out and out[0]["href"] == "https://d"       # never crashes; degrades

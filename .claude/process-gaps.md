@@ -36,7 +36,9 @@
 25. 🟠 **Aucun agent ne peut DÉCLENCHER le moteur** — Hugo « possède » les steps 0-6 sur le papier, sans chemin de code pour lancer un run.
 
 ## D. Pipeline marketing
-26. 🟠 **Iris tourne sur DuckDuckGo** (qualité basse, lib dépréciée `ddgs`) ; cible Serper non branchée.
+26. ✅ **FAIT (2026-07-16)** : `web_search.py` (Iris + Carousel + pipeline marketing) préfère
+    désormais **Serper** dès que `SERPER_API_KEY` est set, DuckDuckGo en fallback keyless (même
+    contrat de retour). Clé ajoutée à `app/config.py`, prompt Iris réaligné, 3 tests. Reste : la clé.
 27. ⚪ Marc marque `[STAT TO VERIFY]` mais **aucune étape de vérification** n'existe → stats non vérifiées peuvent partir.
 28. 🟡 **Newsletter (pondération 70/10/20) notée mais PAS un format supporté** par Oliver.
 29. 🔴 **Le marketing n'a aucun accès à l'audience CRM** → les « 70 % audience CRM existante » sont impossibles (pas de données CRM dans l'app).
