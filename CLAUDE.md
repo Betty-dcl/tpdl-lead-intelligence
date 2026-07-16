@@ -32,7 +32,10 @@
   `/recurring` de Maya s'active au 2e import réel.
 - Sources codées (gated) : Serper News/Jobs (+ fallback SerpAPI auto), Exa Q1/Q2/Q3, Perplexity
   Sonar, registres UE (source web GRATUITE), Firecrawl (IR). Contacts : Apollo réel (gated).
-  Clés externes encore VIDES → tout reste en dry-run tant qu'elles ne sont pas fournies.
+  ⚠️ CLÉS PRÉSENTES dans `.env` (constaté 2026-07-16, non testées par un appel live) : Anthropic,
+  SerpAPI, Exa, Perplexity, Firecrawl, Apify → le stack recherche + Anthropic sont là ⇒ **un run
+  LIVE du moteur est techniquement possible** (coûte de l'argent). VIDES : Serper (fallback SerpAPI),
+  Apollo, Kaspr, Bouncer, Lemlist (contacts/email/outreach). Aucun run live lancé sans accord.
 - Outreach/CRM réel (terrain, hors repo) : **PipeDrive** (CRM), **Surf** (LinkedIn→PipeDrive),
   Sales Navigator, **MailChimp** (newsletters). Envoi des messages MANUEL par un SDR en Inde.
   Détail dans `.claude/operational-context.md`.

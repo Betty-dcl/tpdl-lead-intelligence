@@ -118,6 +118,21 @@ def test_julie_draft_addresses_stored_contact(client):
             db.commit()
 
 
+# ── Hugo /rerun — explains the engine trigger, never fabricates a refresh ───
+
+def test_hugo_rerun_explains_without_fabricating(client):
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        hugo = AGENT_CLASSES["hugo"].load(db, "hugo")
+        meta = hugo._dispatch_command("/rerun")
+        assert meta["action"] == "rerun_explained"
+        msg = meta["augmented_message"].lower()
+        assert "dry-run" in msg and "live" in msg
+        assert "never" in msg           # instructed not to claim a refresh happened
+        assert isinstance(meta["metadata"]["live_ready"], bool)
+
+
 # ── Iris dispatch (was entirely untested) ──────────────────────────────────
 
 def test_iris_research_needs_topic(client):

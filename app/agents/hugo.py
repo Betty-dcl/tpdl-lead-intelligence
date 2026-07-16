@@ -69,6 +69,32 @@ class HugoAgent(BaseAgent):
             text = "/company" + text[len("/generate"):]
         low = text.lower()
 
+        # ── /rerun — trigger / explain an engine run ─────────────────────
+        if low == "/rerun" or low.startswith("/rerun"):
+            from app.config import settings
+            live_ready = bool(settings.anthropic_api_key) and \
+                settings.anthropic_api_key != "not-set"
+            augmented = (
+                "The user ran `/rerun`. Explain how a pipeline run works now, honestly:\n"
+                "- A **dry-run smoke test** (zero cost, the probe fixture) can be launched "
+                "from the **Usage page** button or `python -m pipeline.runner --fixture "
+                "pipeline/fixtures/probe_diagnostics.json`. It proves the chain "
+                "(research → extract → score) but NEVER overwrites the scored database.\n"
+                f"- A **live run** {'IS' if live_ready else 'is NOT'} currently possible "
+                f"({'API key present' if live_ready else 'ANTHROPIC_API_KEY missing'}). "
+                "Live runs spend money and are launched from the CLI so the cost is "
+                "explicit: `python -m pipeline.runner --top 5 --live --max-usd 1` then "
+                "`python import_csv.py data/csv/engine_run.csv` (this is what feeds a 2nd "
+                "run into Maya's /recurring).\n"
+                "As Hugo, relay this plainly and NEVER claim you already refreshed the data."
+            )
+            return {
+                "augmented_message": augmented,
+                "action": "rerun_explained",
+                "task_title": "/rerun",
+                "metadata": {"live_ready": live_ready},
+            }
+
         # ── /scan [sector?] ──────────────────────────────────────────────
         if low == "/scan" or low.startswith("/scan "):
             parts = text.split(maxsplit=1)

@@ -9,12 +9,26 @@
 ## Où on en est
 - Phase : **Step 3 (workflow) largement FAIT en code** — le moteur Neotek est reconstruit dans
   `pipeline/` (dry-run 0 coût + `--live` gated, 112 tests verts). Step 2 (formation) terminé côté
-  prompts (9 agents avec Vera). Reste bloqué par l'externe : clés API pour un run LIVE + chat live.
+  prompts (9 agents avec Vera). ⚠️ Les clés recherche + Anthropic sont DANS `.env` (2026-07-16) ⇒
+  un run LIVE est techniquement possible (voir log) ; aucun lancé sans accord (coût). Vides :
+  Serper, Apollo, Kaspr, Bouncer, Lemlist.
 - Base + mémoire : posées et rapatriées dans le repo.
 - Dernier run Neotek : 25/05 (492 entreprises, 35 éligibles) — FIGÉ. Amorcé comme run #1 dans
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-16 — ⚠️ **CONSTAT : les clés API sont DANS `.env`** (Anthropic, SerpAPI, Exa, Perplexity,
+  Firecrawl, Apify). Contredit toute la mémoire « bloqué sur les clés ». Non testées par un appel
+  live (donc validité inconnue), mais présentes ⇒ **un run LIVE du moteur est techniquement
+  possible dès maintenant** (dépense réelle). Vides : Serper, Apollo, Kaspr, Bouncer, Lemlist.
+  Décision : NE PAS lancer de run live sans accord explicite (coût + écrase la table companies).
+- 2026-07-16 — **Moteur déclenchable depuis l'UI (gaps #24/#25/backlog #9).** Nouveau routeur
+  `app/routers/engine.py` : `POST /api/engine/run` (dry-run par défaut = smoke test 0 coût de la
+  fixture probe, **n'écrit JAMAIS la table companies** ; live gated → 400 sans clé, 501 « lancer
+  au CLI » avec clé, pour garder la dépense explicite) + `GET /api/engine/status`. Panneau sur la
+  page Usage (bouton « Run smoke test », résultat scoré, chip LIVE READY/DRY-RUN ONLY). Commande
+  `/rerun` de Hugo (explicative, ne fabrique jamais un refresh). Vérifié : smoke test UI → Probe
+  scoré 5.8, non importé, coût 0. `tests/test_engine_api.py` (3) + test `/rerun`. Suite : 153 verts.
 - 2026-07-16 — **Iris/marketing : migration DuckDuckGo → Serper (gap #26).** `app/tools/web_search.py`
   préfère Serper (`google.serper.dev`) quand `SERPER_API_KEY` est set (meilleure qualité), fallback
   DuckDuckGo keyless sinon — même contrat de retour, ne lève jamais. `serper_api_key` ajoutée à
@@ -168,22 +182,22 @@
 - 2026-07-09 — Confirmé : le moteur pipeline Neotek n'est PAS accessible (on n'a que les CSV).
 
 ## Checklist des blocages (cocher quand levé)
-- [ ] #1 Clé Anthropic réelle dans `.env` (placeholder actuellement)
+- [x] #1 Clé Anthropic dans `.env` (PRÉSENTE au 2026-07-16, validité non testée par un appel live)
 - [x] #1b IDs de modèles fixés : Sonnet 5 (extraction) + Opus 4.8 (interprétation/chat)
-- [ ] #2 Clé Exa
-- [ ] #3 Clé Perplexity
+- [x] #2 Clé Exa (présente dans .env, validité non testée)
+- [x] #3 Clé Perplexity (présente dans .env, validité non testée)
 - [x] #4 Brand DNA : angles sectoriels peuplés (`app/tools/sectors.py`, positionnement réel
       anonymisé). Reste : les CHIFFRES/résultats clients précis d'Andrés pour durcir les proof points.
 - [~] #5 Kaspr : connecteur CODÉ + gated (`app/tools/kaspr.py`, préféré par Inès). Reste : `KASPR_API_KEY`.
-- [ ] #6 Token Apify (bonus)
+- [x] #6 Token Apify (présent dans .env)
 - [x] #7 Reconstruction du moteur pipeline (`pipeline/`, dry-run + live gated, 112 tests). Reste :
       lancer un run LIVE réel (dépend des clés API), pas le code.
 - [x] #7c Historique des runs (`RunSnapshot`) + `backfill_snapshots.py` → run 25/05 amorcé (run #1).
       `/recurring` s'active au 2e import. Reste : un 2e CSV réel à importer.
 - [x] #7b Modèle `Contact` étendu (function / seniority / crm_segment) + `app/tools/segmentation.py`
       + migration additive SQLite dans `init_db` + tests (44 passent). Reste : Apollo pour peupler.
-- [ ] Serper configuré (← SerpAPI + DuckDuckGo)
-- [ ] Firecrawl configuré
+- [ ] Serper configuré (vide ; SerpAPI présent en fallback, web_search bascule auto)
+- [x] Firecrawl configuré (clé présente dans .env)
 - [~] Bouncer : connecteur CODÉ + gated (`app/tools/bouncer.py`, fail-closed). Reste : `BOUNCER_API_KEY`.
 - [~] Lemlist : connecteur CODÉ + gated (`app/tools/lemlist.py`, sortant/humain). Reste : `LEMLIST_API_KEY`.
 - [ ] n8n (mutualisation Devengo demandée à Andrés ?)

@@ -214,6 +214,50 @@
       </table>
     </div>
   </section>
+
+  <!-- ── Engine trigger ───────────────────────────────────────────────── -->
+  <section class="tpdl-card p-6 mt-8" x-show="engine">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <h2 class="text-lg font-semibold">Lead Intelligence engine</h2>
+          <span class="provider-chip"
+                :class="engine?.live_available ? 'chip-live' : 'chip-off'"
+                x-text="engine?.live_available ? 'LIVE READY' : 'DRY-RUN ONLY'"></span>
+        </div>
+        <p class="text-sm text-ink-2 max-w-xl" x-text="engine?.note || ''"></p>
+        <p class="text-[11px] text-ink-3 mt-1" x-show="engine?.live_blocker"
+           x-text="'Live blocker: ' + (engine?.live_blocker || '')"></p>
+      </div>
+      <button class="tpdl-btn tpdl-btn--primary" @click="runSmokeTest()"
+              :disabled="engineBusy">
+        <span x-text="engineBusy ? 'Running…' : 'Run smoke test (dry-run)'"></span>
+      </button>
+    </div>
+
+    <!-- result -->
+    <template x-if="lastRun">
+      <div class="mt-5 border-t border-line pt-4">
+        <div class="flex items-center gap-2 flex-wrap text-sm mb-2">
+          <span class="font-medium" x-text="lastRun.company"></span>
+          <span class="tpdl-badge tpdl-badge--dark" x-text="'score ' + lastRun.assessed_score"></span>
+          <span class="tpdl-badge tpdl-badge--outline" x-text="lastRun.coverage"></span>
+          <span class="tpdl-badge"
+                :class="lastRun.outreach_eligible ? 'tpdl-badge--accent' : 'tpdl-badge--outline'"
+                x-text="lastRun.outreach_eligible ? 'outreach eligible' : 'below threshold'"></span>
+          <span class="text-[11px] text-ink-3">· $<span x-text="lastRun.cost_usd"></span> · not imported</span>
+        </div>
+        <p class="text-sm text-ink-2 mb-2" x-text="lastRun.intelligence_summary"></p>
+        <div class="flex flex-wrap gap-1.5">
+          <template x-for="s in (lastRun.signals || [])" :key="s.category">
+            <span class="provider-chip chip-local"
+                  x-text="s.category + ' · ' + s.total"></span>
+          </template>
+        </div>
+      </div>
+    </template>
+    <p class="mt-4 text-xs text-[color:var(--tpdl-error)]" x-show="engineError" x-text="engineError"></p>
+  </section>
 </div>
 
 <script>
@@ -224,8 +268,33 @@ function creditsPage() {
     runs: [],
     loading: false,
     fetchedAt: null,
+    engine: null,
+    engineBusy: false,
+    engineError: '',
+    lastRun: null,
 
-    async init() { await this.refresh(); },
+    async init() { await this.refresh(); await this.loadEngine(); },
+
+    async loadEngine() {
+      try {
+        this.engine = await (await fetch('/api/engine/status')).json();
+        this.lastRun = this.engine.last_dry_run || null;
+      } catch (e) { /* panel stays hidden */ }
+    },
+
+    async runSmokeTest() {
+      this.engineBusy = true; this.engineError = '';
+      try {
+        const res = await fetch('/api/engine/run', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({live: false}),
+        });
+        const data = await res.json();
+        if (!res.ok) { this.engineError = data.detail || 'Run failed.'; }
+        else { this.lastRun = data; }
+      } catch (e) { this.engineError = String(e); }
+      finally { this.engineBusy = false; }
+    },
 
     async refresh() {
       this.loading = true;
