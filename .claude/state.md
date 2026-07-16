@@ -24,6 +24,9 @@
   Puis **contraste WCAG AA** : `ink-3`/`--tpdl-text-faint` #8a8a8a (3.3:1, sous le seuil 4.5) →
   #6f6f6f (4.8:1), hiérarchie préservée. `ink`/`ink-2` OK ; accent-texte utilise `--tpdl-accent-ink`
   #0a3a26 (12:1). Cache custom.css bumpé v=3. Vérifié en live (eyebrow 4.81:1, design intact).
+  Puis **focus clavier** : anneau `:focus-visible` `rgba(52,213,145,0.22)` (~1.2:1, à peine visible)
+  → anneau 2 couches vert vif + halo teal foncé (~3:1 sur fond clair), cache v=4. Drawer déjà fermé
+  par `keydown.escape.window`. Vérifié en live (anneau net sur lien de nav).
 - 2026-07-15 — **QA mobile (375px) → overflow horizontal corrigé sur Home + Marketing.** Cause :
   grille `grid-cols-12` avec enfants `col-span-12` → sur mobile les 11 column-gaps de 32px (=352px)
   dépassent la largeur contenu (~311px), quel que soit le nombre de tracks (prouvé : forcer 1 track
