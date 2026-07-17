@@ -17,6 +17,20 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **Trou d'extraction diagnostiqué & corrigé (`max_tokens` 16384) + prefill Sonnet 5 KO.**
+  Diagnostic des faux zéros du run lunch (Reig Jofre 7.5→0, Grifols 6.5→0 vs mai) : recherche OK
+  (~114 docs) mais extraction = 0. Cause : **Sonnet 5 raisonne en prose avant le JSON** (« Now let me
+  identify quotes… ») → sur gros corpus (souvent espagnol) le JSON dépasse 8192 tokens → tronqué →
+  illisible → 0 évidence. **Fix : `pipeline/extract.py` max_tokens 8192 → 16384** (laisse la place au
+  raisonnement + un gros set verbatim). Confirmé live : **Reig Jofre 0→7.0, Grifols 0→7.3/8.0**.
+  ⚠️ NE PAS interdire la prose (essayé) : ça FAIT CHUTER le recall (Reig Jofre repassait à 0) — le
+  listage de candidats du modèle AIDE l'extraction ; le parseur tolère déjà la prose, seule la
+  troncature posait problème. ⚠️ **Le prefill assistant (truc habituel « JSON only ») N'EST PAS
+  supporté par `claude-sonnet-5`** (400 « does not support assistant message prefill ») — piste morte,
+  d'où le levier max_tokens. Suite : 168 verts. **⚠️ DETTE DONNÉE : la table `companies` garde encore
+  des faux zéros** sur les sociétés CH+ES scorées AVANT ce fix (Reig Jofre, Grifols, + prob. Cantabria,
+  Faes, Ferrer, Geistlich) → re-runner le set lunch (ou juste ces sociétés) avec le fix + réimporter
+  pour un dataset européen propre.
 - 2026-07-17 — **Maya `/recurring` ACTIVÉE (2 runs) + re-scoring des 6 faux zéros + import.** (1) Re-scoré
   les 6 faux zéros (`--names …`, recherche en cache, ~0,30 $) → Almirall 7.5, Galderma 5.8, XtalPi 4.8,
   Maddox 5.2, Medinova 6.0, LETI 6.2, **aucune troncature** (fix scoring confirmé). Fusionnés dans
