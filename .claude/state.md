@@ -17,6 +17,16 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **Maya : les 3 améliorations restantes de l'audit FAITES (commit ac4b092).**
+  (1) `/top` : fraîcheur PAR LIGNE (« scored 2026-05-25 — STALE » vs « (latest run) ») + compte de
+  stales — un 9.0 figé de mai ne domine plus silencieusement un 8.5 frais de juillet (constaté :
+  7 du top 8 sont stale). (2) `/trends` : segmentation **LATEST RUN vs OLDER STOCK** (join
+  signals→import_run_id) — avant, les 790 signaux (618 mai + 172 juillet) étaient présentés comme
+  « la semaine » ; lecture réelle du run frais : leadership_change #1 (57) devant ma_expansion (55),
+  alors que le stock ancien est dominé par ma_expansion (278) → vraie inflexion visible. Service
+  areas calculées sur le run frais only. (3) `/recurring` : section **NEW THIS RUN** (premières
+  apparitions, par score) + note honnête « N non-rescannés (absence ≠ signal disparu) » = la question
+  nouveaux-vs-répétés de Nathalie. (4) Vocabulaire weekly → per-run/monthly partout. Suite : **175 verts**.
 - 2026-07-17 — **Audit de Maya sur le 1er historique réel → bug d'inversion de trajectoire corrigé
   (commit 5b75cf7).** `/recurring` affichait `min→max` comme trajectoire : **toute société en DÉCLIN
   était présentée en HAUSSE** (Reig Jofre 7.5→4.6 affiché « 4.6→7.5 ↑ ») ; en plus, le tri « meilleur
