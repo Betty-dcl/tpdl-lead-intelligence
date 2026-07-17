@@ -23,12 +23,12 @@ import csv
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from pipeline import export, extract, research, score, techscan
 from pipeline.config import EngineConfig
-from pipeline.types import CompanyResult, EvidenceBlock
+from pipeline.types import CompanyResult, EvidenceBlock, EvidenceItem
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] [%(name)s] %(message)s")
 logger = logging.getLogger("pipeline.runner")
@@ -218,6 +218,13 @@ def main() -> None:
                         help="SPENDS MONEY: enable real API calls (needs keys in .env)")
     parser.add_argument("--batch", action="store_true",
                         help="Score via the Anthropic Batch API (-50%%, up to 24h)")
+    parser.add_argument("--submit", action="store_true",
+                        help="Batch submit→exit (no 24h wait): research+extract, submit the "
+                             "scoring batch, save state, then the machine can be shut down. "
+                             "Collect later with --fetch. Implies --batch --live.")
+    parser.add_argument("--fetch", type=Path, default=None, metavar="STATE.json",
+                        help="Collect a batch submitted with --submit and write the CSV "
+                             "(re-run until Anthropic has finished, within 24h).")
     parser.add_argument("--resume", action="store_true",
                         help="Skip companies already in --out (recover a crashed run)")
     parser.add_argument("--force", action="store_true",
@@ -227,6 +234,11 @@ def main() -> None:
                              "model spend would exceed this. Live runs only.")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = parser.parse_args()
+
+    # ── fetch a previously-submitted batch (no company selection needed) ──
+    if args.fetch is not None:
+        _run_fetch(EngineConfig.load(live=True), args)
+        return
 
     companies = _select_companies(args)
     if not companies:
@@ -270,6 +282,13 @@ def main() -> None:
 
     # On resume, preserve the rows already written (never overwrite prior work).
     existing_rows = export.read_existing(args.out) if args.resume else []
+
+    # ── submit→fetch-later: submit the batch and exit (machine can shut down) ──
+    if args.submit:
+        if not cfg.live:
+            parser.error("--submit requires --live (it submits a paid batch)")
+        _run_submit(cfg, companies, args)
+        return
 
     if args.batch and cfg.live and len(companies) > 1:
         results = _run_batched(cfg, companies, args)
@@ -340,6 +359,117 @@ def _run_batched(cfg, companies, args):
         results.append(_assemble(cfg, c.name, c.sector, c.identity, tech, viol, flags,
                                  scored, not_ev, summary))
     return results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Submit → fetch-later (machine-free 24h batch wait)
+#   --submit : research+extract locally, submit the scoring batch, write a
+#              pending-state file, EXIT. The machine can then be shut down.
+#   --fetch  : read the state file, and once Anthropic has finished, collect +
+#              assemble + write the CSV. Re-run until it's ready.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _block_to_dict(b: EvidenceBlock) -> dict:
+    return {
+        "company_name": b.company_name, "sector": b.sector,
+        "tech_stack_summary": b.tech_stack_summary,
+        "items": [{"quote": it.quote, "source": it.source, "url": it.url,
+                   "event_date": it.event_date.isoformat() if it.event_date else None,
+                   "category": it.category} for it in b.items],
+    }
+
+
+def _block_from_dict(d: dict) -> EvidenceBlock:
+    items = [EvidenceItem(
+        quote=i["quote"], source=i["source"], url=i["url"],
+        event_date=date.fromisoformat(i["event_date"]) if i["event_date"] else None,
+        category=i["category"]) for i in d["items"]]
+    return EvidenceBlock(company_name=d["company_name"], sector=d["sector"],
+                         items=items, tech_stack_summary=d["tech_stack_summary"])
+
+
+def _pending_path(out: Path) -> Path:
+    return out.with_suffix(out.suffix + ".pending.json")
+
+
+def _run_submit(cfg, companies, args) -> None:
+    """Research+extract locally, submit the scoring batch, persist state, exit."""
+    from pipeline import batch as batch_mod
+    from pipeline import estimate as est_mod
+
+    if cfg.live and args.max_usd is not None:          # same budget trim as _run_batched
+        per = est_mod.estimate_run(1).model_cost_batch_usd
+        affordable = int(args.max_usd // per) if per else len(companies)
+        if affordable < len(companies):
+            logger.warning("[budget] $%.2f cap ≈ %d companies (batch); trimming from %d.",
+                           args.max_usd, affordable, len(companies))
+            companies = companies[:max(0, affordable)]
+        if not companies:
+            logger.error("[budget] cap too low to score even one company.")
+            return
+
+    prepared, blocks = [], []
+    for c in companies:
+        block, tech, viol, flags = _prepare(cfg, c.name, c.sector, args.fixture, c.identity)
+        prepared.append((c, tech, viol, flags))
+        blocks.append(block)
+
+    batch_id = batch_mod.submit_blocks(cfg, blocks)
+
+    state = {
+        "batch_id": batch_id,
+        "out": str(args.out),
+        "companies": [
+            {"name": c.name, "sector": c.sector, "identity": c.identity,
+             "tech_stack": tech, "violations": viol, "flags": flags,
+             "block": _block_to_dict(block)}
+            for (c, tech, viol, flags), block in zip(prepared, blocks)
+        ],
+    }
+    pending = _pending_path(args.out)
+    pending.parent.mkdir(parents=True, exist_ok=True)
+    pending.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    logger.info("Batch %s submitted for %d companies. State saved to %s",
+                batch_id, len(blocks), pending)
+    logger.info("You can now shut the machine down. Later, fetch the results with:\n"
+                "    python -m pipeline.runner --fetch %s", pending)
+
+
+def _run_fetch(cfg, args) -> None:
+    """Collect a previously-submitted batch and write the CSV (re-run until ready)."""
+    from pipeline import batch as batch_mod
+
+    pending = args.fetch
+    if not pending.exists():
+        logger.error("No pending-state file at %s", pending)
+        return
+    state = json.loads(pending.read_text(encoding="utf-8"))
+    batch_id = state["batch_id"]
+
+    status = batch_mod.batch_status(cfg, batch_id)
+    if status != "ended":
+        logger.info("Batch %s not finished yet (status=%s). Try again later "
+                    "(Anthropic processes within 24h).", batch_id, status)
+        return
+
+    blocks = [_block_from_dict(c["block"]) for c in state["companies"]]
+    id_to_block = batch_mod._id_map(blocks)
+    scored_by_company = batch_mod.collect_results(cfg, batch_id, id_to_block)
+
+    results = []
+    for c in state["companies"]:
+        scored, not_ev, summary = scored_by_company.get(c["name"], ([], [], ""))
+        results.append(_assemble(cfg, c["name"], c["sector"], c["identity"],
+                                 c["tech_stack"], c["violations"], c["flags"],
+                                 scored, not_ev, summary))
+
+    out = Path(state["out"])
+    existing_rows = export.read_existing(out) if args.resume else []
+    flag_boilerplate(results, existing_rows)
+    export.write_csv(results, cfg, out, existing_rows)
+    logger.info("Wrote %s (%d companies) — re-import: python import_csv.py %s",
+                out, len(results), out)
+    pending.unlink(missing_ok=True)     # consumed
 
 
 if __name__ == "__main__":

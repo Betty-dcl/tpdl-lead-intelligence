@@ -826,3 +826,97 @@ def test_boilerplate_does_not_flag_genuinely_distinct_rationales(cfg):
     results = [one(n, v) for n, v in zip("ABC", distinct)]
     flag_boilerplate(results)
     assert not any(r.review_flag for r in results)
+
+
+# ─── Batch submit → fetch-later (machine-free 24h wait) ──────────────────────
+
+def test_block_serialisation_round_trip():
+    from pipeline import runner
+    blk = EvidenceBlock(
+        company_name="Acme", sector="Pharma", tech_stack_summary="no CRM",
+        items=[EvidenceItem(quote="q", source="exa_q3", url="https://x",
+                            event_date=date(2026, 6, 1), category="pe_event"),
+               EvidenceItem(quote="q2", source="perplexity", url=None,
+                            event_date=None, category="ma_expansion")])
+    blk2 = runner._block_from_dict(runner._block_to_dict(blk))
+    assert blk2.company_name == "Acme" and blk2.sector == "Pharma"
+    assert blk2.tech_stack_summary == "no CRM" and len(blk2.items) == 2
+    assert blk2.items[0].event_date == date(2026, 6, 1) and blk2.items[0].category == "pe_event"
+    assert blk2.items[1].url is None and blk2.items[1].event_date is None
+
+
+def _fake_batches(store, status="ended", scoring_json=None):
+    from types import SimpleNamespace
+    scoring_json = scoring_json or (
+        '{"signals": [{"category":"pe_event","what_happened":"Buyout closed",'
+        '"why_it_matters":"PE mandate","tpdl_relevance":"Operating model alignment",'
+        '"confidence":"high","signal_strength":5}], "signals_not_evidenced": [],'
+        '"intelligence_summary":"One. Two. Three."}')
+
+    def create(requests):
+        store["requests"] = requests
+        return SimpleNamespace(id="batch_x")
+
+    def results(bid):
+        for r in store["requests"]:
+            yield SimpleNamespace(custom_id=r["custom_id"], result=SimpleNamespace(
+                type="succeeded", message=SimpleNamespace(
+                    content=[SimpleNamespace(type="text", text=scoring_json)])))
+
+    return SimpleNamespace(messages=SimpleNamespace(batches=SimpleNamespace(
+        create=create,
+        retrieve=lambda bid: SimpleNamespace(processing_status=status),
+        results=results)))
+
+
+def test_batch_submit_and_collect(monkeypatch, cfg):
+    from pipeline import batch as batch_mod
+    blocks = [EvidenceBlock(company_name="Acme", sector=None, tech_stack_summary=None,
+              items=[EvidenceItem(quote="Blackstone completed the buyout.", source="exa_q3",
+                     url="https://x", event_date=date(2026, 6, 1), category="pe_event")])]
+    store = {}
+    monkeypatch.setattr(batch_mod, "_client", lambda c: _fake_batches(store))
+    assert batch_mod.submit_blocks(cfg, blocks) == "batch_x"        # submit returns id, no wait
+    res = batch_mod.collect_results(cfg, "batch_x", batch_mod._id_map(blocks))
+    scored, not_ev, summary = res["Acme"]
+    assert scored and scored[0].signal.category == "pe_event" and scored[0].total > 0
+    assert summary == "One. Two. Three."
+
+
+def test_run_fetch_writes_csv_when_ended(monkeypatch, cfg, tmp_path):
+    from types import SimpleNamespace
+    from pipeline import runner, batch as batch_mod
+    out = tmp_path / "run.csv"
+    pending = tmp_path / "run.csv.pending.json"
+    pending.write_text(json.dumps({"batch_id": "batch_x", "out": str(out), "companies": [
+        {"name": "Acme", "sector": "Pharma", "identity": {"website": None},
+         "tech_stack": None, "violations": [], "flags": [],
+         "block": {"company_name": "Acme", "sector": "Pharma", "tech_stack_summary": None,
+                   "items": [{"quote": "q", "source": "exa_q3", "url": "https://x",
+                              "event_date": "2026-06-01", "category": "pe_event"}]}}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(batch_mod, "batch_status", lambda c, bid: "ended")
+
+    def fake_collect(c, bid, id_map):
+        sig = InterpretedSignal(category="pe_event", what_happened="w", why_it_matters="y",
+                tpdl_relevance="Operating model alignment", confidence="high", signal_strength=5,
+                evidence=[_item(category="pe_event", event_date=date(2026, 6, 1))])
+        return {"Acme": ([score.score_signal(cfg, sig, TODAY)], [], "A. B. C.")}
+    monkeypatch.setattr(batch_mod, "collect_results", fake_collect)
+
+    runner._run_fetch(cfg, SimpleNamespace(fetch=pending, resume=False))
+    rows = list(csv.DictReader(open(out)))
+    assert rows and rows[0]["Company Name"] == "Acme" and float(rows[0]["Assessed Score"]) > 0
+    assert not pending.exists()                                     # consumed on success
+
+
+def test_run_fetch_waits_when_not_ended(monkeypatch, cfg, tmp_path):
+    from types import SimpleNamespace
+    from pipeline import runner, batch as batch_mod
+    out = tmp_path / "run.csv"
+    pending = tmp_path / "run.csv.pending.json"
+    pending.write_text(json.dumps({"batch_id": "b", "out": str(out), "companies": []}),
+                       encoding="utf-8")
+    monkeypatch.setattr(batch_mod, "batch_status", lambda c, bid: "in_progress")
+    runner._run_fetch(cfg, SimpleNamespace(fetch=pending, resume=False))
+    assert not out.exists() and pending.exists()                   # nothing written, state kept

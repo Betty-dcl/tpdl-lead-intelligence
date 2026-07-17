@@ -25,20 +25,20 @@ _POLL_SECONDS = 30
 _MAX_WAIT_SECONDS = 24 * 3600
 
 
-def score_blocks_batched(cfg: EngineConfig, blocks: list[EvidenceBlock],
-                         poll_seconds: int = _POLL_SECONDS
-                         ) -> dict[str, tuple[list[ScoredSignal], list[str], str]]:
-    """Score every block via one Batch API job. Keyed by company_name.
-
-    Falls back cleanly: the deterministic arithmetic (recency/corroboration)
-    is still applied in code to each interpreted signal, exactly like the
-    synchronous path — batch only changes HOW the Opus calls are sent.
-    """
+def _client(cfg: EngineConfig):
     require_live(cfg, cfg.anthropic_api_key, "Batch scoring (Opus 4.8)")
     import anthropic
+    return anthropic.Anthropic(api_key=cfg.anthropic_api_key)
 
-    client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
-    requests = [
+
+def _id_map(blocks: list[EvidenceBlock]) -> dict[str, EvidenceBlock]:
+    """custom_id → block. Deterministic (index + name slug), so a separate
+    `fetch` process rebuilds the SAME mapping from the persisted blocks."""
+    return {_safe_id(i, b.company_name): b for i, b in enumerate(blocks)}
+
+
+def _requests(cfg: EngineConfig, blocks: list[EvidenceBlock]) -> list[dict]:
+    return [
         {
             "custom_id": _safe_id(i, b.company_name),
             "params": {
@@ -50,24 +50,35 @@ def score_blocks_batched(cfg: EngineConfig, blocks: list[EvidenceBlock],
         }
         for i, b in enumerate(blocks)
     ]
-    id_to_block = {r["custom_id"]: b for r, b in zip(requests, blocks)}
 
-    batch = client.messages.batches.create(requests=requests)
-    logger.info("[batch] submitted %d companies (id=%s) — polling every %ds",
-                len(requests), batch.id, poll_seconds)
 
-    waited = 0
-    while True:
-        batch = client.messages.batches.retrieve(batch.id)
-        if batch.processing_status == "ended":
-            break
-        if waited >= _MAX_WAIT_SECONDS:
-            raise TimeoutError(f"Batch {batch.id} did not finish within 24h")
-        time.sleep(poll_seconds)
-        waited += poll_seconds
+def submit_blocks(cfg: EngineConfig, blocks: list[EvidenceBlock]) -> str:
+    """Submit the scoring batch and return its id WITHOUT waiting.
 
+    This is the 'submit' half of the submit→fetch-later flow: the machine can
+    be shut down after this returns; the results are collected by a separate
+    `fetch` run once Anthropic has finished (within 24h)."""
+    client = _client(cfg)
+    batch = client.messages.batches.create(requests=_requests(cfg, blocks))
+    logger.info("[batch] submitted %d companies (id=%s) — fetch later", len(blocks), batch.id)
+    return batch.id
+
+
+def batch_status(cfg: EngineConfig, batch_id: str) -> str:
+    """Anthropic processing_status: 'in_progress' | 'ended' | 'canceling' …"""
+    return _client(cfg).messages.batches.retrieve(batch_id).processing_status
+
+
+def collect_results(cfg: EngineConfig, batch_id: str, id_to_block: dict[str, EvidenceBlock]
+                    ) -> dict[str, tuple[list[ScoredSignal], list[str], str]]:
+    """Parse a finished batch into scored results, keyed by company_name.
+
+    Deterministic arithmetic (recency/corroboration) is applied in code here,
+    exactly like the synchronous path — batch only changes HOW Opus was called.
+    """
+    client = _client(cfg)
     results: dict[str, tuple[list[ScoredSignal], list[str], str]] = {}
-    for entry in client.messages.batches.results(batch.id):
+    for entry in client.messages.batches.results(batch_id):
         block = id_to_block.get(entry.custom_id)
         if block is None:
             continue
@@ -79,8 +90,33 @@ def score_blocks_batched(cfg: EngineConfig, blocks: list[EvidenceBlock],
         signals, not_evidenced, summary = _parse_interpretation(text, block)
         scored = [score_signal(cfg, s) for s in signals]
         results[block.company_name] = (scored, not_evidenced, summary)
-    logger.info("[batch] scored %d companies at -50%%", len(results))
+    logger.info("[batch] collected %d companies at -50%%", len(results))
     return results
+
+
+def score_blocks_batched(cfg: EngineConfig, blocks: list[EvidenceBlock],
+                         poll_seconds: int = _POLL_SECONDS
+                         ) -> dict[str, tuple[list[ScoredSignal], list[str], str]]:
+    """Blocking mode: submit, poll up to 24h, then collect. Keyed by company_name.
+
+    Keeps the machine running the whole time; for a machine-free wait use the
+    submit_blocks()/collect_results() split via `--submit`/`--fetch`.
+    """
+    client = _client(cfg)
+    id_to_block = _id_map(blocks)
+    batch = client.messages.batches.create(requests=_requests(cfg, blocks))
+    logger.info("[batch] submitted %d companies (id=%s) — polling every %ds",
+                len(blocks), batch.id, poll_seconds)
+    waited = 0
+    while True:
+        b = client.messages.batches.retrieve(batch.id)
+        if b.processing_status == "ended":
+            break
+        if waited >= _MAX_WAIT_SECONDS:
+            raise TimeoutError(f"Batch {batch.id} did not finish within 24h")
+        time.sleep(poll_seconds)
+        waited += poll_seconds
+    return collect_results(cfg, batch.id, id_to_block)
 
 
 def _safe_id(index: int, name: str) -> str:
