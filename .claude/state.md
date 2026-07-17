@@ -17,6 +17,18 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **PREMIER RUN LIVE réel du moteur — clés validées + bug d'extraction trouvé & corrigé.**
+  Run de validation `--top 3 --live --max-usd 1` (<0,20 $) : a prouvé que **toutes les clés payantes
+  fonctionnent et ont du crédit** (Anthropic Sonnet+Opus, Exa, SerpAPI, Perplexity) et que le pipeline
+  tourne de bout en bout (n'écrase PAS `companies`, écrit un CSV). MAIS extraction = 0 évidence sur 3/3
+  → « unparseable JSON from model ». **Cause :** ~100 docs bruts/société → sortie Sonnet dépassait
+  `max_tokens=4096` → JSON tronqué (le scoring Opus, lui, parsait bien). **Corrigé** (`pipeline/extract.py`,
+  commit 1822a46) : max_tokens → 8192, parseur tolérant aux fences ```json``` + log du `stop_reason`.
+  **Re-run `--top 1` (Hologic, recherche servie du cache → ~0,05 $) : 24 évidences, score 8,5,
+  outreach-eligible** (pe_event Blackstone/TPG + leadership_change, tous deux datés/haute confiance ;
+  cession spéculative correctement flaggée). Chaîne recherche→extraction→scoring→CSV **entièrement
+  validée en live**. Sorties : `data/csv/engine_run.csv` (top-3, vide) + `engine_run_probe.csv` (top-1, réel).
+  Suite : **161 verts**. NB : importer un vrai CSV (`python import_csv.py …`) débloquerait `/recurring` de Maya.
 - 2026-07-17 — **Détection de boilerplate renforcée (exact → normalisé + quasi-duplicat).** Le flag
   de review « rationale identique sur 3+ sociétés » (`flag_boilerplate` dans `pipeline/runner.py`)
   reposait sur l'**égalité exacte de chaîne** — or Opus produit rarement deux rationales caractère-
@@ -252,8 +264,9 @@
       anonymisé). Reste : les CHIFFRES/résultats clients précis d'Andrés pour durcir les proof points.
 - [~] #5 Kaspr : connecteur CODÉ + gated (`app/tools/kaspr.py`, préféré par Inès). Reste : `KASPR_API_KEY`.
 - [x] #6 Token Apify (présent dans .env)
-- [x] #7 Reconstruction du moteur pipeline (`pipeline/`, dry-run + live gated, 112 tests). Reste :
-      lancer un run LIVE réel (dépend des clés API), pas le code.
+- [x] #7 Reconstruction du moteur pipeline (`pipeline/`, dry-run + live gated). **RUN LIVE RÉEL FAIT
+      le 2026-07-17** (top-1/top-3, <0,25 $ total) : 6 clés validées, chaîne de bout en bout OK, bug
+      d'extraction (max_tokens) trouvé & corrigé. Reste : un run business (Lunch/top-35) après crédit + scope.
 - [x] #7c Historique des runs (`RunSnapshot`) + `backfill_snapshots.py` → run 25/05 amorcé (run #1).
       `/recurring` s'active au 2e import. Reste : un 2e CSV réel à importer.
 - [x] #7b Modèle `Contact` étendu (function / seniority / crm_segment) + `app/tools/segmentation.py`
