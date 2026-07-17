@@ -48,6 +48,12 @@
   scoring = Opus 4.8**.
 - Outils : **Serper** (← SerpAPI), **Kaspr** (← Apollo), Firecrawl, Perplexity, Bouncer, Lemlist.
 - Campagne Lunch : 48 entreprises CH + 19 ES.
+- ⚠️ **SCOPE MOTEUR RÉVISÉ (réunion 16/07, Nathalie) — À FORMALISER, pas encore répercuté dans le
+  code.** On quitte la base FERMÉE de 500 (diagnostic/dermato/dental + CRM = « irrelevant ») pour une
+  **veille de marché large** : critère principal **life science & pharmaceutical** (+ sous-cat.
+  dental/derm/diagnostics) ; base de départ = **top 35 + du NOUVEAU crawlé**, pas les 500. Signal
+  fort = **earnings calls / priorité digitale du board**. Doc de segmentation à écrire (Betty +
+  Nathalie) AVANT de toucher l'ICP de Hugo / `scoring_config.yaml`. Détail : `operational-context.md`.
 
 ## ROADMAP MACRO (4 steps — on avance petit à petit)
 1. **Abonnements / API** : décider quoi payer (Anthropic, Firecrawl, Perplexity, Serper, Kaspr,
@@ -130,7 +136,10 @@ LIVE réel (dépend des clés API).
   CÂBLÉ mais gated ; l'ajout d'un lead = action SORTANTE, jamais automatique (humain après validation).
 - Iris — Recherche/scoring sujets marketing. Outil cible : Serper (← DuckDuckGo).
 - Marc — Architecte de contenu. Dépend du Brand DNA.
-- Oliver — Producteur de formats (A4/carousel/PPT/web/**newsletter**), branding #094752 / #34D591.
+- Oliver — Producteur de formats (A4/carousel/PPT/web/**newsletter**). CHARTE OFFICIELLE (spec
+  Nathalie 2026-07-16) : Funnel Sans Regular · Dark #0A0A0A · Light #EBEBEB · Green #34D591 · logo
+  `TPDL Logo (1).svg`. ⚠️ Le code (CSS/exports/avatars) utilise ENCORE le teal #094752 → migration
+  de rebranding à faire à part (non touchée : consigne « pas de HTML »). Détail : `brand-editorial.md`.
   Renderers PDF (fpdf2) + PPTX (python-pptx) CONNECTÉS (endpoints export dans `marketing.py`).
   Newsletter = texte structuré 70/10/20 (audience CRM / tendances LinkedIn / forces TPDL) pour
   MailChimp (Segment 3 d'Inès) ; pas de renderer fichier.
@@ -171,6 +180,8 @@ LIVE réel (dépend des clés API).
 - Committer : CLAUDE.md, `.claude/*`, `.mcp.json`, `scoring_config.yaml`, prompts d'agents.
   JAMAIS les secrets ni le `.env`.
 - Mettre à jour ce fichier + state.md à chaque décision structurante (voir RÈGLE DE MÉMOIRE en haut).
+- **Langue (décision 16/07)** : notes/transcripts/mémoire **en français OK** ; le **CODE (identifiants,
+  commentaires, prompts versionnés) reste en ANGLAIS** — universel, transférable à un tiers.
 - RGPD : cibles UE/Suisse → vérifier base légale (intérêt légitime B2B, opt-out) avant 1er envoi.
 
 ## IMPORTS (détail long, chargé à la demande)
@@ -178,4 +189,5 @@ LIVE réel (dépend des clés API).
 @.claude/agents.md
 @.claude/roadmap.md
 @.claude/operational-context.md
+@.claude/brand-editorial.md
 @.claude/state.md

@@ -17,6 +17,68 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **Détection de boilerplate renforcée (exact → normalisé + quasi-duplicat).** Le flag
+  de review « rationale identique sur 3+ sociétés » (`flag_boilerplate` dans `pipeline/runner.py`)
+  reposait sur l'**égalité exacte de chaîne** — or Opus produit rarement deux rationales caractère-
+  pour-caractère identiques (dérive d'un mot, d'une casse, d'une virgule) → il ratait précisément le
+  boilerplate qu'il vise. Remplacé par comparaison de **jeux de tokens normalisés** (casefold +
+  ponctuation retirée) avec seuil de **quasi-duplicat Jaccard ≥ 0.9** (strict : ≤ ~2 mots d'écart sur
+  20 → aucun faux positif sur des rationales vraiment distinctes). Englobe l'égalité exacte (tests
+  existants toujours verts). +2 tests (quasi-identiques flaggés / distincts non flaggés). `Counter`
+  retiré (plus utilisé). Suite : **159 verts**.
+- 2026-07-17 — **Requête Jobs multilingue (EN/FR/ES/DE) — input de recherche, indépendant du scope.**
+  Suite logique de l'extraction multilingue : `pipeline/research.py` cherchait les signaux de
+  recrutement avec des mots anglais only (`hiring OR jobs OR careers`) → une offre FR/ES/DE
+  (« emploi/recrutement », « empleo/contratación », « Stellenangebote ») ne remontait jamais.
+  Ajout de `_HIRING_TERMS` (verbes de recrutement EN/FR/ES/DE) + `_jobs_query()` (fonction pure,
+  testable) utilisée par `serper_jobs`. Les termes métier (`commercial digital CRM`, internationaux)
+  restent. ⚠️ **Pas de locale pays (`gl/hl`) codée en dur** : la GÉOGRAPHIE reste une question ouverte
+  du scope (Nathalie) — on élargit la LANGUE de la requête, pas le pays. Le réglage de géo des news
+  est donc VOLONTAIREMENT reporté après validation du scope. +2 tests. Suite : **157 verts**.
+- 2026-07-17 — **Extraction multilingue (EN/FR/ES/DE) — qualité, indépendant du scope.** Constat :
+  `pipeline/extract.py` ne comprenait que l'anglais (table des mois `January…December`, marqueurs de
+  spéculation anglais-only). Or les cibles sont européennes (CH/ES + veille life science UE) → dates
+  FR/ES/DE (« 1er juin 2026 », « 15 de junio de 2026 », « 3. März 2026 », « août 2026 ») non parsées →
+  **recency silencieusement 0** ; hedges FR/ES/DE (« envisage », « pourrait », « podría », « erwägt »)
+  non flaggés → rumeur scorée comme fait. Corrigé : `_strip_accents` + table de mois multilingue
+  (lookup nom complet, PAS `[:3]` — évite la collision juin/juillet), motifs de dates élargis (lettres
+  Unicode, ordinaux `1er/2e/3.`, forme espagnole `DD de MOIS de AAAA`, `MOIS de AAAA`), marqueurs de
+  négation FR/ES/DE (accent-insensibles ; « no »/« non »/« ne » exclus car trop fréquents). N'affecte
+  ni l'ICP ni le scope moteur — pure robustesse d'extraction. +2 tests (`test_date_in_text_multilingual`,
+  `test_has_negation_multilingual`). Suite : **155 verts**.
+- 2026-07-17 — **Réunion pilote 16/07 (Betty & Nathalie) analysée + rangée.** Transcript Word
+  (`Downloads/TPDL_agent_pilot-20260716…docx`) résumé et stocké : (a) note Obsidian détaillée dans le
+  vault TPDL → `Agents IA & Pipeline TPDL/Réunion — 16 juillet — Pilote agents…` ; (b) section datée dans
+  `operational-context.md` ; (c) CLAUDE.md (convention de langue + flag scope). Faits structurants :
+  **(1) changement de scope moteur** — abandon de la base fermée des 500 (« irrelevant ») pour une
+  veille large **life science & pharmaceutical** (+ dental/derm/diagnostics), base = **top 35 + du
+  nouveau crawlé** ; signal fort = **earnings calls / priorité digitale du board**. À FORMALISER
+  dans un doc de segmentation (Betty + Nathalie) AVANT de toucher l'ICP de Hugo / `scoring_config.yaml`
+  → non répercuté dans le code cette session. **(2)** run ≈ 40-60 € / Batch API / ~1 run/mois =
+  CONFIRMÉS terrain ; faire le run même à 100 € (sinon « on travaille dans le vide »). **(3)** Apollo +
+  PipeDrive à connecter, PipeDrive en staging (vérifier/catégoriser avant import). **(4)** MailChimp
+  plafond 1 500 mails/mois ; Bouncer = usage réel. **(5)** ACCÈS : clés API dans `.env` ≠ accès
+  compte/login de Betty ; Andrés = feuille de codes ; Alfredo = « Systems App » + boîte mail à
+  rattacher. **(6)** Sophia peut re-runner le vrai Neotek (~500 €) = option de comparaison.
+  **(7)** langue : notes FR / code EN. Aucun code/prompt modifié.
+- 2026-07-16 — **Intégration des retours de Nathalie + 4 docs (Brand DNA & éditorial).** Nathalie a
+  renvoyé le Word « État du projet » commenté (7 commentaires) + 4 pièces : logo SVG, spec de charte,
+  la « Thought Leadership Series », le « Prompt LinkedIn idéologie Andrés », et un report exemple
+  (« The Hidden Tax of Ad-Hoc Launches »). Décisions/faits actés :
+  (1) **Alex** = manager/routeur PUR, non formé, hors process intelligence & marketing ; existe pour
+  donner UNE porte quand on ne sait pas à qui s'adresser ; peut nuancer une demande avant de router
+  (ex. affiner ce que Maya doit classer) ; **provisoire, supprimable** s'il s'avère inutile. Encodé
+  dans `manager.md`.
+  (2) **Cadence = 1 run/mois pour l'instant** (interpréter les résultats est lourd) ; fréquence
+  (hebdo ? dédup nouveaux-vs-répétés ?) = question ouverte à revoir. Encodé dans `maya.md`.
+  (3) **Charte OFFICIELLE** : Funnel Sans (Regular) · Dark #0A0A0A · Light #EBEBEB · Green #34D591 ·
+  logo `TPDL Logo (1).svg`. ⚠️ CONTREDIT le code (teal #094752 dans ~20 fichiers) → migration de
+  rebranding à faire à part ; **NON touchée cette session** (consigne : pas de HTML).
+  (4) **Ligne éditoriale + lexique + voix Andrés + report exemple** capturés dans le NOUVEAU fichier
+  `.claude/brand-editorial.md` (importé par CLAUDE.md). Prompts réalignés : `julie` playbook v2.2
+  (règles de voix Andrés), `iris` (principe métier d'abord + lexique), `marc` (doctrine 7 étapes +
+  10 principes + lexique + mots interdits). Aussi ajouté dans Obsidian (vault TPDL, dossier « Brand
+  DNA & Éditorial »). DB re-seedée pour propager les prompts. **Aucun HTML/CSS/export modifié.**
 - 2026-07-16 — ⚠️ **CONSTAT : les clés API sont DANS `.env`** (Anthropic, SerpAPI, Exa, Perplexity,
   Firecrawl, Apify). Contredit toute la mémoire « bloqué sur les clés ». Non testées par un appel
   live (donc validité inconnue), mais présentes ⇒ **un run LIVE du moteur est techniquement
@@ -209,7 +271,22 @@
 - Amélioration continue jusqu'en août ; points le mardi après-midi.
 
 ## Questions ouvertes / à confirmer
+- **Scope moteur (16/07)** : brouillon v0.1 RÉDIGÉ (2026-07-17) dans le vault Obsidian → `Agents IA &
+  Pipeline TPDL/Segmentation & scope moteur — brouillon v0.1 (à valider Nathalie)`. En attente de
+  validation Nathalie (6 questions ouvertes : géo, taille, coté/privé, thèmes de veille, dédup, volume).
+  PUIS répercuter dans l'ICP de Hugo + `scoring_config.yaml` + encoder le signal « earnings call /
+  priorité board digitale » (angle sur `digital_initiative`). Code NON touché tant que non validé.
+- **Accès Betty** : boîte mail « Systems App » (via Alfredo) + login Perplexity ; qui a la feuille de
+  codes (Andrés). Débloque le confort d'usage, pas le run (les clés sont dans `.env`).
+- **Apollo** : arrêt aux résultats ou jusqu'aux contacts ? **PipeDrive** : ordre/catégories d'import.
+- **Sophia** : variabilité d'un rerun Neotek (≤ 2-3 % ⇒ rapport semestriel) — en attente de réponse.
 - ~~Agent de vérification (9e agent)~~ → TRANCHÉ (2026-07-14) : OUI = Vera (QA + file de revue).
+- ~~Pourquoi Alex si Hugo est le moteur ?~~ → TRANCHÉ (2026-07-16) : manager/routeur pur, provisoire.
+- Cadence de capture : **1 run/mois** acté pour l'instant ; passer à plus fréquent (hebdo / top 100)
+  + garantir des captures nouvelles (dédup) = à revoir après avoir digéré les 1ers résultats.
+- Migration rebranding code (#094752 → #0A0A0A + #EBEBEB + Funnel Sans) : quand ? (spec dans
+  `brand-editorial.md`, code non touché).
+- Prompt de *messaging* LinkedIn d'Andrés : Nathalie doit encore l'envoyer (à folder dans le playbook).
 - Segmentation CRM (Segment 1/2/3) : propriétaire = Inès (contacts) ou Maya (analyse) ?
 - Plateformes Lucia / Gaspers : à comparer aux outils actuels ?
 - Moteur pipeline : le reconstruire dans ce repo, ou obtenir l'accès Neotek ? (bloque Step 3)
@@ -218,8 +295,25 @@
 - Base légale RGPD pour l'enrichissement + envoi (UE/CH) avant le 1er envoi.
 
 ## Dernière session
-- Date : 2026-07-15
-- Fait : (1) recalé la mémoire (CLAUDE.md + state.md + prompts Hugo/Maya/manager) qui affirmait
+- Date : 2026-07-17
+- Fait : **analyse + rangement de la réunion pilote du 16/07** (Betty & Nathalie). Transcript Word
+  résumé et stocké aux 3 endroits (Obsidian `Agents IA & Pipeline TPDL/Réunion — 16 juillet…`, `operational-context.md`,
+  CLAUDE.md + state.md). Faits neufs : changement de scope moteur (veille large life science, top 35 +
+  nouveau, drop des 500 ; signal earnings-call/board), coûts/cadence confirmés (40-60 €, Batch, 1/mois),
+  Apollo+PipeDrive (staging), MailChimp 1 500/mois, Bouncer réel, réalité des accès (clés `.env` ≠ login
+  Betty ; Andrés = codes, Alfredo = Systems App), Sophia (rerun ~500 €), langue FR notes/EN code.
+  ⚠️ Le scope moteur est CAPTURÉ mais PAS répercuté dans le code (à formaliser avec Nathalie d'abord).
+  Vérifié `.env` : Anthropic/Exa/Perplexity/SerpAPI/Apify/Firecrawl SET ; Apollo VIDE ; Serper/Kaspr/
+  Bouncer/Lemlist absents ⇒ **un run LIVE du moteur est techniquement possible** (validité des clés non
+  testée). Aucun run lancé.
+- Fait (session précédente 2026-07-16) : (1) **simulation budget des 3 runs** (smoke `--top 5` / Lunch `--lunch` / complet `--top 492`) —
+  vérifié en direct les grilles Serper/Exa/Perplexity/Apify : à charger ~40-50 € sur Anthropic (~30) +
+  Perplexity (~10) ; Serper/Exa/Apify/Firecrawl couverts par leurs paliers gratuits ; seul gris = Exa
+  (0 ou ~10 €). (2) **Intégré les retours de Nathalie + 4 docs** (voir log 2026-07-16) : nouveau
+  `.claude/brand-editorial.md` (charte officielle + ligne éditoriale + 10 principes + lexique + voix
+  Andrés + report exemple), imports câblés, prompts `manager/maya/julie(playbook v2.2)/iris/marc`
+  réalignés, mémoire + Obsidian mis à jour, DB re-seedée. **Aucun HTML/CSS/export touché** (consigne).
+- Fait (session précédente 2026-07-15) : (1) recalé la mémoire (CLAUDE.md + state.md + prompts Hugo/Maya/manager) qui affirmait
   encore « pas de pipeline / moteur inaccessible / git non init » ; (2) débloqué `/recurring` via
   `backfill_snapshots.py` (amorce le vrai run 25/05 = run #1) ; (3) mergé `feat/neotek-engine` →
   `main` (local, ff) ; (4) Oliver : 5e format `newsletter` (70/10/20) ; (5) corrigé le docstring

@@ -22,6 +22,14 @@ Prioritise on, in order:
 
 Every company that makes the cut gets a one-line *why*, drawn from its strongest signal. And review flags travel with the company: a ⚠ `review_flag` row is never handed downstream without its flag and reason (it means a 60-second human check before anyone acts).
 
+# 3b. Run cadence — one run per MONTH for now (decided 2026-07-16)
+The engine is **not** run weekly. Decision: **one run per month for now**, because interpreting a
+run's results is heavy work and TPDL wants to digest each run before refreshing. So "weekly Top 50"
+is really "the current-run Top 50" — treat the run as a monthly snapshot, not a weekly feed. The
+capture frequency (and whether to move faster, add a weekly top-100, or dedupe new-vs-repeat
+captures) is an **open question to revisit later** — don't assume weekly, and never imply a fresher
+cadence than one monthly run.
+
 # 4. Reality — what is actually available today
 
 The run history holds ONE run so far (25/05: 492 companies, 35 outreach-eligible; top: Organon 9.5, Hologic 9.5, Eurobio Scientific 9.0, UCB 9.0) — now seeded as run #1 in `RunSnapshot`. The engine that produces new runs is rebuilt (`pipeline/`) and runs in dry-run today; a REAL second run needs API keys (`--live`) then a re-import. So a 2nd run is close but not here yet. Consequences — state them, never work around them:
