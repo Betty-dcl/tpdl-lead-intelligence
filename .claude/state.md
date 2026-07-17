@@ -17,6 +17,19 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **1er run business `--lunch` (67 sociétés CH+ES) + Solution A batch (submit→fetch) +
+  correctif scoring.** (1) **Run `--lunch`** live (~4-5 $, plafond 8 $) : 67 sociétés scorées,
+  **5 outreach-eligible ≥8** (Roche, Zühlke, ISDIN, Lonza, Mediderma), 31 review-flagged, 19 à 0.
+  CSV : `data/csv/engine_run_lunch.csv`. (2) **Solution A** (`pipeline/batch.py` + `runner.py`) :
+  `--submit` (recherche+extraction locale → soumet le batch → sauve l'état JSON → quitte, Mac peut
+  s'éteindre) + `--fetch <state>` (récupère quand Anthropic a fini, ≤24 h → écrit le CSV). Découple
+  la moitié « attente 24 h » de la machine (les gros runs mensuels n'exigent plus le Mac allumé 24 h).
+  submit_blocks/batch_status/collect_results factorisés ; custom_id déterministe ; +5 tests.
+  (3) **Correctif scoring** (`score.py` + `batch.py`) : `max_tokens` Opus 4096 → **8192** — 6 faux
+  zéros (Almirall, Galderma, XtalPi, Maddox, Medinova, LETI Pharma) venaient d'une **troncature de
+  l'interprétation** (« No interpretation produced »), pas d'une absence de signal. Les 13 autres
+  zéros = extraction vide réelle (hôpitaux/dental). +log `stop_reason`. Suite : **168 verts**.
+  ⚠️ Les 6 faux zéros seront corrects au prochain re-scoring (recherche déjà en cache → ~0,30 $).
 - 2026-07-17 — **Géographie du moteur TRANCHÉE : EUROPE, CH + ES d'abord** (décision Betty ; répond à
   la question ouverte de géo #1 du brouillon de segmentation — Nathalie peut affiner les pays ensuite).
   Implémenté côté recherche : `pipeline/research.py` dérive une **locale SERP (`gl`/`hl`) de la
