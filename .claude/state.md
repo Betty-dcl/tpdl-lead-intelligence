@@ -17,6 +17,18 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **Maya `/recurring` ACTIVÉE (2 runs) + re-scoring des 6 faux zéros + import.** (1) Re-scoré
+  les 6 faux zéros (`--names …`, recherche en cache, ~0,30 $) → Almirall 7.5, Galderma 5.8, XtalPi 4.8,
+  Maddox 5.2, Medinova 6.0, LETI 6.2, **aucune troncature** (fix scoring confirmé). Fusionnés dans
+  `engine_run_lunch.csv`. (2) `python import_csv.py engine_run_lunch.csv` → **67 updated** (les 67 CH+ES
+  étaient déjà dans les 492 → table reste à 492, 67 re-scorées juillet), run #2 ajouté. Total 492,
+  outreach-eligible 36. (3) **`/recurring` actif** : 2 runs distincts (25/05 #1 = 492 ; 17/07 #2 = 67),
+  67 sociétés récurrentes avec delta mai→juillet. **⚠️ FINDING (Maya) :** plusieurs sociétés bien scorées
+  en mai tombent à 0 en juillet — Reig Jofre 7.5→0, Grifols 6.5→0 (et Cantabria, Faes, Ferrer, Geistlich).
+  La **recherche marche** (111-114 docs, comme Roche 115→8.0) → c'est l'**EXTRACTION qui renvoie 0** sur
+  ces sociétés (0 troncature loguée) = notre moteur rate des signaux que le Neotek original captait.
+  À investiguer (re-run extraction avec dump du brut Sonnet, ~0,05 $). NB : mai = Neotek original,
+  juillet = notre reconstruction (moteurs différents) → écart en partie attendu, mais 7.5→0 pue le miss.
 - 2026-07-17 — **1er run business `--lunch` (67 sociétés CH+ES) + Solution A batch (submit→fetch) +
   correctif scoring.** (1) **Run `--lunch`** live (~4-5 $, plafond 8 $) : 67 sociétés scorées,
   **5 outreach-eligible ≥8** (Roche, Zühlke, ISDIN, Lonza, Mediderma), 31 review-flagged, 19 à 0.
