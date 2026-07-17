@@ -95,8 +95,12 @@ def live_extract(cfg: EngineConfig, company: str, docs: list[RawDoc]) -> list[Ev
     client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
     response = client.messages.create(
         model=cfg.extraction_model,
-        max_tokens=8192,   # verbatim extraction of a large corpus can be long;
-                           # 4096 truncated the JSON → unparseable → 0 evidence
+        # Sonnet 5 ignores "JSON only" and reasons in prose first ("Now let me
+        # identify quotes…"), which eats the budget and truncates the JSON → 0
+        # evidence (assistant-prefill is NOT supported on this model, so we can't
+        # suppress the preamble that way). 16384 leaves room for prose + a large
+        # verbatim set; the parser tolerates the prose, truncation is the risk.
+        max_tokens=16384,
         system=EXTRACT_PROMPT,
         messages=[{
             "role": "user",
@@ -105,8 +109,7 @@ def live_extract(cfg: EngineConfig, company: str, docs: list[RawDoc]) -> list[Ev
     )
     text = "".join(b.text for b in response.content if b.type == "text")
     if response.stop_reason == "max_tokens":
-        logger.warning("[extract] %s: response hit max_tokens (output truncated) — "
-                       "consider capping input docs", company)
+        logger.warning("[extract] %s: response hit max_tokens (output truncated)", company)
     return _parse_items(text)
 
 

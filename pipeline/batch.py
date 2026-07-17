@@ -43,7 +43,7 @@ def _requests(cfg: EngineConfig, blocks: list[EvidenceBlock]) -> list[dict]:
             "custom_id": _safe_id(i, b.company_name),
             "params": {
                 "model": cfg.interpretation_model,
-                "max_tokens": 8192,   # match score.py: 4096 truncated rich interpretations
+                "max_tokens": 8192,   # 4096 truncated rich interpretations → false 0
                 "system": SCORE_PROMPT,
                 "messages": [{"role": "user", "content": evidence_payload(b)}],
             },

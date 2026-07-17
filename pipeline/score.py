@@ -128,8 +128,8 @@ def live_interpret(cfg: EngineConfig, block: EvidenceBlock) -> tuple[list[Interp
     client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
     response = client.messages.create(
         model=cfg.interpretation_model,
-        max_tokens=8192,   # 4096 truncated the interpretation on evidence-rich
-                           # companies → "No interpretation produced" → false 0
+        max_tokens=8192,   # 4096 truncated rich interpretations → "No interpretation
+                           # produced" → false 0 (prefill unsupported on this model)
         system=SCORE_PROMPT,
         messages=[{"role": "user", "content": evidence_payload(block)}],
     )
