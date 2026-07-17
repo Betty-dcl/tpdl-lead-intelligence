@@ -128,11 +128,15 @@ def live_interpret(cfg: EngineConfig, block: EvidenceBlock) -> tuple[list[Interp
     client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
     response = client.messages.create(
         model=cfg.interpretation_model,
-        max_tokens=4096,
+        max_tokens=8192,   # 4096 truncated the interpretation on evidence-rich
+                           # companies → "No interpretation produced" → false 0
         system=SCORE_PROMPT,
         messages=[{"role": "user", "content": evidence_payload(block)}],
     )
     text = "".join(b.text for b in response.content if b.type == "text")
+    if response.stop_reason == "max_tokens":
+        logger.warning("[score] %s: interpretation hit max_tokens (truncated)",
+                       block.company_name)
     return _parse_interpretation(text, block)
 
 
