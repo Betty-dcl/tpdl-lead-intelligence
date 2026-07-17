@@ -17,6 +17,17 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **Audit de Maya sur le 1er historique réel → bug d'inversion de trajectoire corrigé
+  (commit 5b75cf7).** `/recurring` affichait `min→max` comme trajectoire : **toute société en DÉCLIN
+  était présentée en HAUSSE** (Reig Jofre 7.5→4.6 affiché « 4.6→7.5 ↑ ») ; en plus, le tri « meilleur
+  score récent » + cap 40 faisait sortir les gros déclins de la liste → Maya ne voyait jamais les
+  FADERS. Corrigé : trajectoire **chronologique** (1er run → dernier run par `run_date`), sortie en
+  **TOP RISERS / TOP FADERS** (delta signé, 20 chacun) + compte des stables. Test de régression
+  anti-inversion. Suite : **175 verts**. Améliorations restantes identifiées (non faites, à décider) :
+  `/trends` compte TOUS les signaux (618 de mai + 172 de juillet) comme « this week » → segmenter par
+  run pour de vraies tendances ; `/top` mélange les millésimes sans le dire (9/10 du top = scores
+  figés de mai) → afficher la date de run par ligne ; vue NEW vs DROPPED entre runs (la question
+  dédup/nouveaux de Nathalie) ; vocabulaire « weekly » → « per run » (cadence réelle = mensuelle).
 - 2026-07-17 — **Durcissement anti-perte-silencieuse (commit 208c916) : 4 défenses structurelles.**
   (1) **Extraction par CHUNKS de 35 docs** (`extract.py`) : sortie bornée par appel → la troncature
   JSON ne PEUT plus arriver, quel que soit le corpus. Tue la flakiness Grifols/Geistlich. Dédup des
