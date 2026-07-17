@@ -215,12 +215,14 @@ def test_maya_recurring_uses_run_snapshots(client):
     from app.database import SessionLocal
     from app.models import RunSnapshot
     with SessionLocal() as db:
-        for run in ("testrunA", "testrunB"):
+        # Big delta (0.5→9.5) so the row is guaranteed inside the capped
+        # TOP RISERS section even when the real DB holds many recurring rows.
+        for run, day, score in (("testrunA", 25, 0.5), ("testrunB", 26, 9.5)):
             db.add(RunSnapshot(
                 import_run_id=run, company_name="Zzy Recurring Co",
-                assessed_score=7.0 if run == "testrunA" else 8.5,
+                assessed_score=score,
                 coverage="1 of 6", outreach_eligible=(run == "testrunB"),
-                signals_found=1, run_date=datetime(2026, 5, 25)))
+                signals_found=1, run_date=datetime(2026, 5, day)))
         db.commit()
         try:
             maya = AGENT_CLASSES["maya"].load(db, "maya")
@@ -228,8 +230,36 @@ def test_maya_recurring_uses_run_snapshots(client):
             msg = meta["augmented_message"]
             assert meta["metadata"]["runs"] >= 2
             assert "Zzy Recurring Co" in msg                 # appears across runs
-            assert "7.0" in msg and "8.5" in msg             # score trajectory shown
+            assert "0.5→9.5" in msg                          # chronological trajectory shown
         finally:
             db.query(RunSnapshot).filter(
                 RunSnapshot.company_name == "Zzy Recurring Co").delete()
+            db.commit()
+
+
+def test_maya_recurring_trajectory_is_chronological_not_minmax(client):
+    """Regression: a DECLINING company (7.5 in May → 4.6 in July) must be shown
+    as 7.5→4.6 under FADERS. The old min→max display inverted every decline
+    into a fake rise (4.6→7.5 ↑)."""
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    from app.models import RunSnapshot
+    with SessionLocal() as db:
+        for run, day, score in (("declA", 25, 7.5), ("declB", 26, 4.6)):
+            db.add(RunSnapshot(
+                import_run_id=run, company_name="Zzy Declining Co",
+                assessed_score=score, coverage="1 of 6", outreach_eligible=False,
+                signals_found=1, run_date=datetime(2026, 5, day)))
+        db.commit()
+        try:
+            maya = AGENT_CLASSES["maya"].load(db, "maya")
+            msg = maya._dispatch_command("/recurring")["augmented_message"]
+            line = next(l for l in msg.splitlines() if "Zzy Declining Co" in l)
+            assert "7.5→4.6" in line and "↓" in line          # chronological + falling
+            assert "4.6→7.5" not in line                      # the inverted form
+            faders = msg.split("TOP FADERS")[1].split("Stable:")[0]
+            assert "Zzy Declining Co" in faders               # listed as a fader
+        finally:
+            db.query(RunSnapshot).filter(
+                RunSnapshot.company_name == "Zzy Declining Co").delete()
             db.commit()

@@ -200,33 +200,51 @@ class MayaAgent(BaseAgent):
                     )
                     meta = {"runs": runs}
                 else:
-                    # Companies appearing in ≥2 runs, with their score trajectory.
-                    rows = (
-                        db.query(
-                            RunSnapshot.company_name,
-                            func.count(func.distinct(RunSnapshot.import_run_id)).label("n"),
-                            func.min(RunSnapshot.assessed_score).label("lo"),
-                            func.max(RunSnapshot.assessed_score).label("hi"),
-                        )
-                        .group_by(RunSnapshot.company_name)
-                        .having(func.count(func.distinct(RunSnapshot.import_run_id)) >= 2)
-                        .order_by(func.count(func.distinct(RunSnapshot.import_run_id)).desc(),
-                                  func.max(RunSnapshot.assessed_score).desc())
-                        .limit(40).all()
-                    )
-                    listing = "\n".join(
-                        f"  - {r.company_name}: seen in {r.n} runs · score {r.lo}→{r.hi}"
-                        f"{' ↑' if r.hi > r.lo else ' ↓' if r.hi < r.lo else ' ='}"
-                        for r in rows
-                    ) or "  (no company appears in 2+ runs yet)"
+                    # Companies appearing in ≥2 runs, with their CHRONOLOGICAL
+                    # score trajectory (first run → latest run). min→max would
+                    # invert every decline: a company falling 7.5→4.6 would be
+                    # displayed as "4.6→7.5 ↑ rising" — the exact opposite call.
+                    snaps = (db.query(RunSnapshot)
+                             .order_by(RunSnapshot.run_date, RunSnapshot.id).all())
+                    by_company: dict[str, list] = {}
+                    for s in snaps:
+                        by_company.setdefault(s.company_name, []).append(s)
+                    recurring = [
+                        (name, len({s.import_run_id for s in lst}),
+                         lst[0].assessed_score or 0, lst[-1].assessed_score or 0)
+                        for name, lst in by_company.items()
+                        if len({s.import_run_id for s in lst}) >= 2
+                    ]
+                    # Two explicit sections. A single "hottest latest score
+                    # first" list capped at 40 would push every big DECLINER
+                    # below the cut — Maya would never see the faders she is
+                    # meant to call out.
+                    risers = sorted((t for t in recurring if t[3] > t[2]),
+                                    key=lambda t: -(t[3] - t[2]))[:20]
+                    faders = sorted((t for t in recurring if t[3] < t[2]),
+                                    key=lambda t: t[3] - t[2])[:20]
+                    stable = len(recurring) - sum(1 for t in recurring if t[3] != t[2])
+
+                    def _fmt(rows_, arrow):
+                        return "\n".join(
+                            f"  - {name}: seen in {n} runs · score {first}→{last} "
+                            f"{arrow} ({last - first:+.1f})"
+                            for name, n, first, last in rows_
+                        ) or "  (none)"
+
                     augmented = (
-                        f"The user ran `/recurring`. Across {runs} runs in the history, the "
-                        f"companies whose signals persist (appear in ≥2 runs) are:\n\n{listing}"
-                        f"\n\nAs Maya, rank the persistent ones (recurrence = higher priority), "
-                        f"call out who is RISING vs FADING by score trajectory, and flag the "
-                        f"top persistent names for Inès."
+                        f"The user ran `/recurring`. Across {runs} runs in the history, "
+                        f"{len(recurring)} companies persist (appear in ≥2 runs). Chronological "
+                        f"score trajectory = earliest run → latest run.\n\n"
+                        f"TOP RISERS (score climbing):\n{_fmt(risers, '↑')}\n\n"
+                        f"TOP FADERS (score falling):\n{_fmt(faders, '↓')}\n\n"
+                        f"Stable: {stable} companies with an unchanged score.\n\n"
+                        f"As Maya, rank the persistent ones (recurrence = higher priority): "
+                        f"risers are heating up (flag the top ones for Inès), faders are "
+                        f"cooling (say whether to keep monitoring or deprioritise)."
                     )
-                    meta = {"runs": runs, "recurring": len(rows)}
+                    meta = {"runs": runs, "recurring": len(recurring),
+                            "risers": len(risers), "faders": len(faders)}
             return {
                 "augmented_message": augmented,
                 "action": "recurring_analysis",
