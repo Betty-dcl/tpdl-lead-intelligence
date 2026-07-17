@@ -180,8 +180,8 @@ def test_maya_top_accepts_glued_number(client):
     with SessionLocal() as db:
         maya = AGENT_CLASSES["maya"].load(db, "maya")
         meta = maya._dispatch_command("/top5")
-        # task_title is "Weekly Top {n}" — glued "/top5" must resolve n=5, not 50.
-        assert meta["task_title"] == "Weekly Top 5"
+        # task_title carries n — glued "/top5" must resolve n=5, not 50.
+        assert meta["task_title"] == "Top 5 (current run)"
 
 
 # ── Oliver newsletter format (70/10/20 mix, feeds MailChimp) ────────────────

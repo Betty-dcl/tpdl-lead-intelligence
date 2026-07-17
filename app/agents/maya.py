@@ -1,14 +1,15 @@
 """Maya — Analyst (step 2 of the sales pipeline).
 
 Maya takes Hugo's scored universe (the `companies` table) and the evidenced
-`signals` table and turns raw research into a decision: the weekly Top 50/100,
-the companies that recur week over week, and the recurring trends.
+`signals` table and turns raw research into a decision: the current-run Top
+50/100, the companies that recur run over run, and the run-level trends.
+(Cadence: ~one engine run per month for now — never imply weekly freshness.)
 
 Slash commands (read the scored DB — no API key needed for the data; Claude
 interprets):
   - /top [N?]      → ranked shortlist (default 50) of in-scope companies.
-  - /trends        → dominant signal types + TPDL service areas this week.
-  - /recurring     → companies appearing across multiple weekly runs.
+  - /trends        → dominant signal types + TPDL service areas, latest run vs stock.
+  - /recurring     → risers/faders/new across runs (needs ≥2 runs in history).
   - /generate [company] → analyst brief positioning one company in the universe
                           (used by the workspace "Generate brief" button).
 """
@@ -122,66 +123,121 @@ class MayaAgent(BaseAgent):
                     .limit(n)
                     .all()
                 )
+                latest = db.query(func.max(Company.run_date)).scalar()
             if not rows:
                 return {
                     "augmented_message": "The user ran `/top` but the scored universe is empty. Say so and suggest Hugo runs the pipeline.",
                     "action": "built_top_list",
                     "task_title": "Top list (empty)",
                 }
+            latest_day = latest.date() if latest else None
+
+            def _freshness(c) -> str:
+                # The universe mixes vintages: a company kept from an older run
+                # carries a score that was never re-verified. Say so per line —
+                # otherwise a stale May 9.0 silently outranks a fresh July 8.5.
+                if not c.run_date:
+                    return "run date unknown"
+                day = c.run_date.date()
+                return (f"scored {day} (latest run)" if day == latest_day
+                        else f"scored {day} — STALE, not refreshed since")
+
             lines = [
                 f"{i+1}. {c.name} — {c.assessed_score} · {c.coverage} · "
-                f"{c.sector_bucket or '—'}{' · ELIGIBLE' if c.outreach_eligible else ''}"
+                f"{c.sector_bucket or '—'}{' · ELIGIBLE' if c.outreach_eligible else ''} "
+                f"· {_freshness(c)}"
                 for i, c in enumerate(rows)
             ]
             eligible = sum(1 for c in rows if c.outreach_eligible)
+            stale = sum(1 for c in rows if c.run_date and c.run_date.date() != latest_day)
             augmented = (
                 f"The user ran `/top {n}`. Here is the ranked Top {len(rows)} from Hugo's "
                 f"scored universe (in-scope only, highest assessed_score first; "
-                f"{eligible} are Outreach Eligible):\n\n" + "\n".join(lines) +
-                "\n\nPresent this as Maya's weekly shortlist: group by score band "
+                f"{eligible} are Outreach Eligible; {stale} of these scores are STALE — "
+                f"from an earlier run, not re-verified in the latest one):\n\n"
+                + "\n".join(lines) +
+                "\n\nPresent this as Maya's current-run shortlist: group by score band "
                 "(8+ Eligible / 5-7 Monitor), call out the standouts and the dominant "
-                "sectors, and flag the 3-5 to prioritise. This list hands to Inès for contacts."
+                "sectors, and flag the 3-5 to prioritise. Weigh freshness explicitly: "
+                "a fresh score is act-on-now; a STALE high score means 'verify before "
+                "acting — signals may have moved'. This list hands to Inès for contacts."
             )
             return {
                 "augmented_message": augmented,
                 "action": "built_top_list",
-                "task_title": f"Weekly Top {n}",
-                "metadata": {"n": len(rows), "eligible": eligible},
+                "task_title": f"Top {n} (current run)",
+                "metadata": {"n": len(rows), "eligible": eligible, "stale": stale},
             }
 
         # ── /trends ──────────────────────────────────────────────────────
         if low == "/trends" or low.startswith("/trends"):
             with SessionLocal() as db:
-                by_cat = (
-                    db.query(Signal.category, func.count(Signal.id))
-                    .group_by(Signal.category)
-                    .order_by(func.count(Signal.id).desc())
-                    .all()
+                # The signals table mixes vintages (companies kept from older
+                # runs still carry their old signals). Counting everything as
+                # "the trends" lets the old stock drown the fresh run — segment
+                # by the company's import run instead.
+                latest_run = (
+                    db.query(Company.import_run_id)
+                    .filter(Company.run_date.isnot(None))
+                    .order_by(Company.run_date.desc())
+                    .limit(1).scalar()
                 )
+                latest_date = db.query(func.max(Company.run_date)).scalar()
+
+                def _cat_dist(fresh: bool):
+                    q = (db.query(Signal.category, func.count(Signal.id))
+                         .join(Company, Signal.company_name == Company.name))
+                    q = (q.filter(Company.import_run_id == latest_run) if fresh
+                         else q.filter(Company.import_run_id != latest_run))
+                    return q.group_by(Signal.category).order_by(
+                        func.count(Signal.id).desc()).all()
+
+                fresh_cat = _cat_dist(fresh=True)
+                stock_cat = _cat_dist(fresh=False)
+                fresh_companies = (db.query(func.count(Company.name))
+                                   .filter(Company.import_run_id == latest_run)
+                                   .scalar() or 0)
+                stock_companies = (db.query(func.count(Company.name))
+                                   .filter(Company.import_run_id != latest_run)
+                                   .scalar() or 0)
                 by_rel = (
                     db.query(Signal.tpdl_relevance, func.count(Signal.id))
-                    .filter(Signal.tpdl_relevance.isnot(None))
+                    .join(Company, Signal.company_name == Company.name)
+                    .filter(Signal.tpdl_relevance.isnot(None),
+                            Company.import_run_id == latest_run)
                     .group_by(Signal.tpdl_relevance)
                     .order_by(func.count(Signal.id).desc())
                     .limit(8)
                     .all()
                 )
                 total = db.query(func.count(Signal.id)).scalar() or 0
-            cat_str = "\n".join(f"  - {c or 'uncategorised'}: {n}" for c, n in by_cat)
-            rel_str = "\n".join(f"  - {r}: {n}" for r, n in by_rel)
+
+            def _fmt_dist(dist):
+                return "\n".join(f"  - {c or 'uncategorised'}: {n}" for c, n in dist) or "  (none)"
+
+            fresh_total = sum(n for _, n in fresh_cat)
+            latest_day = latest_date.date() if latest_date else "?"
             augmented = (
-                f"The user ran `/trends`. Across {total} evidenced signals in the current "
-                f"run, the distribution is:\n\nBy signal type:\n{cat_str}\n\n"
-                f"By TPDL service area (top):\n{rel_str}\n\n"
-                f"As Maya, read the dominant trends of the week: which signal types and "
-                f"service areas are surging, what that implies about where TPDL should "
-                f"focus, and which one or two themes are worth a marketing angle (hand to Iris)."
+                f"The user ran `/trends`. The universe holds {total} evidenced signals, "
+                f"but they mix vintages — the trend read must come from the LATEST run, "
+                f"with the older stock as context only.\n\n"
+                f"LATEST RUN ({latest_day} · {fresh_companies} companies · {fresh_total} signals) "
+                f"— by signal type:\n{_fmt_dist(fresh_cat)}\n\n"
+                f"OLDER STOCK ({stock_companies} companies, not re-scanned since their "
+                f"earlier run) — by signal type:\n{_fmt_dist(stock_cat)}\n\n"
+                f"By TPDL service area (latest run only, top):\n"
+                + ("\n".join(f"  - {r}: {n}" for r, n in by_rel) or "  (none)") +
+                "\n\nAs Maya, read the dominant trends OF THE LATEST RUN: which signal "
+                "types and service areas dominate the fresh data, how that differs from "
+                "the older stock's mix, what it implies about where TPDL should focus, "
+                "and which one or two themes are worth a marketing angle (hand to Iris)."
             )
             return {
                 "augmented_message": augmented,
                 "action": "analysed_trends",
-                "task_title": "Weekly trends",
-                "metadata": {"signals": total},
+                "task_title": "Run trends",
+                "metadata": {"signals": total, "fresh_signals": fresh_total,
+                             "fresh_companies": fresh_companies},
             }
 
         # ── /recurring ───────────────────────────────────────────────────
@@ -193,10 +249,11 @@ class MayaAgent(BaseAgent):
                 if runs <= 1:
                     augmented = (
                         "The user ran `/recurring`. The run-history table holds only ONE "
-                        "run so far, so week-over-week recurrence cannot be computed yet. "
+                        "run so far, so run-over-run recurrence cannot be computed yet. "
                         "As Maya, explain this view tracks companies whose signals persist "
-                        "or re-appear across weekly runs (a strong prioritisation cue), and "
-                        "that it activates automatically from the second imported run."
+                        "or re-appear across engine runs (~monthly cadence for now — a "
+                        "strong prioritisation cue), and that it activates automatically "
+                        "from the second imported run."
                     )
                     meta = {"runs": runs}
                 else:
@@ -225,6 +282,29 @@ class MayaAgent(BaseAgent):
                                     key=lambda t: t[3] - t[2])[:20]
                     stable = len(recurring) - sum(1 for t in recurring if t[3] != t[2])
 
+                    # New vs repeated (the dedup question): who shows up for the
+                    # FIRST time in the latest run, and how much of the history
+                    # was simply not re-scanned this time (runs may deliberately
+                    # target a subset, so absence ≠ signal gone).
+                    from datetime import datetime as _dt
+
+                    def _run_key(rid):
+                        dates = [s.run_date for s in snaps
+                                 if s.import_run_id == rid and s.run_date]
+                        return max(dates) if dates else _dt.min
+
+                    latest_run_id = max({s.import_run_id for s in snaps}, key=_run_key)
+                    new_names = sorted(
+                        (name for name, lst in by_company.items()
+                         if {s.import_run_id for s in lst} == {latest_run_id}),
+                        key=lambda name: -(by_company[name][-1].assessed_score or 0))
+                    not_rescanned = sum(
+                        1 for lst in by_company.values()
+                        if latest_run_id not in {s.import_run_id for s in lst})
+                    new_str = "\n".join(
+                        f"  - {name}: {by_company[name][-1].assessed_score}"
+                        for name in new_names[:15]) or "  (none)"
+
                     def _fmt(rows_, arrow):
                         return "\n".join(
                             f"  - {name}: seen in {n} runs · score {first}→{last} "
@@ -239,12 +319,19 @@ class MayaAgent(BaseAgent):
                         f"TOP RISERS (score climbing):\n{_fmt(risers, '↑')}\n\n"
                         f"TOP FADERS (score falling):\n{_fmt(faders, '↓')}\n\n"
                         f"Stable: {stable} companies with an unchanged score.\n\n"
+                        f"NEW THIS RUN (first appearance ever, by score):\n{new_str}\n"
+                        f"({len(new_names)} new in total; {not_rescanned} historical companies "
+                        f"were not re-scanned in the latest run — absence there means 'not "
+                        f"scanned', not 'signal gone'.)\n\n"
                         f"As Maya, rank the persistent ones (recurrence = higher priority): "
                         f"risers are heating up (flag the top ones for Inès), faders are "
-                        f"cooling (say whether to keep monitoring or deprioritise)."
+                        f"cooling (say whether to keep monitoring or deprioritise), and call "
+                        f"out the strongest NEW entrants — fresh blood is what widens the "
+                        f"funnel."
                     )
                     meta = {"runs": runs, "recurring": len(recurring),
-                            "risers": len(risers), "faders": len(faders)}
+                            "risers": len(risers), "faders": len(faders),
+                            "new": len(new_names)}
             return {
                 "augmented_message": augmented,
                 "action": "recurring_analysis",
