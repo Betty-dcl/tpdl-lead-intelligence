@@ -17,6 +17,16 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **10 faux zéros re-scorés avec le fix 16384 → dashboard nettoyé (38 outreach-eligible).**
+  Identifié via `/recurring` (mai≥5 → juillet 0) : 10 faux zéros. Re-run `--names …` (cache, ~0,50 $) :
+  **8 récupérés** (Cantabria 8.5 + Ferrer 8.0 = nouveaux ≥8 ; Ypsomed 7.7, Faes 7.5, Straumann 7.0,
+  Nobel 6.0, Avinent 5.5, Reig Jofre 4.6). **2 restent flaky-0 (Grifols, Geistlich)** = très gros
+  corpus qui tronquent parfois MÊME à 16384 → non-déterminisme résiduel du modèle ; un re-run les
+  attrape en général. Fusion **upgrade-only** (un 0 flaky n'écrase jamais une valeur) dans
+  `engine_run_lunch.csv` + réimport → `companies` : 492, **outreach-eligible 38**, review 35, 5 zéros.
+  ⚠️ **Le réimport du CSV corrigé a AJOUTÉ un 3ᵉ RunSnapshot** (hash différent) → historique = #1 mai /
+  #2 juillet-buggé / #3 juillet-corrigé. À NETTOYER : supprimer le #2 buggé (`import_run_id=c7ff0aab446d`)
+  pour que `/recurring` compare mai vs juillet-corrigé proprement (sinon une société montre 7.0→0→8.5).
 - 2026-07-17 — **Trou d'extraction diagnostiqué & corrigé (`max_tokens` 16384) + prefill Sonnet 5 KO.**
   Diagnostic des faux zéros du run lunch (Reig Jofre 7.5→0, Grifols 6.5→0 vs mai) : recherche OK
   (~114 docs) mais extraction = 0. Cause : **Sonnet 5 raisonne en prose avant le JSON** (« Now let me
