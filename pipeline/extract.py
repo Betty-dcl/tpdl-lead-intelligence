@@ -95,7 +95,8 @@ def live_extract(cfg: EngineConfig, company: str, docs: list[RawDoc]) -> list[Ev
     client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
     response = client.messages.create(
         model=cfg.extraction_model,
-        max_tokens=4096,
+        max_tokens=8192,   # verbatim extraction of a large corpus can be long;
+                           # 4096 truncated the JSON → unparseable → 0 evidence
         system=EXTRACT_PROMPT,
         messages=[{
             "role": "user",
@@ -103,17 +104,33 @@ def live_extract(cfg: EngineConfig, company: str, docs: list[RawDoc]) -> list[Ev
         }],
     )
     text = "".join(b.text for b in response.content if b.type == "text")
+    if response.stop_reason == "max_tokens":
+        logger.warning("[extract] %s: response hit max_tokens (output truncated) — "
+                       "consider capping input docs", company)
     return _parse_items(text)
 
 
+def _json_object(text: str) -> str | None:
+    """Pull the JSON object out of a model reply, tolerating ```json fences and
+    surrounding prose. Returns the candidate string or None."""
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+    raw = fence.group(1) if fence else text
+    m = re.search(r"\{.*\}", raw, re.DOTALL)
+    return m.group() if m else None
+
+
 def _parse_items(text: str) -> list[EvidenceItem]:
-    m = re.search(r"\{.*\}", text, re.DOTALL)
-    if not m:
+    candidate = _json_object(text)
+    if not candidate:
         return []
     try:
-        payload = json.loads(m.group())
+        payload = json.loads(candidate)
     except json.JSONDecodeError:
-        logger.warning("[extract] unparseable JSON from model")
+        # Log a snippet so a systematic format/truncation issue is diagnosable
+        # without re-running blind (fix for the "0 evidence, silent" failure).
+        snippet = candidate[:200] + " … " + candidate[-200:] if len(candidate) > 400 else candidate
+        logger.warning("[extract] unparseable JSON from model (len=%d): %s",
+                       len(candidate), snippet)
         return []
     items = []
     for raw in payload.get("items", [])[:MAX_ITEMS_PER_COMPANY]:

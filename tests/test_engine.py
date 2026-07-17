@@ -664,6 +664,20 @@ def test_has_negation_multilingual():
     assert not extract.has_negation("La empresa adquirió a su rival en marzo de 2026.")
 
 
+def test_parse_items_tolerates_json_fences():
+    """Sonnet often wraps the object in a ```json fence — must still parse."""
+    fenced = ('```json\n{"items": [{"quote": "Anna Roe was appointed CEO.", '
+              '"source": "exa_q2", "url": "https://x", "event_date": "2026-06-01", '
+              '"category": "leadership_change"}]}\n```')
+    items = extract._parse_items(fenced)
+    assert len(items) == 1 and items[0].category == "leadership_change"
+
+
+def test_parse_items_returns_empty_on_truncated_json():
+    """A truncated (max_tokens) reply must fail closed, never crash the run."""
+    assert extract._parse_items('{"items": [{"quote": "partial quote that never clo') == []
+
+
 def test_extract_flags_speculative_quote(cfg):
     docs = [RawDoc(source="serper_news", url="https://x.com/a", title="T",
                    text="The group is reportedly considering an acquisition of a rival.")]
