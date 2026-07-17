@@ -17,6 +17,19 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **Durcissement anti-perte-silencieuse (commit 208c916) : 4 défenses structurelles.**
+  (1) **Extraction par CHUNKS de 35 docs** (`extract.py`) : sortie bornée par appel → la troncature
+  JSON ne PEUT plus arriver, quel que soit le corpus. Tue la flakiness Grifols/Geistlich. Dédup des
+  quotes inter-chunks (normalisées). Vérifié live : **Grifols 7.2 (4/6 signaux), Geistlich 6.8 (5/6)** —
+  couverture MEILLEURE que l'appel unique (chaque chunk = pleine attention). (2) **Salvage de JSON
+  tronqué** (`_salvage_item_dicts`) : une réponse coupée rend tous les items COMPLETS au lieu de 0
+  (fail-closed, rien d'inventé). (3) **Retry d'interprétation** (`score.py`) : réponse Opus illisible
+  → 1 retry (sentinel `FAILED_SUMMARY` ; évidence vide non retryée). (4) **Canary zéro-évidence**
+  (`runner.py`) : ≥30 docs mais 0 item en live → review-flag « extraction anomaly » — un faux zéro ne
+  peut plus atteindre le CSV sans marquage. +6 tests → **174 verts**. Dataset final propre :
+  fusion upgrade-only + réimport + purge du snapshot intermédiaire → historique = 2 runs nets
+  (mai 492 / juillet 67 corrigé), **seuls 3 vrais zéros restent** (Luzerner, USZ, Z-Systems — bas en
+  mai aussi), 38 outreach-eligible, deltas /recurring cohérents (Grifols 6.5→7.2, Geistlich 6.0→6.8).
 - 2026-07-17 — **10 faux zéros re-scorés avec le fix 16384 → dashboard nettoyé (38 outreach-eligible).**
   Identifié via `/recurring` (mai≥5 → juillet 0) : 10 faux zéros. Re-run `--names …` (cache, ~0,50 $) :
   **8 récupérés** (Cantabria 8.5 + Ferrer 8.0 = nouveaux ≥8 ; Ypsomed 7.7, Faes 7.5, Straumann 7.0,
