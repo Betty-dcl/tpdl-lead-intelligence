@@ -224,6 +224,36 @@ def test_serper_jobs_sends_multilingual_query(monkeypatch):
     assert "recrutement" in captured["q"] and "empleo" in captured["q"]
 
 
+def test_market_locale_europe_first():
+    assert research._market_locale("Basel, Switzerland") == ("ch", None)
+    assert research._market_locale("Madrid, Spain") == ("es", "es")
+    assert research._market_locale("Boston, USA") == (None, None)   # non-EU ⇒ global
+    assert research._market_locale(None) == (None, None)
+
+
+def test_serper_news_sends_locale(monkeypatch):
+    live = EngineConfig(live=True, serper_api_key="k")
+    captured = {}
+    def fake_post(url, payload, headers):
+        captured.update(payload); return {"news": []}
+    monkeypatch.setattr(research, "_post_json", fake_post)
+    research.serper_news(live, "Acme", gl="ch", hl=None)
+    assert captured.get("gl") == "ch" and "hl" not in captured   # hl omitted when None
+
+
+def test_gather_localises_serp_from_company_location(monkeypatch):
+    live = EngineConfig(live=True, serper_api_key="k")
+    seen = {}
+    def fake_news(cfg, company, num=10, gl=None, hl=None):
+        seen["gl"], seen["hl"] = gl, hl; return []
+    monkeypatch.setattr(research, "serper_news", fake_news)
+    monkeypatch.setattr(research, "serper_jobs", lambda *a, **k: [])
+    monkeypatch.setattr(research, "exa_search", lambda *a, **k: [])
+    monkeypatch.setattr(research, "perplexity_sonar", lambda *a, **k: [])
+    research.gather(live, "Acme", use_cache=False, location="Zurich, Switzerland")
+    assert seen == {"gl": "ch", "hl": None}                       # Swiss company ⇒ gl=ch
+
+
 def test_perplexity_none_found_returns_empty(monkeypatch):
     live = EngineConfig(live=True, perplexity_api_key="k")
     monkeypatch.setattr(research, "_post_json", lambda *a, **k: {

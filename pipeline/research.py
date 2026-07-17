@@ -129,12 +129,44 @@ def _parse_relative_date(s: str, today: date | None = None) -> date | None:
 # Serper (target SERP engine — replaces SerpAPI)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def serper_news(cfg: EngineConfig, company: str, num: int = 10) -> list[RawDoc]:
+# SERP locale per company, derived from its known location (Europe-first:
+# CH + ES are the reference/Lunch markets). A Swiss company's news is searched
+# with gl=ch, a Spanish one with gl=es — better regional/trade-press ranking
+# WITHOUT adding any extra search (same 2 SERP calls/company, just localised).
+# Unknown or non-European location ⇒ (None, None) = global (unchanged behaviour).
+# hl left None where a country is multilingual (CH); the multilingual extraction
+# already handles FR/DE/IT, so gl alone is enough there.
+_MARKET_LOCALE: dict[str, tuple[str, str | None]] = {
+    "CH": ("ch", None), "ES": ("es", "es"), "FR": ("fr", "fr"),
+    "DE": ("de", "de"), "IT": ("it", "it"), "GB": ("uk", "en"),
+    "UK": ("uk", "en"), "BE": ("be", None), "NL": ("nl", "nl"),
+    "AT": ("at", "de"), "PT": ("pt", "pt"),
+}
+
+
+def _market_locale(location: str | None) -> tuple[str | None, str | None]:
+    """(gl, hl) for a company location, or (None, None) if unknown/non-European."""
+    if not location:
+        return (None, None)
+    try:
+        from app.tools.radars import detect_country
+        return _MARKET_LOCALE.get(detect_country(location) or "", (None, None))
+    except Exception:
+        return (None, None)
+
+
+def serper_news(cfg: EngineConfig, company: str, num: int = 10,
+                gl: str | None = None, hl: str | None = None) -> list[RawDoc]:
     """Serper Google News — regional/trade press. https://serper.dev"""
     require_live(cfg, cfg.serper_api_key, "Serper News")
+    payload = {"q": f'"{company}"', "num": num}
+    if gl:
+        payload["gl"] = gl
+    if hl:
+        payload["hl"] = hl
     data = _post_json(
         "https://google.serper.dev/news",
-        {"q": f'"{company}"', "num": num},
+        payload,
         {"X-API-KEY": cfg.serper_api_key},
     )
     return [
@@ -165,12 +197,18 @@ def _jobs_query(company: str) -> str:
     return f'"{company}" ({_HIRING_TERMS}) commercial digital CRM'
 
 
-def serper_jobs(cfg: EngineConfig, company: str, num: int = 10) -> list[RawDoc]:
+def serper_jobs(cfg: EngineConfig, company: str, num: int = 10,
+                gl: str | None = None, hl: str | None = None) -> list[RawDoc]:
     """Serper Google search scoped to job postings — direct hiring-signal proxy."""
     require_live(cfg, cfg.serper_api_key, "Serper Jobs")
+    payload = {"q": _jobs_query(company), "num": num}
+    if gl:
+        payload["gl"] = gl
+    if hl:
+        payload["hl"] = hl
     data = _post_json(
         "https://google.serper.dev/search",
-        {"q": _jobs_query(company), "num": num},
+        payload,
         {"X-API-KEY": cfg.serper_api_key},
     )
     return [
@@ -190,16 +228,22 @@ def serper_jobs(cfg: EngineConfig, company: str, num: int = 10) -> list[RawDoc]:
 # lands in .env, no code change needed).
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _serpapi_url(engine: str, query: str, key: str) -> str:
+def _serpapi_url(engine: str, query: str, key: str,
+                 gl: str | None = None, hl: str | None = None) -> str:
     from urllib.parse import urlencode
-    return "https://serpapi.com/search.json?" + urlencode(
-        {"engine": engine, "q": query, "api_key": key})
+    params = {"engine": engine, "q": query, "api_key": key}
+    if gl:
+        params["gl"] = gl
+    if hl:
+        params["hl"] = hl
+    return "https://serpapi.com/search.json?" + urlencode(params)
 
 
-def serpapi_news(cfg: EngineConfig, company: str) -> list[RawDoc]:
+def serpapi_news(cfg: EngineConfig, company: str,
+                 gl: str | None = None, hl: str | None = None) -> list[RawDoc]:
     """SerpAPI Google News — same role as serper_news."""
     require_live(cfg, cfg.serpapi_key, "SerpAPI News")
-    data = _get_json(_serpapi_url("google_news", f'"{company}"', cfg.serpapi_key))
+    data = _get_json(_serpapi_url("google_news", f'"{company}"', cfg.serpapi_key, gl, hl))
     return [
         RawDoc(
             source="serpapi_news",
@@ -212,11 +256,12 @@ def serpapi_news(cfg: EngineConfig, company: str) -> list[RawDoc]:
     ]
 
 
-def serpapi_jobs(cfg: EngineConfig, company: str) -> list[RawDoc]:
+def serpapi_jobs(cfg: EngineConfig, company: str,
+                 gl: str | None = None, hl: str | None = None) -> list[RawDoc]:
     """SerpAPI Google Jobs — direct hiring-signal proxy (same role as serper_jobs)."""
     require_live(cfg, cfg.serpapi_key, "SerpAPI Jobs")
     data = _get_json(_serpapi_url(
-        "google_jobs", f"{company} commercial digital CRM data", cfg.serpapi_key))
+        "google_jobs", f"{company} commercial digital CRM data", cfg.serpapi_key, gl, hl))
     docs = []
     for item in data.get("jobs_results", []):
         # Only keep postings actually at the target company
@@ -375,7 +420,8 @@ def fixture_docs(path: Path) -> list[RawDoc]:
 
 def gather(cfg: EngineConfig, company: str,
            fixture: Path | None = None,
-           use_cache: bool = True) -> list[RawDoc]:
+           use_cache: bool = True,
+           location: str | None = None) -> list[RawDoc]:
     """Run every available source; skip cleanly what is offline.
 
     Dry-run + no fixture ⇒ empty research (valid: company scores 0).
@@ -401,10 +447,15 @@ def gather(cfg: EngineConfig, company: str,
     if cfg.eu_registry_enabled:           # conditional free source, opt-in (saves SERP quota)
         sources.append(eu_registry)
 
+    # Europe-first locale: SERP sources get the company's market (gl/hl); the
+    # neural/registry sources are locale-agnostic and take (cfg, company) only.
+    gl, hl = _market_locale(location)
+    serp_set = set(serp_sources)
+
     docs: list[RawDoc] = []
     for fn in sources:
         try:
-            got = fn(cfg, company)
+            got = fn(cfg, company, gl=gl, hl=hl) if fn in serp_set else fn(cfg, company)
             # Parse-bug canary: a LIVE source returning nothing may be a schema
             # mismatch, not a true absence of signal — make it visible.
             if cfg.live and not got:

@@ -50,8 +50,8 @@ def _prepare(cfg: EngineConfig, name: str, sector: str | None,
                     else "blocked" if ts.scan_blocked
                     else "no domain" if ts.domain_missing else "stack detected")
 
-    # Step 2 — research
-    docs = research.gather(cfg, name, fixture=fixture)
+    # Step 2 — research (Europe-first: SERP localised to the company's market)
+    docs = research.gather(cfg, name, fixture=fixture, location=identity.get("location"))
     logger.info("[%s] research: %d raw docs", name, len(docs))
 
     # Step 3 — extraction (Sonnet 5) + verbatim QA + speculation flags
