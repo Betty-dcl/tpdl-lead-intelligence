@@ -263,3 +263,24 @@ def test_maya_recurring_trajectory_is_chronological_not_minmax(client):
             db.query(RunSnapshot).filter(
                 RunSnapshot.company_name == "Zzy Declining Co").delete()
             db.commit()
+
+
+def test_hugo_surfaces_freshness_everywhere(client):
+    """The universe mixes vintages — /stats, /scan and /company must all carry
+    the per-company run date so a stale May score is never presented as live
+    intelligence."""
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        hugo = AGENT_CLASSES["hugo"].load(db, "hugo")
+
+        stats = hugo._dispatch_command("/stats")
+        assert "fresh" in stats["metadata"] and "Freshness:" in stats["augmented_message"]
+
+        scan = hugo._dispatch_command("/scan")
+        assert "stale" in scan["metadata"]
+        assert ("latest run" in scan["augmented_message"]
+                or "STALE" in scan["augmented_message"])
+
+        rerun = hugo._dispatch_command("/rerun")
+        assert set(rerun["metadata"]) >= {"live_ready", "anthropic", "research"}

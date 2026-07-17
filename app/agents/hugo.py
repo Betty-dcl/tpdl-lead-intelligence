@@ -1,10 +1,12 @@
 """Hugo — Deep Research & Scoring (operator of the TPDL Lead Intelligence Pipeline).
 
 Hugo owns the scored company universe produced by the Lead Intelligence
-Pipeline (8 research sources → Haiku extraction → Sonnet scoring → scored CSV,
-ingested into the `companies` table). He surfaces and explains that scored
-output, and is the agent we'll wire the live re-run engines into once the API
-keys (Exa, Perplexity, SerpAPI, Apify) are provided.
+Pipeline (8 research sources → Sonnet 5 verbatim extraction → Opus 4.8
+interpretation → scored CSV, ingested into the `companies` table). The engine
+is rebuilt in `pipeline/` and proven live (first real runs 2026-07-17); live
+runs spend money and are launched deliberately from the CLI, never from chat.
+The universe mixes vintages (May baseline + per-run refreshes) — every command
+below surfaces the per-company run date so staleness is never silent.
 
 Slash commands (all read the already-scored `companies` table — no API key
 needed to pull the data; Claude formats the response):
@@ -72,8 +74,21 @@ class HugoAgent(BaseAgent):
         # ── /rerun — trigger / explain an engine run ─────────────────────
         if low == "/rerun" or low.startswith("/rerun"):
             from app.config import settings
-            live_ready = bool(settings.anthropic_api_key) and \
+            anthropic_ok = bool(settings.anthropic_api_key) and \
                 settings.anthropic_api_key != "not-set"
+            # A real refresh also needs at least one research source — an
+            # Anthropic-only setup would extract/score over empty research.
+            research_ok = any([
+                getattr(settings, "exa_api_key", ""),
+                getattr(settings, "perplexity_api_key", ""),
+                getattr(settings, "serpapi_key", ""),
+                getattr(settings, "serper_api_key", ""),
+            ])
+            live_ready = anthropic_ok and research_ok
+            keys_state = ("Anthropic + research keys present"
+                          if live_ready else
+                          "ANTHROPIC_API_KEY missing" if not anthropic_ok
+                          else "no research key (Exa/Perplexity/SerpAPI/Serper) present")
             augmented = (
                 "The user ran `/rerun`. Explain how a pipeline run works now, honestly:\n"
                 "- A **dry-run smoke test** (zero cost, the probe fixture) can be launched "
@@ -81,18 +96,20 @@ class HugoAgent(BaseAgent):
                 "pipeline/fixtures/probe_diagnostics.json`. It proves the chain "
                 "(research → extract → score) but NEVER overwrites the scored database.\n"
                 f"- A **live run** {'IS' if live_ready else 'is NOT'} currently possible "
-                f"({'API key present' if live_ready else 'ANTHROPIC_API_KEY missing'}). "
-                "Live runs spend money and are launched from the CLI so the cost is "
-                "explicit: `python -m pipeline.runner --top 5 --live --max-usd 1` then "
-                "`python import_csv.py data/csv/engine_run.csv` (this is what feeds a 2nd "
-                "run into Maya's /recurring).\n"
+                f"({keys_state}). Live runs spend real money and are launched from the "
+                "CLI so the cost stays explicit and capped: `python -m pipeline.runner "
+                "--top 5 --live --max-usd 1` (or `--lunch`, or `--batch --submit` + "
+                "`--fetch` for machine-free volume runs), then `python import_csv.py "
+                "<out.csv>` to feed the run into the database and Maya's /recurring. "
+                "Cadence decision: ~one run per month.\n"
                 "As Hugo, relay this plainly and NEVER claim you already refreshed the data."
             )
             return {
                 "augmented_message": augmented,
                 "action": "rerun_explained",
                 "task_title": "/rerun",
-                "metadata": {"live_ready": live_ready},
+                "metadata": {"live_ready": live_ready, "anthropic": anthropic_ok,
+                             "research": research_ok},
             }
 
         # ── /scan [sector?] ──────────────────────────────────────────────
@@ -106,6 +123,7 @@ class HugoAgent(BaseAgent):
                         func.lower(Company.sector_bucket) == sector.lower()
                     )
                 rows = q.order_by(Company.assessed_score.desc()).limit(15).all()
+                latest = db.query(func.max(Company.run_date)).scalar()
             if not rows:
                 return {
                     "augmented_message": (
@@ -115,25 +133,37 @@ class HugoAgent(BaseAgent):
                     "action": "scanned_universe",
                     "task_title": f"Scan — {sector or 'all'} (empty)",
                 }
+            latest_day = latest.date() if latest else None
+
+            def _fresh(c) -> str:
+                if not c.run_date:
+                    return "run date unknown"
+                day = c.run_date.date()
+                return ("fresh (latest run)" if day == latest_day
+                        else f"scored {day} — STALE")
+
             lines = [
                 f"- {c.name} — score {c.assessed_score} · {c.coverage} · "
                 f"{c.sector_bucket or '—'} · {c.location or '—'}"
-                f"{' · OUTREACH ELIGIBLE' if c.outreach_eligible else ''}"
+                f"{' · OUTREACH ELIGIBLE' if c.outreach_eligible else ''} · {_fresh(c)}"
                 for c in rows
             ]
+            stale = sum(1 for c in rows if c.run_date and c.run_date.date() != latest_day)
             augmented = (
                 f"The user ran `/scan{(' ' + sector) if sector else ''}`. Here are the "
                 f"top {len(rows)} scored companies from my Lead Intelligence Pipeline "
-                f"(highest assessed_score first):\n\n" + "\n".join(lines) +
+                f"(highest assessed_score first; {stale} carry a STALE score from an "
+                f"earlier run, not re-verified since):\n\n" + "\n".join(lines) +
                 "\n\nPresent this as a tight prioritised shortlist. Call out which are "
                 "Outreach Eligible (score ≥ 8) and recommend the 2-3 to act on first. "
+                "Weigh freshness: a STALE high score means 'verify before acting'. "
                 "Remind the user a high score with low coverage = one strong signal."
             )
             return {
                 "augmented_message": augmented,
                 "action": "scanned_universe",
                 "task_title": f"Scan — {sector or 'all'}",
-                "metadata": {"sector": sector, "returned": len(rows)},
+                "metadata": {"sector": sector, "returned": len(rows), "stale": stale},
             }
 
         # ── /company [name] ──────────────────────────────────────────────
@@ -159,12 +189,24 @@ class HugoAgent(BaseAgent):
                     "action": "company_brief",
                     "task_title": f"/company: {name} (not found)",
                 }
+            with SessionLocal() as db:
+                latest = db.query(func.max(Company.run_date)).scalar()
+            latest_day = latest.date() if latest else None
+            if c.run_date:
+                day = c.run_date.date()
+                scored_line = (f"Scored on: {day} (latest run — fresh)"
+                               if day == latest_day else
+                               f"Scored on: {day} — STALE (not re-verified in the "
+                               f"latest run of {latest_day})")
+            else:
+                scored_line = "Scored on: unknown run date"
             block = (
                 f"COMPANY: {c.name}\n"
                 f"Sector: {c.sector_bucket} ({c.sector or '—'}) · Location: {c.location or '—'} · "
                 f"Revenue: {c.revenue or '—'} · Website: {c.website or '—'}\n"
                 f"Assessed Score: {c.assessed_score} · Coverage: {c.coverage} · "
                 f"Outreach Eligible: {c.outreach_eligible}\n"
+                f"{scored_line}\n"
                 f"ICP-flagged: {c.icp_flag} · Review-flagged: {c.review_flag}"
                 f"{(' (' + c.review_flag_reason + ')') if c.review_flag and c.review_flag_reason else ''}\n\n"
                 f"INTELLIGENCE SUMMARY:\n{c.intelligence_summary}\n\n"
@@ -178,7 +220,8 @@ class HugoAgent(BaseAgent):
                 f"never invent dates/sources/events.\n\n{block}\n\n"
                 f"Give: (1) a 2-3 sentence read of where the commercial opening is, "
                 f"(2) the strongest evidenced signal and its TPDL relevance, "
-                f"(3) a timing call — engage now / monitor / verify first — with why. "
+                f"(3) a timing call — engage now / monitor / verify first — with why "
+                f"(a STALE score argues for 'verify first'). "
                 f"Then note this company is ready to hand to Maya for shortlisting."
             )
             return {
@@ -196,28 +239,42 @@ class HugoAgent(BaseAgent):
                     Company.outreach_eligible.is_(True)).scalar() or 0
                 icp = db.query(func.count(Company.name)).filter(
                     Company.icp_flag.is_(True)).scalar() or 0
+                review = db.query(func.count(Company.name)).filter(
+                    Company.review_flag.is_(True)).scalar() or 0
                 sectors = (
                     db.query(Company.sector_bucket, func.count(Company.name))
                     .group_by(Company.sector_bucket)
                     .order_by(func.count(Company.name).desc())
                     .all()
                 )
+                latest = db.query(func.max(Company.run_date)).scalar()
+                fresh = 0
+                if latest:
+                    day_start = latest.replace(hour=0, minute=0, second=0, microsecond=0)
+                    fresh = db.query(func.count(Company.name)).filter(
+                        Company.run_date >= day_start).scalar() or 0
             sector_str = ", ".join(f"{(s or 'Unknown')}: {n}" for s, n in sectors)
+            latest_day = latest.date() if latest else "unknown"
             augmented = (
                 f"The user ran `/stats`. Here is my Lead Intelligence Pipeline universe "
                 f"as currently scored in the database:\n\n"
                 f"- Total companies: {total}\n"
                 f"- Outreach Eligible (score ≥ 8): {eligible}\n"
                 f"- ICP-flagged (out of target criteria): {icp}\n"
+                f"- Review-flagged (needs a 60s human check): {review}\n"
+                f"- Freshness: latest run {latest_day} refreshed {fresh} companies; "
+                f"the other {total - fresh} carry scores from earlier runs (stale)\n"
                 f"- By sector: {sector_str}\n\n"
-                f"Summarise the state of the universe in a few lines and point the user to "
-                f"`/scan` for the shortlist or `/company [name]` for a full brief."
+                f"Summarise the state of the universe in a few lines — including how "
+                f"much of it is fresh vs stale — and point the user to `/scan` for the "
+                f"shortlist or `/company [name]` for a full brief."
             )
             return {
                 "augmented_message": augmented,
                 "action": "universe_stats",
                 "task_title": "Universe stats",
-                "metadata": {"total": total, "eligible": eligible},
+                "metadata": {"total": total, "eligible": eligible,
+                             "review": review, "fresh": fresh},
             }
 
         return None
