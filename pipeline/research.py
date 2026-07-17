@@ -149,12 +149,28 @@ def serper_news(cfg: EngineConfig, company: str, num: int = 10) -> list[RawDoc]:
     ]
 
 
+# Hiring intent across the target markets (EN/FR/ES/DE). A French or Spanish job
+# posting never says "hiring"/"careers", so an English-only query silently misses
+# European recruitment signals. The role focus (commercial/digital/CRM/data) stays
+# in its already-international form. No country locale (gl/hl) is hardcoded here:
+# the market geography is still an open scope question (see the segmentation draft),
+# so we widen the LANGUAGE of the query, not its country.
+_HIRING_TERMS = ("hiring OR jobs OR careers OR emploi OR recrutement OR carrières "
+                 "OR empleo OR contratación OR empleos OR Karriere OR Stellenangebote")
+
+
+def _jobs_query(company: str) -> str:
+    """SERP query for hiring signals — exposed as a pure function so it is testable
+    without a live call."""
+    return f'"{company}" ({_HIRING_TERMS}) commercial digital CRM'
+
+
 def serper_jobs(cfg: EngineConfig, company: str, num: int = 10) -> list[RawDoc]:
     """Serper Google search scoped to job postings — direct hiring-signal proxy."""
     require_live(cfg, cfg.serper_api_key, "Serper Jobs")
     data = _post_json(
         "https://google.serper.dev/search",
-        {"q": f'"{company}" (hiring OR jobs OR careers) commercial digital CRM', "num": num},
+        {"q": _jobs_query(company), "num": num},
         {"X-API-KEY": cfg.serper_api_key},
     )
     return [

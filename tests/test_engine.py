@@ -203,6 +203,27 @@ def test_serper_news_parses(monkeypatch):
     assert docs[0].published == date(2026, 6, 1)
 
 
+def test_jobs_query_is_multilingual():
+    q = research._jobs_query("Acme")
+    assert '"Acme"' in q
+    # target-market hiring verbs surface FR/ES/DE postings an English-only query misses
+    for term in ("emploi", "recrutement", "empleo", "contratación", "Stellenangebote"):
+        assert term in q
+    assert "commercial digital CRM" in q      # role focus kept (international terms)
+
+
+def test_serper_jobs_sends_multilingual_query(monkeypatch):
+    live = EngineConfig(live=True, serper_api_key="k")
+    captured = {}
+    def fake_post(url, payload, headers):
+        captured["q"] = payload["q"]
+        return {"organic": [{"title": "T", "link": "https://x", "snippet": "s"}]}
+    monkeypatch.setattr(research, "_post_json", fake_post)
+    docs = research.serper_jobs(live, "Acme")
+    assert docs and docs[0].source == "serper_jobs"
+    assert "recrutement" in captured["q"] and "empleo" in captured["q"]
+
+
 def test_perplexity_none_found_returns_empty(monkeypatch):
     live = EngineConfig(live=True, perplexity_api_key="k")
     monkeypatch.setattr(research, "_post_json", lambda *a, **k: {
@@ -611,6 +632,38 @@ def test_has_negation_flags_speculation():
     assert not extract.has_negation("Anna Roe was appointed CEO on 1 June 2026.")
 
 
+def test_date_in_text_multilingual():
+    today = date(2026, 9, 1)
+    # French
+    assert extract.date_in_text("nommée le 1er juin 2026 à la tête", today) == date(2026, 6, 1)
+    assert extract.date_in_text("en août 2026, le groupe", today) == date(2026, 8, 1)
+    assert extract.date_in_text("le 2e mai 2026", today) == date(2026, 5, 2)
+    # Spanish "15 de junio de 2026"
+    assert extract.date_in_text("nombrada el 15 de junio de 2026", today) == date(2026, 6, 15)
+    assert extract.date_in_text("en marzo de 2026 la empresa", today) == date(2026, 3, 1)
+    # German
+    assert extract.date_in_text("im August 2026 kündigte", today) == date(2026, 8, 1)
+    assert extract.date_in_text("am 3. März 2026 wurde ernannt", today) == date(2026, 3, 3)
+    # French juin vs juillet must not collide (the old [:3] bug)
+    assert extract.date_in_text("depuis juillet 2026", today) == date(2026, 7, 1)
+    assert extract.date_in_text("depuis juin 2026", today) == date(2026, 6, 1)
+    # English still works unchanged
+    assert extract.date_in_text("effective 1 June 2026", today) == date(2026, 6, 1)
+    assert extract.date_in_text("on 2026-04-30", today) == date(2026, 4, 30)
+
+
+def test_has_negation_multilingual():
+    # French / Spanish / German hedges are flagged
+    assert extract.has_negation("Le groupe envisage une acquisition.")
+    assert extract.has_negation("La société pourrait céder sa filiale.")
+    assert extract.has_negation("El grupo estudia una posible fusión.")
+    assert extract.has_negation("La empresa podría vender su división.")
+    assert extract.has_negation("Der Konzern erwägt eine Übernahme.")
+    # a plain completed fact in French/Spanish is NOT flagged
+    assert not extract.has_negation("Anna Roe a été nommée directrice le 1er juin 2026.")
+    assert not extract.has_negation("La empresa adquirió a su rival en marzo de 2026.")
+
+
 def test_extract_flags_speculative_quote(cfg):
     docs = [RawDoc(source="serper_news", url="https://x.com/a", title="T",
                    text="The group is reportedly considering an acquisition of a rival.")]
@@ -694,3 +747,38 @@ def test_boilerplate_counts_preserved_rows_on_resume(cfg):
     current = [CompanyResult(name="C", signals=[score.score_signal(cfg, sig, TODAY)])]
     flag_boilerplate(current, existing)                   # 2 prior + 1 now = 3 ⇒ flag
     assert current[0].review_flag and "boilerplate" in (current[0].review_flag_reason or "")
+
+
+def test_boilerplate_catches_near_identical_not_just_exact(cfg):
+    """Opus drifts by a word/comma/capital — exact match missed that; the
+    normalised near-duplicate check catches it."""
+    variants = [
+        "Hiring push creates execution pressure and a capability gap aligned with digital execution.",
+        "Hiring push creates execution pressure and a capability gap aligned with Digital Execution",
+        "Hiring push creates execution pressure and capability gap, aligned with digital execution.",
+    ]
+    def one(name, wm):
+        sig = InterpretedSignal(category="hiring", what_happened="w", why_it_matters=wm,
+                                tpdl_relevance="x", confidence="low", signal_strength=3,
+                                evidence=[_item()])
+        return CompanyResult(name=name, signals=[score.score_signal(cfg, sig, TODAY)])
+    results = [one(n, v) for n, v in zip("ABC", variants)]
+    flag_boilerplate(results)
+    assert all(r.review_flag for r in results)            # all three flagged despite wording drift
+
+
+def test_boilerplate_does_not_flag_genuinely_distinct_rationales(cfg):
+    """Three different rationales must NOT be merged (no false positives)."""
+    distinct = [
+        "New CEO triggers an operating-model review across commercial functions.",
+        "PE ownership mandates a 12-month commercial performance improvement plan.",
+        "A CRM replacement programme signals a data-strategy transformation underway.",
+    ]
+    def one(name, wm):
+        sig = InterpretedSignal(category="hiring", what_happened="w", why_it_matters=wm,
+                                tpdl_relevance="x", confidence="low", signal_strength=3,
+                                evidence=[_item()])
+        return CompanyResult(name=name, signals=[score.score_signal(cfg, sig, TODAY)])
+    results = [one(n, v) for n, v in zip("ABC", distinct)]
+    flag_boilerplate(results)
+    assert not any(r.review_flag for r in results)

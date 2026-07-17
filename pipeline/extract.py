@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import unicodedata
 from datetime import date, datetime
 
 from pipeline.config import PROMPTS_DIR, EngineConfig, require_live
@@ -144,36 +145,76 @@ def _parse_iso(value) -> date | None:
 # ("effective 1 June 2026" is the event date; the article may be older/newer)
 # ─────────────────────────────────────────────────────────────────────────────
 
-_MONTHS = {m.lower(): i for i, m in enumerate(
-    ("January", "February", "March", "April", "May", "June", "July",
-     "August", "September", "October", "November", "December"), start=1)}
-_MONTHS.update({m[:3]: i for m, i in list(_MONTHS.items())})  # jan, feb, …
+def _strip_accents(s: str) -> str:
+    """février → fevrier, août → aout, März → marz — so one map covers EU sources."""
+    return "".join(c for c in unicodedata.normalize("NFD", s)
+                   if unicodedata.category(c) != "Mn")
+
+
+# Month names EN / FR / ES / DE (accent-stripped, lowercase). Targets are
+# European (CH/ES + wider life-science watch), so a date in a French, Spanish
+# or German source ("1er juin 2026", "15 de junio de 2026", "August 2026") must
+# parse too — otherwise recency is silently 0 (the same class of bug that was
+# fixed once already for English SERP dates). Same-ordinal names collapse to the
+# same month number across languages, so there is no cross-language collision.
+_MONTH_NAMES = {
+    1:  ("january", "jan", "janvier", "enero", "januar"),
+    2:  ("february", "feb", "fevrier", "febrero", "februar"),
+    3:  ("march", "mar", "mars", "marzo", "marz"),
+    4:  ("april", "apr", "avril", "abril"),
+    5:  ("may", "mai", "mayo"),
+    6:  ("june", "jun", "juin", "junio", "juni"),
+    7:  ("july", "jul", "juillet", "julio", "juli"),
+    8:  ("august", "aug", "aout", "agosto"),
+    9:  ("september", "sep", "sept", "septembre", "septiembre"),
+    10: ("october", "oct", "octobre", "octubre", "oktober"),
+    11: ("november", "nov", "novembre", "noviembre"),
+    12: ("december", "dec", "decembre", "diciembre", "dezember"),
+}
+_MONTHS = {name: num for num, names in _MONTH_NAMES.items() for name in names}
+
+
+def _month_num(token: str) -> int | None:
+    """Full-name lookup (accent-stripped). NOT a [:3] truncation — that would
+    collapse French juin/juillet to the same 'jui'."""
+    return _MONTHS.get(_strip_accents(token).lower())
+
+
+# A month token is a run of Unicode letters (so accented FR/ES/DE names match);
+# 3-12 chars excludes the 2-letter Spanish "de" separator.
+_MON = r"[^\W\d_]{3,12}"
+# Day ordinals across languages: 1st / 1er / 2e / 2ème / 1º.
+_ORD = r"(?:st|nd|rd|th|er|ere|eme|e|º|°)?"
 
 _DATE_PATTERNS = (
     # 2026-06-01
-    re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b"),
-    # 1 June 2026 / 01 Jun 2026
-    re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?\s+(\d{4})\b"),
+    re.compile(r"\b(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})\b"),
+    # Spanish: 15 de junio de 2026  (before the generic form so "de" isn't eaten)
+    re.compile(rf"\b(?P<d>\d{{1,2}})\s+de\s+(?P<mon>{_MON})\s+de\s+(?P<y>\d{{4}})\b",
+               re.IGNORECASE),
+    # 1 June 2026 / 01 Jun 2026 / 1er juin 2026 / 2e mai 2026 / 3. März 2026
+    re.compile(rf"\b(?P<d>\d{{1,2}}){_ORD}\.?\s+(?P<mon>{_MON})\.?\s+(?P<y>\d{{4}})\b",
+               re.IGNORECASE),
     # June 1, 2026 / Jun 1 2026
-    re.compile(r"\b([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b"),
-    # June 2026 (month only → 1st of month)
-    re.compile(r"\b([A-Za-z]{3,9})\.?\s+(\d{4})\b"),
+    re.compile(rf"\b(?P<mon>{_MON})\.?\s+(?P<d>\d{{1,2}}){_ORD},?\s+(?P<y>\d{{4}})\b",
+               re.IGNORECASE),
+    # June 2026 / juin 2026 / marzo de 2026 (month only → 1st of month)
+    re.compile(rf"\b(?P<mon>{_MON})\.?\s+(?:de\s+)?(?P<y>\d{{4}})\b", re.IGNORECASE),
 )
 
 
-def _date_from_match(pattern, groups) -> date | None:
+def _date_from_match(match: re.Match) -> date | None:
+    g = match.groupdict()
     try:
-        if pattern is _DATE_PATTERNS[0]:
-            return date(int(groups[0]), int(groups[1]), int(groups[2]))
-        if pattern is _DATE_PATTERNS[1]:
-            month = _MONTHS.get(groups[1].lower()[:3])
-            return date(int(groups[2]), month, int(groups[0])) if month else None
-        if pattern is _DATE_PATTERNS[2]:
-            month = _MONTHS.get(groups[0].lower()[:3])
-            return date(int(groups[2]), month, int(groups[1])) if month else None
-        month = _MONTHS.get(groups[0].lower()[:3])
-        return date(int(groups[1]), month, 1) if month else None
-    except ValueError:
+        year = int(g["y"])
+        if g.get("m"):                       # numeric ISO month
+            return date(year, int(g["m"]), int(g["d"]))
+        month = _month_num(g["mon"])
+        if not month:
+            return None
+        day = int(g["d"]) if g.get("d") else 1
+        return date(year, month, day)
+    except (ValueError, TypeError):
         return None
 
 
@@ -183,13 +224,13 @@ def date_in_text(text: str, today: date | None = None) -> date | None:
     Guardrails (fix for the "wrong date" risk): dates in the future or older
     than 5 years are discarded; among the rest the MOST RECENT is returned
     (an event date like "appointed June 2026" beats stale context like
-    "founded in 2019 ... appointed June 2026").
+    "founded in 2019 ... appointed June 2026"). Parses EN/FR/ES/DE months.
     """
     today = today or date.today()
     cands: list[date] = []
     for pattern in _DATE_PATTERNS:
         for m in pattern.finditer(text):
-            d = _date_from_match(pattern, m.groups())
+            d = _date_from_match(m)
             if d and d <= today and (today - d).days <= 365 * 5:
                 cands.append(d)
     return max(cands) if cands else None
@@ -201,11 +242,23 @@ def date_in_text(text: str, today: date | None = None) -> date | None:
 # Matched on WORD BOUNDARIES (see has_negation) so "not" doesn't fire inside
 # "cannot"/"another" and "may" doesn't fire inside "Mayer". Multi-word markers
 # match as phrases. Hedges kept deliberately narrow to limit false review noise.
+# Markers are stored ACCENT-STRIPPED and matched against accent-stripped text,
+# so "podría"/"podria", "prévoit"/"prevoit", "erwägt"/"erwagt" all fire.
 _NEGATION_MARKERS = (
+    # English
     "not", "no longer", "denied", "denies", "deny", "rumour", "rumor",
     "reportedly", "allegedly", "considering", "may", "might", "could",
     "would", "plans to", "planning to", "expected to", "is set to",
     "in talks", "explores", "exploring", "potential", "speculation",
+    # French (bare "non"/"ne" deliberately excluded — far too common)
+    "envisage", "envisagerait", "pourrait", "en discussions", "en pourparlers",
+    "prevoit de", "devrait", "aurait", "rumeur", "presume", "dementi",
+    "potentiel", "eventuel", "serait",
+    # Spanish (bare "no" deliberately excluded — far too common)
+    "podria", "estudia", "en conversaciones", "en negociaciones", "preve",
+    "planea", "supuestamente", "presunto", "posible", "niega", "nego",
+    # German
+    "erwagt", "pruft", "konnte", "in gesprachen", "angeblich", "moglicherweise",
 )
 
 _NEGATION_RE = re.compile(
@@ -213,8 +266,12 @@ _NEGATION_RE = re.compile(
 
 
 def has_negation(text: str) -> bool:
-    """True if the quote hedges/negates — kept but flagged (event may not have happened)."""
-    return bool(_NEGATION_RE.search(text.lower()))
+    """True if the quote hedges/negates — kept but flagged (event may not have happened).
+
+    Accent-insensitive and multilingual (EN/FR/ES/DE): European sources hedge in
+    their own language, and an unflagged rumour would otherwise be scored as fact.
+    """
+    return bool(_NEGATION_RE.search(_strip_accents(text).lower()))
 
 
 # ─────────────────────────────────────────────────────────────────────────────

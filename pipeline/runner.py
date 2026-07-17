@@ -22,7 +22,7 @@ import argparse
 import csv
 import json
 import logging
-from collections import Counter
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -106,34 +106,66 @@ def run_company(cfg: EngineConfig, name: str, sector: str | None = None,
                      scored, not_evidenced, summary)
 
 
+_BOILERPLATE_MIN = 3        # a rationale shared by this many is boilerplate
+_BOILERPLATE_SIM = 0.9      # Jaccard ≥ this ⇒ "the same rationale" (near-duplicate)
+
+
+def _rationale_tokens(text: str) -> frozenset[str]:
+    """Casefolded, punctuation-stripped token set — the comparison basis.
+
+    Exact-string matching missed the real thing: Opus rarely repeats a rationale
+    character-for-character, it drifts by a word, a capital or a comma. Comparing
+    normalised token SETS catches those near-identical variants too.
+    """
+    return frozenset(re.sub(r"[^\w\s]", " ", text).casefold().split())
+
+
+def _near_duplicate(a: frozenset[str], b: frozenset[str]) -> bool:
+    """True if two rationales are the same modulo trivial wording (Jaccard ≥ 0.9).
+
+    The threshold is deliberately strict (≤ ~2 differing words in a 20-word
+    rationale) so genuinely distinct rationales are never merged."""
+    if not a or not b:
+        return False
+    return len(a & b) / len(a | b) >= _BOILERPLATE_SIM
+
+
 def flag_boilerplate(results: list[CompanyResult],
                      existing_rows: list[dict] | None = None) -> None:
-    """Cross-company review flag: identical tpdl rationale on 3+ companies.
+    """Cross-company review flag: the same tpdl rationale (near-identical) on 3+.
 
-    On --resume, seed the count from rows already written (their `Signal N Why
+    On --resume, seed the corpus from rows already written (their `Signal N Why
     It Matters` columns) so boilerplate spanning the prior + current batch is
     still caught — otherwise a rationale repeated across the resume boundary
-    slips through.
+    slips through. Matching is normalised + near-duplicate, not exact string.
     """
-    rationales = Counter()
+    corpus: list[frozenset[str]] = []
     for row in existing_rows or []:
         for col in ("Signal 1 Why It Matters", "Signal 2 Why It Matters",
                     "Signal 3 Why It Matters"):
             text = (row.get(col) or "").strip()
             if text:
-                rationales[text] += 1
+                corpus.append(_rationale_tokens(text))
     for r in results:
         for s in r.signals:
             if s.signal.why_it_matters:
-                rationales[s.signal.why_it_matters] += 1
-    boilerplate = {text for text, n in rationales.items() if n >= 3}
-    if not boilerplate:
+                corpus.append(_rationale_tokens(s.signal.why_it_matters))
+    if not corpus:
         return
+
+    def occurrences(tokens: frozenset[str]) -> int:
+        # counts itself + its near-duplicates in the corpus (parity with the old
+        # occurrence count, but tolerant of wording drift)
+        return sum(1 for other in corpus if _near_duplicate(tokens, other))
+
     for r in results:
-        if any(s.signal.why_it_matters in boilerplate for s in r.signals):
-            r.review_flag = True
-            extra = "boilerplate tpdl_rationale shared by 3+ companies"
-            r.review_flag_reason = "; ".join(filter(None, [r.review_flag_reason, extra]))
+        for s in r.signals:
+            wm = s.signal.why_it_matters
+            if wm and occurrences(_rationale_tokens(wm)) >= _BOILERPLATE_MIN:
+                r.review_flag = True
+                extra = "boilerplate tpdl_rationale shared by 3+ companies"
+                r.review_flag_reason = "; ".join(filter(None, [r.review_flag_reason, extra]))
+                break
 
 
 def _select_companies(args) -> list:
