@@ -17,6 +17,19 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **Audit de Hugo (même exercice que Maya) → désinformation du prompt corrigée + fraîcheur
+  partout (commit da5f494, DB re-seedée).** Trouvé : (1) **hugo.md désinformait activement** — « a REAL
+  data refresh is not possible until keys land » + « dataset frozen, 35 eligible, top Hologic 9.5 » ;
+  faux depuis aujourd'hui (clés validées, runs live faits, 38 éligibles, 2 runs). Réécrit : moteur
+  OPÉRATIONNEL gated par coût/intention (~1 run/mois), dataset à MILLÉSIMES MÉLANGÉS → fraîcheur
+  par société obligatoire dans chaque brief ; la ligne « recurrence impossible (1 seul run) » route
+  désormais vers /recurring de Maya (actif). (2) Docstring hugo.py parlait encore de « Haiku extraction
+  → Sonnet scoring » (modèles abandonnés le 09/07). (3) `/scan` : fraîcheur par ligne + compte stale ;
+  `/company` : ligne « Scored on: » (un brief d'intelligence sans date = faute pro) + « STALE ⇒ verify
+  first » ; `/stats` : review-flagged + répartition fraîcheur (67 fresh / 425 stale). (4) `/rerun` :
+  live_ready exige Anthropic ET ≥1 clé recherche. +1 test. Suite : **176 verts**. 📌 Observation DONNÉE
+  (pas code, pour Vera/futur run) : doublons visibles dans l'univers — « Sesderma », « Sesderma
+  (Mediderma Group) », « Mediderma (Sesderma Group) » = 3 lignes du même groupe ; « Glenmark » ×2.
 - 2026-07-17 — **Maya : les 3 améliorations restantes de l'audit FAITES (commit ac4b092).**
   (1) `/top` : fraîcheur PAR LIGNE (« scored 2026-05-25 — STALE » vs « (latest run) ») + compte de
   stales — un 9.0 figé de mai ne domine plus silencieusement un 8.5 frais de juillet (constaté :
