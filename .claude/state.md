@@ -17,6 +17,17 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-17 — **Géographie du moteur TRANCHÉE : EUROPE, CH + ES d'abord** (décision Betty ; répond à
+  la question ouverte de géo #1 du brouillon de segmentation — Nathalie peut affiner les pays ensuite).
+  Implémenté côté recherche : `pipeline/research.py` dérive une **locale SERP (`gl`/`hl`) de la
+  localisation connue de chaque société** (société suisse → `gl=ch`, espagnole → `gl=es`) via le
+  `detect_country` existant (CH/ES seulement pour l'instant ; table `_MARKET_LOCALE` prête pour
+  FR/DE/IT/UK/BE/NL/AT/PT). **Aucune recherche supplémentaire** (mêmes 2 appels SERP/société, juste
+  localisés → coût inchangé) ; localisation inconnue/non-UE → global (comportement inchangé). Câblé
+  dans les 4 fonctions SERP (Serper + SerpAPI) + `gather(location=…)` + `_prepare`. Complète le
+  multilingue d'extraction EN/FR/ES/DE. +3 tests. Suite : **164 verts**. ⚠️ L'autre moitié de « baser
+  sur l'Europe » = l'**univers d'entreprises** (liste candidate européenne) — dépend de la liste/scope
+  (Nathalie) ; `--lunch` (48 CH + 19 ES) est déjà l'univers CH+ES prêt à l'emploi.
 - 2026-07-17 — **PREMIER RUN LIVE réel du moteur — clés validées + bug d'extraction trouvé & corrigé.**
   Run de validation `--top 3 --live --max-usd 1` (<0,20 $) : a prouvé que **toutes les clés payantes
   fonctionnent et ont du crédit** (Anthropic Sonnet+Opus, Exa, SerpAPI, Perplexity) et que le pipeline
