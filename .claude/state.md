@@ -24,9 +24,10 @@
   corpus qui tronquent parfois MÊME à 16384 → non-déterminisme résiduel du modèle ; un re-run les
   attrape en général. Fusion **upgrade-only** (un 0 flaky n'écrase jamais une valeur) dans
   `engine_run_lunch.csv` + réimport → `companies` : 492, **outreach-eligible 38**, review 35, 5 zéros.
-  ⚠️ **Le réimport du CSV corrigé a AJOUTÉ un 3ᵉ RunSnapshot** (hash différent) → historique = #1 mai /
-  #2 juillet-buggé / #3 juillet-corrigé. À NETTOYER : supprimer le #2 buggé (`import_run_id=c7ff0aab446d`)
-  pour que `/recurring` compare mai vs juillet-corrigé proprement (sinon une société montre 7.0→0→8.5).
+  Le réimport avait ajouté un 3ᵉ snapshot → **NETTOYÉ** : le snapshot juillet-buggé (`c7ff0aab446d`,
+  67 lignes) supprimé. Historique propre = **2 runs** : mai #1 (`cb97cf5d50d2`, 492) + juillet-corrigé
+  (`d0c561fd8988`, 67). `/recurring` montre des deltas cohérents (Cantabria 7.0→8.5, Ferrer 6.0→8.0,
+  Roche 7.0→8.0, Reig Jofre 7.5→4.6).
 - 2026-07-17 — **Trou d'extraction diagnostiqué & corrigé (`max_tokens` 16384) + prefill Sonnet 5 KO.**
   Diagnostic des faux zéros du run lunch (Reig Jofre 7.5→0, Grifols 6.5→0 vs mai) : recherche OK
   (~114 docs) mais extraction = 0. Cause : **Sonnet 5 raisonne en prose avant le JSON** (« Now let me
