@@ -121,23 +121,40 @@ def evidence_payload(block: EvidenceBlock) -> str:
 # Live interpretation (Opus 4.8) — behind the money gate
 # ─────────────────────────────────────────────────────────────────────────────
 
+FAILED_SUMMARY = "No interpretation produced. " * 3  # parse-failure sentinel
+
+_INTERPRET_ATTEMPTS = 2   # one retry: a truncated/garbled reply is stochastic,
+                          # so a single re-ask usually yields a clean one — far
+                          # cheaper than a silent false zero surviving to the CSV.
+
+
 def live_interpret(cfg: EngineConfig, block: EvidenceBlock) -> tuple[list[InterpretedSignal], list[str], str]:
     require_live(cfg, cfg.anthropic_api_key, "Interpretation (Opus 4.8)")
     import anthropic
 
     client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
-    response = client.messages.create(
-        model=cfg.interpretation_model,
-        max_tokens=8192,   # 4096 truncated rich interpretations → "No interpretation
-                           # produced" → false 0 (prefill unsupported on this model)
-        system=SCORE_PROMPT,
-        messages=[{"role": "user", "content": evidence_payload(block)}],
-    )
-    text = "".join(b.text for b in response.content if b.type == "text")
-    if response.stop_reason == "max_tokens":
-        logger.warning("[score] %s: interpretation hit max_tokens (truncated)",
-                       block.company_name)
-    return _parse_interpretation(text, block)
+    result = ([], list(SIGNAL_CATEGORIES), FAILED_SUMMARY)
+    for attempt in range(1, _INTERPRET_ATTEMPTS + 1):
+        response = client.messages.create(
+            model=cfg.interpretation_model,
+            max_tokens=8192,   # 4096 truncated rich interpretations → false 0
+                               # (assistant prefill unsupported on this model)
+            system=SCORE_PROMPT,
+            messages=[{"role": "user", "content": evidence_payload(block)}],
+        )
+        text = "".join(b.text for b in response.content if b.type == "text")
+        if response.stop_reason == "max_tokens":
+            logger.warning("[score] %s: interpretation hit max_tokens (truncated)",
+                           block.company_name)
+        result = _parse_interpretation(text, block)
+        # Empty evidence legitimately yields no signals; a parse FAILURE is
+        # detected by its sentinel summary — only that case is worth a retry.
+        if result[2] != FAILED_SUMMARY or not block.items:
+            return result
+        logger.warning("[score] %s: unusable interpretation (attempt %d/%d)%s",
+                       block.company_name, attempt, _INTERPRET_ATTEMPTS,
+                       " — retrying" if attempt < _INTERPRET_ATTEMPTS else " — giving up")
+    return result
 
 
 def _coerce_strength(value) -> int:
@@ -155,14 +172,14 @@ def _coerce_strength(value) -> int:
 def _parse_interpretation(text: str, block: EvidenceBlock) -> tuple[list[InterpretedSignal], list[str], str]:
     m = re.search(r"\{.*\}", text, re.DOTALL)
     if not m:
-        return [], list(SIGNAL_CATEGORIES), "No interpretation produced. " * 3
+        return [], list(SIGNAL_CATEGORIES), FAILED_SUMMARY
     try:
         payload = json.loads(m.group())
     except json.JSONDecodeError:
         # Mirror _parse_items: one bad reply must not abort the company (or, via
         # the batch loop, discard every other company's paid results).
         logger.warning("[score] unparseable JSON from model for %s", block.company_name)
-        return [], list(SIGNAL_CATEGORIES), "No interpretation produced. " * 3
+        return [], list(SIGNAL_CATEGORIES), FAILED_SUMMARY
     by_cat: dict[str, list[EvidenceItem]] = {}
     for e in block.items:
         by_cat.setdefault(e.category, []).append(e)

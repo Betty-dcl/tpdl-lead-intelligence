@@ -88,29 +88,55 @@ def _docs_payload(docs: list[RawDoc]) -> str:
     return "\n\n".join(blocks)
 
 
+# Docs per extraction call. Sonnet 5 reasons in prose before its JSON (prefill
+# is unsupported on this model, so the preamble can't be suppressed); on a
+# 100+-doc corpus that pushed the JSON past max_tokens → truncated → items lost
+# (the Grifols/Geistlich flaky zeros). Chunking bounds the OUTPUT of every call:
+# fewer docs in → fewer candidate quotes out → truncation structurally cannot
+# happen, regardless of corpus size. One chunk ⇒ identical to the old behaviour.
+CHUNK_DOCS = 35
+
+
+def _dedupe_items(items: list[EvidenceItem]) -> list[EvidenceItem]:
+    """Drop duplicate quotes across chunks (same normalised quote = one item)."""
+    seen: set[str] = set()
+    unique: list[EvidenceItem] = []
+    for it in items:
+        key = _normalise(it.quote)
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(it)
+    return unique
+
+
 def live_extract(cfg: EngineConfig, company: str, docs: list[RawDoc]) -> list[EvidenceItem]:
     require_live(cfg, cfg.anthropic_api_key, "Extraction (Sonnet 5)")
     import anthropic
 
     client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
-    response = client.messages.create(
-        model=cfg.extraction_model,
-        # Sonnet 5 ignores "JSON only" and reasons in prose first ("Now let me
-        # identify quotes…"), which eats the budget and truncates the JSON → 0
-        # evidence (assistant-prefill is NOT supported on this model, so we can't
-        # suppress the preamble that way). 16384 leaves room for prose + a large
-        # verbatim set; the parser tolerates the prose, truncation is the risk.
-        max_tokens=16384,
-        system=EXTRACT_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": f"COMPANY: {company}\n\nRAW DOCUMENTS:\n\n{_docs_payload(docs)}",
-        }],
-    )
-    text = "".join(b.text for b in response.content if b.type == "text")
-    if response.stop_reason == "max_tokens":
-        logger.warning("[extract] %s: response hit max_tokens (output truncated)", company)
-    return _parse_items(text)
+    items: list[EvidenceItem] = []
+    chunks = [docs[i:i + CHUNK_DOCS] for i in range(0, len(docs), CHUNK_DOCS)] or [[]]
+    for n, chunk in enumerate(chunks, 1):
+        response = client.messages.create(
+            model=cfg.extraction_model,
+            max_tokens=16384,
+            system=EXTRACT_PROMPT,
+            messages=[{
+                "role": "user",
+                "content": f"COMPANY: {company}\n\nRAW DOCUMENTS:\n\n{_docs_payload(chunk)}",
+            }],
+        )
+        text = "".join(b.text for b in response.content if b.type == "text")
+        if response.stop_reason == "max_tokens":
+            # Should be unreachable with chunking; if it happens, the salvage
+            # path in _parse_items still recovers every complete item.
+            logger.warning("[extract] %s: chunk %d/%d hit max_tokens (truncated)",
+                           company, n, len(chunks))
+        items.extend(_parse_items(text))
+    if len(chunks) > 1:
+        logger.info("[extract] %s: %d chunks → %d items before dedupe",
+                    company, len(chunks), len(items))
+    return _dedupe_items(items)[:MAX_ITEMS_PER_COMPANY]
 
 
 def _json_object(text: str) -> str | None:
@@ -122,21 +148,39 @@ def _json_object(text: str) -> str | None:
     return m.group() if m else None
 
 
+def _salvage_item_dicts(text: str) -> list[dict]:
+    """Recover the COMPLETE item objects from a truncated/broken JSON reply.
+
+    A reply cut mid-array used to cost every item ("unparseable → 0 evidence").
+    Item objects are flat (no nested braces), so each complete `{...}` block can
+    be parsed independently; only the one item cut in half is lost. Fail-closed:
+    anything that doesn't parse or has no quote is skipped, never invented.
+    """
+    salvaged = []
+    for m in re.finditer(r"\{[^{}]*\}", text):
+        try:
+            d = json.loads(m.group())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(d, dict) and d.get("quote") and d.get("category"):
+            salvaged.append(d)
+    return salvaged
+
+
 def _parse_items(text: str) -> list[EvidenceItem]:
-    candidate = _json_object(text)
-    if not candidate:
-        return []
+    candidate = _json_object(text) or text
     try:
         payload = json.loads(candidate)
+        raw_items = payload.get("items", [])
     except json.JSONDecodeError:
-        # Log a snippet so a systematic format/truncation issue is diagnosable
-        # without re-running blind (fix for the "0 evidence, silent" failure).
-        snippet = candidate[:200] + " … " + candidate[-200:] if len(candidate) > 400 else candidate
-        logger.warning("[extract] unparseable JSON from model (len=%d): %s",
-                       len(candidate), snippet)
-        return []
+        # Truncated or malformed reply: salvage every complete item instead of
+        # dropping the whole company (the old "unparseable → 0 evidence" failure).
+        raw_items = _salvage_item_dicts(candidate)
+        snippet = candidate[:160] + " … " + candidate[-160:] if len(candidate) > 360 else candidate
+        logger.warning("[extract] broken JSON from model (len=%d) — salvaged %d "
+                       "complete item(s): %s", len(candidate), len(raw_items), snippet)
     items = []
-    for raw in payload.get("items", [])[:MAX_ITEMS_PER_COMPANY]:
+    for raw in raw_items[:MAX_ITEMS_PER_COMPANY]:
         quote = raw.get("quote", "")
         # Backstop: if the model returned no date but the quote states one,
         # recover it deterministically (never guess — regex on the quote only).

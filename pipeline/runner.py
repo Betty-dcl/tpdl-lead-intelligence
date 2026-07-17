@@ -58,6 +58,15 @@ def _prepare(cfg: EngineConfig, name: str, sector: str | None,
     block, violations, flags = extract.extract(cfg, name, sector, docs, tech_stack)
     logger.info("[%s] extraction: %d evidence items (%d dropped, %d flagged)",
                 name, len(block.items), len(violations), len(flags))
+    # Canary: a rich corpus that yields ZERO evidence is more likely an
+    # extraction failure than a true absence (the lunch-run false zeros all
+    # looked exactly like this). Flag it so a human checks instead of the
+    # company silently scoring 0.
+    if cfg.live and len(docs) >= 30 and not block.items:
+        flags = [*flags, f"extraction anomaly: {len(docs)} research docs but 0 "
+                         "evidence items — verify this is a true absence"]
+        logger.warning("[%s] canary: %d docs but 0 evidence — review-flagged",
+                       name, len(docs))
     return block, tech_stack, violations, flags
 
 
@@ -69,8 +78,11 @@ def _assemble(cfg: EngineConfig, name: str, sector: str | None, identity: dict,
     extra = []
     if violations:
         extra.append(f"{len(violations)} extraction QA violations")
-    if flags:
-        extra.append(f"{len(flags)} speculative/negated quote(s) — verify event happened")
+    anomalies = [f for f in flags if f.startswith("extraction anomaly")]
+    spec = [f for f in flags if not f.startswith("extraction anomaly")]
+    if spec:
+        extra.append(f"{len(spec)} speculative/negated quote(s) — verify event happened")
+    extra.extend(anomalies)   # keep the anomaly text verbatim — it says what to check
     if extra:
         review = True
         reason = "; ".join(filter(None, [reason, *extra]))

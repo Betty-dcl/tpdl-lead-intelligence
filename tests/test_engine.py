@@ -920,3 +920,85 @@ def test_run_fetch_waits_when_not_ended(monkeypatch, cfg, tmp_path):
     monkeypatch.setattr(batch_mod, "batch_status", lambda c, bid: "in_progress")
     runner._run_fetch(cfg, SimpleNamespace(fetch=pending, resume=False))
     assert not out.exists() and pending.exists()                   # nothing written, state kept
+
+
+# ─── Hardening: chunking, salvage, retry, canary ─────────────────────────────
+
+def test_salvage_recovers_complete_items_from_truncated_json():
+    truncated = ('Some prose first.\n{"items": ['
+                 '{"quote": "Anna Roe was appointed CEO.", "source": "exa_q2", '
+                 '"url": "https://x", "event_date": "2026-06-01", "category": "leadership_change"}, '
+                 '{"quote": "The group acquired a rival.", "source": "serpapi_news", '
+                 '"url": null, "event_date": null, "category": "ma_expansion"}, '
+                 '{"quote": "cut in half he')
+    items = extract._parse_items(truncated)
+    assert len(items) == 2                                  # both complete items recovered
+    assert items[0].category == "leadership_change" and items[0].event_date == date(2026, 6, 1)
+    assert items[1].category == "ma_expansion" and items[1].url is None
+
+
+def test_salvage_never_invents(caplog):
+    # no complete item objects at all → still zero, fail-closed
+    assert extract._parse_items('{"items": [{"quote": "never closes') == []
+
+
+def test_dedupe_items_across_chunks():
+    a = _item(quote="Same sentence here.", category="hiring")
+    b = _item(quote="Same  sentence   HERE.", category="hiring")   # whitespace/case variant
+    c = _item(quote="A different sentence.", category="hiring")
+    out = extract._dedupe_items([a, b, c])
+    assert len(out) == 2
+
+
+def test_live_extract_chunks_large_corpora(monkeypatch):
+    calls = []
+    class FakeMessages:
+        def create(self, **kw):
+            calls.append(kw["messages"][0]["content"])
+            from types import SimpleNamespace
+            return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(
+                type="text", text='{"items": []}')])
+    class FakeClient:
+        def __init__(self, api_key): self.messages = FakeMessages()
+    import sys, types as _t
+    monkeypatch.setitem(sys.modules, "anthropic", _t.SimpleNamespace(Anthropic=FakeClient))
+    live = EngineConfig(live=True, anthropic_api_key="k")
+    docs = [RawDoc(source="s", url=None, title=f"t{i}", text="x" * 30) for i in range(80)]
+    extract.live_extract(live, "Acme", docs)
+    assert len(calls) == 3                                   # 80 docs → 35+35+10
+
+
+def test_live_interpret_retries_on_unusable_reply(monkeypatch):
+    replies = iter(["garbage, not json at all",
+                    '{"signals": [], "signals_not_evidenced": [], "intelligence_summary": "A. B. C."}'])
+    class FakeMessages:
+        def create(self, **kw):
+            from types import SimpleNamespace
+            return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(
+                type="text", text=next(replies))])
+    class FakeClient:
+        def __init__(self, api_key): self.messages = FakeMessages()
+    import sys, types as _t
+    monkeypatch.setitem(sys.modules, "anthropic", _t.SimpleNamespace(Anthropic=FakeClient))
+    live = EngineConfig(live=True, anthropic_api_key="k")
+    block = EvidenceBlock(company_name="Acme", sector=None, tech_stack_summary=None,
+                          items=[_item()])
+    signals, not_ev, summary = score.live_interpret(live, block)
+    assert summary == "A. B. C."                             # retry rescued the parse failure
+
+
+def test_canary_flags_rich_corpus_with_zero_evidence(monkeypatch):
+    from pipeline import runner
+    live = EngineConfig(live=True, anthropic_api_key="k")
+    docs = [RawDoc(source="s", url=None, title=f"t{i}", text="irrelevant text " * 5)
+            for i in range(40)]
+    monkeypatch.setattr(runner.research, "gather", lambda *a, **k: docs)
+    monkeypatch.setattr(runner.techscan, "scan",
+                        lambda *a, **k: __import__("types").SimpleNamespace(
+                            summary=lambda: None, is_digital_gap=lambda: False,
+                            scan_blocked=True, domain_missing=False))
+    monkeypatch.setattr(runner.extract, "extract",
+                        lambda *a, **k: (EvidenceBlock(company_name="Acme", sector=None,
+                                                       items=[], tech_stack_summary=None), [], []))
+    block, tech, viol, flags = runner._prepare(live, "Acme", None, None, {})
+    assert any("extraction anomaly" in f for f in flags)     # 40 docs + 0 items ⇒ flagged
