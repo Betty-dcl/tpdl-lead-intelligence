@@ -17,6 +17,14 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-18 — **Compteur local Exa/Perplexity (commit 07e6393).** Question Betty : « on ne pourra
+  jamais savoir combien ? » → Si : le moteur est le seul à connaître le nombre de requêtes qu'il
+  envoie, donc il les compte lui-même. `log_search_calls` (fail-open, `activity_log` action
+  `engine_search` sous hugo) ; `exa_search` logge le nombre RÉEL de requêtes abouties (finally —
+  un run avorté compte ce qui a été dépensé), `perplexity_sonar` 1/appel. Cartes Exa/Perplexity :
+  « N requests this month · M all-time (counted by the engine) » au lieu du simple « no usage API ».
+  ⚠️ Compte à partir de MAINTENANT (les 201+67 du run lunch d'hier ne sont pas rétro-comptés).
+  +2 tests. Suite : **181 verts**.
 - 2026-07-18 — **Page Usage : calcul vérifié + tally par modèle + dépense moteur loggée + Apify/
   Firecrawl connectés (commit 9e8012e).** (1) Calcul Anthropic VÉRIFIÉ juste (5 539 in × 5 $ + 453
   out × 25 $ = 0,04 $, tarif liste Opus) mais tout était costé au prix Opus → `usage.py` price désormais
