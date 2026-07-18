@@ -17,6 +17,19 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-18 — **Hugo remis au niveau du moteur + registre UE public ACTIVÉ par défaut (commit
+  7efa3c2, poussé GitHub).** Constat : hugo.md ne mentionnait NI la découverte, NI le nouveau scope,
+  NI les 122 candidats (0 occurrence de « discover ») + une phrase morte « needs API keys ». Fait :
+  (1) hugo.md Mode C DISCOVERY (scope veille large tranché par Betty, mécanique --discover, angle
+  earnings-call, candidats = décision humaine avant dépense) + table des sources corrigée (registre
+  via SERP pas Firecrawl ; SerpAPI actif tant que Serper absent) + re-seed. (2) **`/candidates`** :
+  nouvelle commande Hugo — affiche discovery_candidates.csv par thème dans le chat = la porte de
+  relecture humaine AVANT de payer le scoring (found ≠ scored ; jamais inventer de détails sur un
+  candidat non scoré). (3) **Registre UE public GRATUIT par défaut ON** (demande Betty) : config
+  default true, kill-switch EU_REGISTRY_ENABLED=0 + flag --no-eu-registry ; estimateur passé à
+  **3 recherches SERP/société** (News+Jobs+registre) pour que le garde-fou quota reste honnête.
+  +4 tests. Suite : **197 verts**. RESTE du plan accepté : audit de vérité des 6 agents jamais
+  audités (Inès, Julie, Iris, Marc, Oliver, Vera) + répétition générale du rituel mensuel en dry-run.
 - 2026-07-18 — **Process durci à coût zéro (commit cfc9b48) : runbook mensuel + tests CLI + hygiène
   Git.** (1) `go-live-runbook.md` : section « RITUEL DU RUN MENSUEL » — checklist reproductible en 13
   étapes (audit Vera → quota → --estimate → accord budget → discover → sélection sous quota → batch
