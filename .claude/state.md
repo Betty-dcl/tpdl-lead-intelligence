@@ -471,7 +471,7 @@
 - [~] Bouncer : connecteur CODÉ + gated (`app/tools/bouncer.py`, fail-closed). Reste : `BOUNCER_API_KEY`.
 - [~] Lemlist : connecteur CODÉ + gated (`app/tools/lemlist.py`, sortant/humain). Reste : `LEMLIST_API_KEY`.
 - [ ] n8n (mutualisation Devengo demandée à Andrés ?)
-- [x] Repo Git initialisé (local). Reste : remote partagé avec Andrés + `main` protégée.
+- [x] Repo Git : remote GitHub PRIVÉ créé et poussé (2026-07-18) — github.com/Betty-dcl/tpdl-lead-intelligence (main + feat/neotek-engine, auth gh CLI). Reste : inviter Andrés (Settings → Collaborators).
 - [x] Renderers PDF/PPTX Oliver connectés (PDF fpdf2 + PPTX python-pptx + endpoints export)
 
 ## Calendrier (source transcript 25.06 — à re-confirmer)
