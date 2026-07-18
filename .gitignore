@@ -33,3 +33,8 @@ data/cache/
 .idea/
 *.swp
 .DS_Store
+
+# secrets & run artifacts (never commit)
+data/.session_secret
+data/csv/engine_run*.csv
+data/csv/discovery_candidates.csv

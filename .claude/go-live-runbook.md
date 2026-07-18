@@ -99,3 +99,48 @@ minimisation des données AVANT le premier message. À trancher avec Andrés. Vo
 - Vera (QA) + file de revue humaine `/review` (http://localhost:8000/review).
 - Connecteurs contacts/email/séquences : fail-closed, ne fabriquent jamais de donnée.
 ```
+
+---
+
+# Le RITUEL DU RUN MENSUEL (checklist reproductible — ajouté 2026-07-18)
+
+> Cadence actée : ~1 run/mois. Chaque euro est décidé AVANT d'être dépensé.
+> Coûts de référence : découverte <0,50 $ · scoring ~0,055 $/société (~0,03 $ en batch)
+> · run 67 sociétés ≈ 4-5 $ · run ~500 ≈ 40-60 €. SerpAPI Free = 250 recherches/mois
+> (2/société, découverte ≈ 8) ; la recherche déjà en CACHE (<7 j) ne consomme rien.
+
+## AVANT (0 coût)
+1. **Vera `/audit`** (sans argument) dans le chat → l'univers est-il propre ?
+   Doublons/localisations à régler AVANT (sinon l'outreach hérite des défauts).
+2. **Quota** : ouvrir la page Usage (localhost:8000/credits) → SerpAPI restant,
+   crédits Firecrawl, tally Anthropic.
+3. **Devis** : `python -m pipeline.runner --lunch --estimate` (ou `--top N`) —
+   affiche coût modèle + besoins SerpAPI, ne dépense rien.
+4. **Accord budget** (Andrés/Nathalie si >10 €). Pas d'accord = pas de run.
+
+## LE RUN (dépense explicite, plafonnée)
+5. **Découverte** (~0,50 $) : `python -m pipeline.runner --discover --live`
+   → `data/csv/discovery_candidates.csv` (nouveaux candidats par thème).
+6. **Sélection** : lunch/top + candidats selon le quota restant
+   (candidats × 2 ≤ SerpAPI restant ; prioriser earnings_call > digital > pe).
+7. **Soumission batch (−50 %, Mac libre ensuite)** :
+   `python -m pipeline.runner --names "<A;B;C>" --live --batch --submit --max-usd 12`
+   (+ `--rescan-tech` ~1×/trimestre pour rafraîchir les tech stacks Apify).
+   ⚠️ La phase locale (recherche+extraction) prend ~1-2 h : Mac ouvert, branché
+   (`caffeinate -i` aide). Ensuite → state JSON sauvé, **Mac éteignable**.
+   🛑 STOP D'URGENCE à tout moment : `pkill -f pipeline.runner` — tant que le
+   state `.pending.json` n'existe pas, AUCUN batch n'a été soumis (0 $ scoring).
+8. **Récupération (≤24 h après)** :
+   `python -m pipeline.runner --fetch data/csv/<out>.csv.pending.json`
+   (répéter jusqu'à « ended » ; écrit le CSV final).
+
+## APRÈS (0 coût)
+9. **Import** : `python import_csv.py data/csv/<out>.csv` → DB + snapshot run.
+10. **Vera `/audit`** → 0 nouvelle issue attendue (sentinelles, formats, doublons).
+11. **Maya** : `/trends` (le run frais vs le stock — digital/hiring montent ?) ·
+    `/recurring` (RISERS/FADERS + NEW THIS RUN = les nouveaux candidats) ·
+    `/top` (fraîcheur par ligne).
+12. **File humaine** : page /review → traiter les review-flags (motifs porteurs
+    uniquement depuis le fix « resting on speculation »).
+13. **Mémoire** : consigner le run dans `.claude/state.md` (coût réel, éligibles,
+    findings) + commit.

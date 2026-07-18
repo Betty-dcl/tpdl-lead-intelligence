@@ -1226,3 +1226,56 @@ def test_hedge_among_clean_corroboration_does_not_flag(cfg):
                                 "Analysts say the group may pursue further deals."])
     r = runner._assemble(cfg, "Acme", None, {}, None, [], [], scored, [], "A. B. C.")
     assert "speculative" not in (r.review_flag_reason or "")
+
+
+# ─── CLI wiring (zero cost): main() end-to-end, --rescan-tech, --discover gate ─
+
+def test_cli_main_dry_run_writes_valid_csv(tmp_path, monkeypatch):
+    """python -m pipeline.runner --fixture … (dry-run) must produce a CSV the
+    importer can read — the full CLI path, not just the library functions."""
+    import sys
+    from pipeline import runner
+    out = tmp_path / "cli_run.csv"
+    monkeypatch.setattr(sys, "argv",
+                        ["runner", "--fixture", str(FIXTURE), "--out", str(out)])
+    runner.main()
+    rows = list(csv.DictReader(open(out)))
+    assert len(rows) == 1
+    assert rows[0]["Company Name"]
+    assert "Assessed Score" in rows[0] and "Review Flag" in rows[0]
+    assert float(rows[0]["Assessed Score"]) >= 0        # scored, not empty
+
+
+def test_cli_rescan_tech_strips_stored_summaries(tmp_path, monkeypatch):
+    """--rescan-tech must drop the DB tech summary so Step 1 actually rescans;
+    without the flag the stored summary is reused (zero Apify spend)."""
+    import sys
+    from pipeline import runner, loader
+    captured = {}
+    def fake_select(args):
+        c = loader.LoadedCompany(name="Acme", sector=None,
+                                 identity={"tech_stack_summary": "stored-summary"})
+        captured["companies"] = [c]
+        return [c]
+    monkeypatch.setattr(runner, "_select_companies", fake_select)
+    monkeypatch.setattr(runner, "_run_sequential", lambda *a, **k: [])
+    monkeypatch.setattr(runner.export, "write_csv", lambda *a, **k: None)
+    out = tmp_path / "x.csv"
+
+    monkeypatch.setattr(sys, "argv", ["runner", "--company", "Acme",
+                                      "--rescan-tech", "--out", str(out)])
+    runner.main()
+    assert "tech_stack_summary" not in captured["companies"][0].identity
+
+    monkeypatch.setattr(sys, "argv", ["runner", "--company", "Acme", "--out", str(out)])
+    runner.main()
+    assert captured["companies"][0].identity.get("tech_stack_summary") == "stored-summary"
+
+
+def test_cli_discover_requires_live(monkeypatch):
+    """--discover without --live must refuse before any code runs (money gate)."""
+    import sys
+    from pipeline import runner
+    monkeypatch.setattr(sys, "argv", ["runner", "--discover"])
+    with pytest.raises(SystemExit):
+        runner.main()
