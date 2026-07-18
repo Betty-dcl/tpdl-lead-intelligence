@@ -81,10 +81,19 @@ def _assemble(cfg: EngineConfig, name: str, sector: str | None, identity: dict,
     if violations:
         extra.append(f"{len(violations)} extraction QA violations")
     anomalies = [f for f in flags if f.startswith("extraction anomaly")]
-    spec = [f for f in flags if not f.startswith("extraction anomaly")]
-    if spec:
-        extra.append(f"{len(spec)} speculative/negated quote(s) — verify event happened")
     extra.extend(anomalies)   # keep the anomaly text verbatim — it says what to check
+    # Speculation flag, LOAD-BEARING only: flag a signal whose ENTIRE evidence
+    # is hedged ("may", "reportedly", "envisage"…) — the signal rests on
+    # speculation, so a human must verify the event happened. A hedge among
+    # corroborated clean quotes is normal press language and must NOT flag:
+    # quote-level flagging sent 53% of the first business run (34/36 flags)
+    # to the review queue, which defeats the triage.
+    resting = [s.signal.category for s in scored
+               if s.signal.evidence
+               and all(extract.has_negation(e.quote) for e in s.signal.evidence)]
+    if resting:
+        extra.append("signal(s) resting entirely on speculative/hedged quotes: "
+                     + ", ".join(resting) + " — verify the event happened")
     # Constitution: the intelligence summary is EXACTLY 3 sentences. A summary
     # far outside that band (when signals exist) means the interpretation
     # drifted — flag it at the source instead of letting it age in the DB.

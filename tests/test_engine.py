@@ -1196,3 +1196,33 @@ def test_discovery_queries_cover_all_signal_themes():
     assert {"earnings_call_digital", "leadership_change", "ma_expansion",
             "pe_event", "digital_initiative", "org_restructuring",
             "hiring"} <= themes
+
+
+# ─── Load-bearing speculation flag (was: any hedged quote ⇒ 53% review rate) ─
+
+def _scored_with(cfg, quotes, category="ma_expansion"):
+    items = [_item(quote=q, category=category, url=f"https://x/{i}")
+             for i, q in enumerate(quotes)]
+    sig = InterpretedSignal(category=category, what_happened="w", why_it_matters="y",
+                            tpdl_relevance="x", confidence="medium", signal_strength=3,
+                            evidence=items)
+    return [score.score_signal(cfg, sig, TODAY)]
+
+
+def test_signal_resting_on_speculation_is_flagged(cfg):
+    from pipeline import runner
+    scored = _scored_with(cfg, ["The group is reportedly considering a sale.",
+                                "The company may divest its dental unit."])
+    r = runner._assemble(cfg, "Acme", None, {}, None, [], [], scored, [], "A. B. C.")
+    assert r.review_flag
+    assert "resting entirely on speculative" in (r.review_flag_reason or "")
+
+
+def test_hedge_among_clean_corroboration_does_not_flag(cfg):
+    """One hedged quote next to clean, corroborated statements is normal press
+    language — must NOT send the company to the review queue."""
+    from pipeline import runner
+    scored = _scored_with(cfg, ["The company completed the acquisition on 1 June 2026.",
+                                "Analysts say the group may pursue further deals."])
+    r = runner._assemble(cfg, "Acme", None, {}, None, [], [], scored, [], "A. B. C.")
+    assert "speculative" not in (r.review_flag_reason or "")
