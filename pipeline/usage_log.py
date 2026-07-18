@@ -44,3 +44,28 @@ def log_anthropic_call(model: str, usage, company: str, stage: str) -> None:
             db.commit()
     except Exception as exc:   # noqa: BLE001 — never let the tally kill a paid run
         logger.debug("[usage_log] skipped (%s)", exc)
+
+
+def log_search_calls(provider: str, requests: int, company: str) -> None:
+    """Record research requests to providers with NO public usage API
+    (Exa, Perplexity): the engine is the only place that knows the count,
+    so it keeps its own tally. Same fail-open contract as above."""
+    if requests <= 0:
+        return
+    try:
+        from app.database import SessionLocal
+        from app.models import ActivityLog
+
+        with SessionLocal() as db:
+            db.add(ActivityLog(
+                agent_id=ENGINE_AGENT_ID,
+                action="engine_search",
+                activity_metadata=json.dumps({
+                    "provider": provider,
+                    "requests": int(requests),
+                    "company": company,
+                }),
+            ))
+            db.commit()
+    except Exception as exc:   # noqa: BLE001
+        logger.debug("[usage_log] skipped (%s)", exc)

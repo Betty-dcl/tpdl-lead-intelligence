@@ -161,23 +161,60 @@ def firecrawl_panel() -> dict:
         return _panel(**base, ok=False, error=str(exc)[:160])
 
 
-def exa_panel() -> dict:
+def _local_search_tally(db: Session, provider: str) -> tuple[int, int]:
+    """(all-time, this-month) request counts the ENGINE logged for a provider
+    that has no public usage API (Exa / Perplexity)."""
+    from datetime import datetime
+    total = month = 0
+    month_start = datetime.utcnow().replace(day=1, hour=0, minute=0,
+                                            second=0, microsecond=0)
+    rows = (db.query(ActivityLog.activity_metadata, ActivityLog.created_at)
+            .filter(ActivityLog.action == "engine_search").all())
+    for meta, created in rows:
+        try:
+            data = json.loads(meta)
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if data.get("provider") != provider:
+            continue
+        n = int(data.get("requests", 0) or 0)
+        total += n
+        if created and created >= month_start:
+            month += n
+    return total, month
+
+
+def _search_detail(db: Session, provider: str, fallback: str) -> str:
+    try:
+        total, month = _local_search_tally(db, provider)
+    except Exception:                      # tally must never break the page
+        return fallback
+    if not total:
+        return fallback + " Local engine count: 0 requests logged so far."
+    return (f"Local engine count: {month} requests this month · {total} all-time "
+            f"(counted by the engine — no public usage API; exact balance on "
+            f"the provider dashboard).")
+
+
+def exa_panel(db: Session) -> dict:
     return _panel(
         provider="exa", label="Exa",
         role="Neural search ×3 (news / leadership / M&A) — engine Step 2",
         configured=bool(settings.exa_api_key),
         ok=bool(settings.exa_api_key),
-        detail="No public usage API — balance lives on the Exa dashboard.",
+        detail=_search_detail(db, "exa",
+                              "No public usage API — balance lives on the Exa dashboard."),
         dashboard_url="https://dashboard.exa.ai")
 
 
-def perplexity_panel() -> dict:
+def perplexity_panel(db: Session) -> dict:
     return _panel(
         provider="perplexity", label="Perplexity",
         role="Sonar, financial press PE/M&A — corroborates, never anchors",
         configured=bool(settings.perplexity_api_key),
         ok=bool(settings.perplexity_api_key),
-        detail="No public usage API — balance lives on the API portal.",
+        detail=_search_detail(db, "perplexity",
+                              "No public usage API — balance lives on the API portal."),
         dashboard_url="https://www.perplexity.ai/settings/api")
 
 
@@ -257,7 +294,7 @@ def all_panels(db: Session) -> list[dict]:
         _cached("serpapi", serpapi_panel),
         _cached("apify", apify_panel),
         _cached("firecrawl", firecrawl_panel),
-        exa_panel(),
-        perplexity_panel(),
+        exa_panel(db),
+        perplexity_panel(db),
         apollo_panel(),
     ]

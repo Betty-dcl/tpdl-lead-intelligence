@@ -291,24 +291,32 @@ def exa_search(cfg: EngineConfig, company: str, num: int = 5) -> list[RawDoc]:
     """Exa neural search — finds semantically close, not keyword-matched."""
     require_live(cfg, cfg.exa_api_key, "Exa")
     docs: list[RawDoc] = []
-    for source, template in _EXA_QUERIES.items():
-        data = _post_json(
-            "https://api.exa.ai/search",
-            {
-                "query": template.format(company=company),
-                "numResults": num,
-                "contents": {"text": {"maxCharacters": 2000}},
-            },
-            {"x-api-key": cfg.exa_api_key},
-        )
-        for item in data.get("results", []):
-            docs.append(RawDoc(
-                source=source,
-                url=item.get("url"),
-                title=item.get("title") or "",
-                text=(item.get("text") or ""),
-                published=_parse_date(item.get("publishedDate")),
-            ))
+    done = 0
+    try:
+        for source, template in _EXA_QUERIES.items():
+            data = _post_json(
+                "https://api.exa.ai/search",
+                {
+                    "query": template.format(company=company),
+                    "numResults": num,
+                    "contents": {"text": {"maxCharacters": 2000}},
+                },
+                {"x-api-key": cfg.exa_api_key},
+            )
+            done += 1
+            for item in data.get("results", []):
+                docs.append(RawDoc(
+                    source=source,
+                    url=item.get("url"),
+                    title=item.get("title") or "",
+                    text=(item.get("text") or ""),
+                    published=_parse_date(item.get("publishedDate")),
+                ))
+    finally:
+        # Exa has no public usage API — the engine keeps its own count
+        # (finally: a run aborted mid-loop still records what was spent).
+        from pipeline.usage_log import log_search_calls
+        log_search_calls("exa", done, company)
     return docs
 
 
@@ -319,6 +327,8 @@ def exa_search(cfg: EngineConfig, company: str, num: int = 5) -> list[RawDoc]:
 
 def perplexity_sonar(cfg: EngineConfig, company: str) -> list[RawDoc]:
     require_live(cfg, cfg.perplexity_api_key, "Perplexity Sonar")
+    from pipeline.usage_log import log_search_calls
+    log_search_calls("perplexity", 1, company)
     data = _post_json(
         "https://api.perplexity.ai/chat/completions",
         {

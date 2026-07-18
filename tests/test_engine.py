@@ -1070,3 +1070,41 @@ def test_gather_includes_firecrawl_ir_when_key_and_website(monkeypatch):
     called.clear()
     research.gather(live, "Acme", use_cache=False, website=None)
     assert called == {}
+
+
+def test_search_tally_counts_exa_and_perplexity_locally():
+    """Exa/Perplexity have no usage API — the engine's own count must land in
+    the panel detail (this was 'on ne saura jamais combien' — now we know)."""
+    from pipeline.usage_log import log_search_calls
+    from app.database import SessionLocal
+    from app.models import ActivityLog
+    from app.tools import usage
+    log_search_calls("exa", 3, "Zzy Tally Co")
+    log_search_calls("perplexity", 1, "Zzy Tally Co")
+    log_search_calls("exa", 0, "Zzy Tally Co")          # zero ⇒ no row
+    with SessionLocal() as db:
+        try:
+            exa_total, exa_month = usage._local_search_tally(db, "exa")
+            pplx_total, _ = usage._local_search_tally(db, "perplexity")
+            assert exa_total >= 3 and exa_month >= 3
+            assert pplx_total >= 1
+            panel = usage.exa_panel(db)
+            assert "requests this month" in panel["detail"]
+        finally:
+            for r in db.query(ActivityLog).filter(
+                    ActivityLog.action == "engine_search").all():
+                import json as _j
+                if _j.loads(r.activity_metadata).get("company") == "Zzy Tally Co":
+                    db.delete(r)
+            db.commit()
+
+
+def test_exa_search_logs_actual_request_count(monkeypatch):
+    from pipeline import usage_log as _ul
+    logged = {}
+    monkeypatch.setattr(_ul, "log_search_calls",
+                        lambda provider, n, company: logged.update({provider: n}))
+    live = EngineConfig(live=True, exa_api_key="k")
+    monkeypatch.setattr(research, "_post_json", lambda *a, **k: {"results": []})
+    research.exa_search(live, "Acme")
+    assert logged == {"exa": 3}                          # Q1/Q2/Q3 all counted
