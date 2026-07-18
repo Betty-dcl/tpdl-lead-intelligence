@@ -17,6 +17,19 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-18 — **Relecture complète des sorties Hugo/Maya → audit d'intégrité PERMANENT (commit
+  6b17fb4).** Audit systématique des 492 lignes (2 runs) codifié en garde-fou reproductible :
+  (1) `app/tools/integrity.py` — contrôles déterministes 0 coût (doublons de sociétés normalisés,
+  résumés hors bande 2-4 phrases, sentinelles, cohérence score↔éligibilité, high-conf sans URL non
+  flaggé, localisations manquantes, secteurs Unknown, drift table signals) ; (2) **Vera `/audit` sans
+  argument = audit de l'UNIVERS entier** (avec nom = audit société inchangé) ; (3) défense moteur :
+  résumé hors 2-4 phrases (avec signaux) → review-flag « summary format breach » à la source.
+  **Constat sur données réelles : 34 issues** — 5 groupes de doublons (Sesderma/Mediderma ×3 dont un
+  localisé « San Marcos, Ca », Glenmark ×2, Julphar, NADMED, ADOR), 12 résumés hors format (11 de mai
+  legacy + 1 de juillet), 17 sans localisation (⇒ pas de locale SERP UE), 138 secteurs « Unknown »
+  (trou du CSV source). SAIN : 0 sentinelle, 0 incohérence éligibilité, 0 high-conf non flaggé,
+  signals sync OK. Nettoyage des doublons/localisations = tâche DONNÉES (à trancher avec Nathalie,
+  idéalement avant le run stratégique). +4 tests. Suite : **185 verts**.
 - 2026-07-18 — **Compteur local Exa/Perplexity (commit 07e6393).** Question Betty : « on ne pourra
   jamais savoir combien ? » → Si : le moteur est le seul à connaître le nombre de requêtes qu'il
   envoie, donc il les compte lui-même. `log_search_calls` (fail-open, `activity_log` action
