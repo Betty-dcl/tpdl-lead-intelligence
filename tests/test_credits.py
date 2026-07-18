@@ -154,7 +154,7 @@ def test_loader_lunch_is_ch_es_only():
 def test_estimator_math_and_quota_verdict(monkeypatch):
     from pipeline import estimate as est_mod
     est = est_mod.estimate_run(20)
-    assert est.serp_searches == 40 and est.exa_requests == 60
+    assert est.serp_searches == 60 and est.exa_requests == 60   # 3 SERP/company (News+Jobs+registry)
     # 20 × (extract 0.022 + score 0.0325) ≈ 1.09
     assert 0.9 < est.model_cost_usd < 1.3
     assert est.model_cost_batch_usd == round(est.model_cost_usd * 0.5, 2)

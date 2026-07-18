@@ -1279,3 +1279,19 @@ def test_cli_discover_requires_live(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["runner", "--discover"])
     with pytest.raises(SystemExit):
         runner.main()
+
+
+# ─── EU registry default-on + Hugo /candidates ───────────────────────────────
+
+def test_eu_registry_default_on_with_kill_switch(monkeypatch):
+    monkeypatch.delenv("EU_REGISTRY_ENABLED", raising=False)
+    cfg = EngineConfig.load(live=False)
+    assert cfg.eu_registry_enabled is True                # default ON (Betty 2026-07-18)
+    monkeypatch.setenv("EU_REGISTRY_ENABLED", "0")
+    assert EngineConfig.load(live=False).eu_registry_enabled is False
+
+
+def test_estimate_counts_registry_search():
+    from pipeline import estimate as est_mod
+    est = est_mod.estimate_run(10)
+    assert est.serp_searches == 30                        # News + Jobs + registry

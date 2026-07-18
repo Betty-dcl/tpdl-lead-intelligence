@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # Per-company API consumption (design: 8 sources, of which live today:)
-SERP_SEARCHES_PER_COMPANY = 2      # News + Jobs
+SERP_SEARCHES_PER_COMPANY = 3      # News + Jobs + EU registry (default-on)
 EXA_REQUESTS_PER_COMPANY = 3       # Q1 / Q2 / Q3
 PPLX_REQUESTS_PER_COMPANY = 1      # Sonar
 
@@ -82,7 +82,7 @@ def render(est: RunEstimate, quota_line: str | None = None) -> str:
     lines = [
         "═══ PRE-FLIGHT ESTIMATE (nothing has been spent) ═══",
         f"Companies:            {est.companies}",
-        f"SerpAPI searches:     {est.serp_searches}  (News + Jobs)",
+        f"SerpAPI searches:     {est.serp_searches}  (News + Jobs + EU registry)",
         f"Exa requests:         {est.exa_requests}  (Q1/Q2/Q3)",
         f"Perplexity requests:  {est.pplx_requests}  (Sonar)",
         f"Model bill (list):    ${est.model_cost_usd}  (~${est.per_company_usd}/company)",

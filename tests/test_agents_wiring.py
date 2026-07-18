@@ -295,3 +295,24 @@ def test_vera_universe_audit_dispatch(client):
         assert meta["task_title"] == "Integrity audit — universe"
         assert meta["metadata"]["total"] > 0
         assert "Duplicate company groups" in meta["augmented_message"]
+
+
+def test_hugo_candidates_lists_discovery_output(client, tmp_path, monkeypatch):
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    import app.agents.hugo as hugo_mod
+    csv_file = tmp_path / "discovery_candidates.csv"
+    csv_file.write_text("Company Name,Theme,Source URL\n"
+                        "Alpenpharm AG,earnings_call_digital,https://x\n"
+                        "Bergbio,pe_event,https://y\n", encoding="utf-8")
+    monkeypatch.setattr(hugo_mod, "DISCOVERY_CSV", csv_file)
+    with SessionLocal() as db:
+        hugo = AGENT_CLASSES["hugo"].load(db, "hugo")
+        meta = hugo._dispatch_command("/candidates")
+        assert meta["metadata"]["candidates"] == 2
+        assert "Alpenpharm AG" in meta["augmented_message"]
+        assert "HUMAN" in meta["augmented_message"]      # review-before-spend framing
+
+        monkeypatch.setattr(hugo_mod, "DISCOVERY_CSV", tmp_path / "absent.csv")
+        none = hugo._dispatch_command("/candidates")
+        assert "none yet" in none["task_title"]

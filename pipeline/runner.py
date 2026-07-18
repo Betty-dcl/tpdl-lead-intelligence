@@ -265,6 +265,9 @@ def main() -> None:
                              "output NEW candidate companies (not yet in the universe) to "
                              "data/csv/discovery_candidates.csv. Requires --live "
                              "(thematic search + one small Sonnet call, <$0.10).")
+    parser.add_argument("--no-eu-registry", action="store_true",
+                        help="Disable the free public EU-registry source for this run "
+                             "(default ON; saves 1 SERP search/company when quota is tight)")
     parser.add_argument("--rescan-tech", action="store_true",
                         help="Force a fresh Apify tech scan even when the DB already "
                              "holds a tech-stack summary (default: reuse the stored "
@@ -321,6 +324,8 @@ def main() -> None:
             return
 
     cfg = EngineConfig.load(live=args.live)
+    if args.no_eu_registry:
+        cfg.eu_registry_enabled = False
     mode = "LIVE (spending enabled)" if cfg.live else "DRY-RUN (zero cost)"
     logger.info("Engine mode: %s · extraction=%s · interpretation=%s",
                 mode, cfg.extraction_model, cfg.interpretation_model)

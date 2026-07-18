@@ -82,8 +82,11 @@ class EngineConfig:
     perplexity_api_key: str = ""
     firecrawl_api_key: str = ""
     apify_token: str = ""
-    eu_registry_enabled: bool = False    # conditional FREE source (public registry pages
-                                         # via the SERP engine we already have — no paid API)
+    eu_registry_enabled: bool = True     # FREE source (public registry pages via the SERP
+                                         # engine we already have — no paid API). Default ON
+                                         # since 2026-07-18 (decision Betty); costs 1 extra
+                                         # SERP search/company. Kill switch:
+                                         # EU_REGISTRY_ENABLED=0 or CLI --no-eu-registry.
 
     # ── scoring weights (from scoring_config.yaml) ──────────────────────
     recency: dict = field(default_factory=lambda: {
@@ -111,8 +114,8 @@ class EngineConfig:
         cfg.perplexity_api_key = os.environ.get("PERPLEXITY_API_KEY", "")
         cfg.firecrawl_api_key = os.environ.get("FIRECRAWL_API_KEY", "")
         cfg.apify_token = os.environ.get("APIFY_TOKEN", "")
-        cfg.eu_registry_enabled = os.environ.get("EU_REGISTRY_ENABLED", "").lower() in (
-            "1", "true", "yes", "on")
+        cfg.eu_registry_enabled = os.environ.get(
+            "EU_REGISTRY_ENABLED", "1").lower() not in ("0", "false", "no", "off")
         cfg.extraction_model = os.environ.get("EXTRACTION_MODEL", DEFAULT_EXTRACTION_MODEL)
         cfg.interpretation_model = os.environ.get(
             "INTERPRETATION_MODEL", DEFAULT_INTERPRETATION_MODEL)

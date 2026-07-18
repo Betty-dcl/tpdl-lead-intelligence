@@ -26,6 +26,10 @@ from app.models import Company
 
 HUGO_ID: str = AgentID.HUGO.value
 
+# Discovery output shown by /candidates (module-level so tests can repoint it).
+from pathlib import Path as _Path
+DISCOVERY_CSV = _Path("data/csv/discovery_candidates.csv")
+
 
 def _find_company(name: str) -> Optional[Company]:
     name_low = name.strip().lower()
@@ -229,6 +233,52 @@ class HugoAgent(BaseAgent):
                 "action": "company_brief",
                 "task_title": f"Intel brief — {c.name}",
                 "metadata": {"company": c.name, "score": c.assessed_score},
+            }
+
+        # ── /candidates — discovery output, for human review BEFORE spending ─
+        if low == "/candidates" or low.startswith("/candidates"):
+            import csv as _csv
+            path = DISCOVERY_CSV
+            if not path.exists():
+                return {
+                    "augmented_message": (
+                        "The user ran `/candidates` but no discovery output exists yet. "
+                        "Explain: the discovery step (market watch over the 6 signal themes "
+                        "+ the earnings-call angle) is launched from the CLI — "
+                        "`python -m pipeline.runner --discover --live` (<$0.50) — and writes "
+                        "data/csv/discovery_candidates.csv. Scoring candidates afterwards is "
+                        "a separate, deliberate paid step (--names)."
+                    ),
+                    "action": "discovery_candidates",
+                    "task_title": "/candidates (none yet)",
+                }
+            with open(path, encoding="utf-8", newline="") as f:
+                rows = list(_csv.DictReader(f))
+            by_theme: dict[str, list[str]] = {}
+            for r in rows:
+                by_theme.setdefault(r.get("Theme") or "unknown", []).append(
+                    r.get("Company Name", "?"))
+            listing = "\n".join(
+                f"  [{theme}] ({len(names)}): " + ", ".join(names[:12])
+                + (f" (+{len(names)-12} more)" if len(names) > 12 else "")
+                for theme, names in sorted(by_theme.items(), key=lambda t: -len(t[1])))
+            augmented = (
+                f"The user ran `/candidates`. The last discovery pass found "
+                f"{len(rows)} NEW companies (not in the scored universe), by watch "
+                f"theme:\n\n{listing}\n\n"
+                f"As Hugo, present this as the discovery shortlist AWAITING A HUMAN "
+                f"DECISION: these names are found, not scored — scoring them costs "
+                f"~$0.055/company (SERP quota: 2-3 searches each). Recommend which "
+                f"themes to score first (earnings-call and PE are TPDL's strongest "
+                f"entry points), and remind that the actual scoring run is launched "
+                f"from the CLI, never from chat. Never invent details about these "
+                f"companies — they have no evidence yet."
+            )
+            return {
+                "augmented_message": augmented,
+                "action": "discovery_candidates",
+                "task_title": f"Discovery candidates ({len(rows)})",
+                "metadata": {"candidates": len(rows), "themes": len(by_theme)},
             }
 
         # ── /stats ───────────────────────────────────────────────────────
