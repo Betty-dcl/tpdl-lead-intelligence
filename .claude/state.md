@@ -17,6 +17,20 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-18 — **Page Usage : calcul vérifié + tally par modèle + dépense moteur loggée + Apify/
+  Firecrawl connectés (commit 9e8012e).** (1) Calcul Anthropic VÉRIFIÉ juste (5 539 in × 5 $ + 453
+  out × 25 $ = 0,04 $, tarif liste Opus) mais tout était costé au prix Opus → `usage.py` price désormais
+  **par modèle loggé** (Opus 5/25, Sonnet 2/10 lancement). (2) **Le moteur écrit sa dépense dans le
+  tally local** : `pipeline/usage_log.py` (fail-open) logge chaque appel Anthropic live (extract/score/
+  score_batch) dans `activity_log` sous l'agent `hugo` (tokens réels + modèle) → la page Usage reflétera
+  les prochains runs, plus seulement le chat. (3) **Firecrawl CONNECTÉ** : `gather(website=…)` ajoute la
+  source conditionnelle `firecrawl_ir` (scrape du site, 1 crédit/société) quand clé+website présents —
+  source #8 du design, nourrit l'angle earnings-call. (4) **Apify** : flag CLI `--rescan-tech` (par
+  défaut on réutilise le tech-stack de la DB → 0 dépense ; c'est POURQUOI le run lunch n'a fait aucun
+  appel Apify — les 492 ont un summary de mai). Constat expliqué à Betty : Exa/Perplexity ONT été
+  utilisés au run lunch (201 + 67 appels) mais n'ont pas d'API d'usage publique → cartes « CONFIGURED ».
+  +3 tests (pricing par modèle, ligne de log moteur, câblage firecrawl_ir) ; tests fake-client
+  neutralisent le logger (sinon lignes fantômes en DB dev à chaque pytest). Suite : **179 verts**.
 - 2026-07-17 — **Audit de Hugo (même exercice que Maya) → désinformation du prompt corrigée + fraîcheur
   partout (commit da5f494, DB re-seedée).** Trouvé : (1) **hugo.md désinformait activement** — « a REAL
   data refresh is not possible until keys land » + « dataset frozen, 35 eligible, top Hologic 9.5 » ;
