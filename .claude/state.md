@@ -17,6 +17,15 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-18 — **Nettoyage données VOLET 1 APPLIQUÉ (OK Betty).** Fusions évidentes : « ADOR
+  Diagnostics » (0.0, même site que la ligne Italy) et « NADMED (Finland) » (6.5, doublon de NADMED
+  7.0) supprimées — société + signaux + snapshots (l'historique /recurring reste cohérent). Les 15
+  localisations manquantes remplies (Eurobio→Les Ulis FR, Trinity→Bray IE, EKF→Cardiff UK, Labor
+  Berlin→DE, TBR→Toulouse FR, etc. ; NeoGenomics→Fort Myers USA = hors-Europe à statuer). Table
+  signals resynchronisée. **Re-audit Vera : 490 sociétés, 0 sans-localisation, 0 sentinelle, 0
+  incohérence — ne restent que les 3 groupes du volet Nathalie** (③ Julphar UAE, ④ Glenmark parent/
+  filiale, ⑤ trio Sesderma/Mediderma). Dossier Obsidian passé en statut « volet 1 appliqué ».
+  ⚠️ La table `companies` a maintenant divergé des CSV d'export passés (normal — la DB est la vérité).
 - 2026-07-18 — **SCOPE TRANCHÉ PAR BETTY (les 6 questions) + étape DÉCOUVERTE construite + signal
   earnings-call encodé (commit 52a10a0).** Décisions Betty (Nathalie peut amender ; doc de segmentation
   Obsidian mis à jour §9) : taille = TOUT (pas de plancher) ; cotées/privées = TOUT ; thèmes = les
