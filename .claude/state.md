@@ -17,6 +17,18 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-18 — **Process durci à coût zéro (commit cfc9b48) : runbook mensuel + tests CLI + hygiène
+  Git.** (1) `go-live-runbook.md` : section « RITUEL DU RUN MENSUEL » — checklist reproductible en 13
+  étapes (audit Vera → quota → --estimate → accord budget → discover → sélection sous quota → batch
+  submit/fetch → import → audit → lectures Maya → file /review → mémoire), coûts de référence, règle
+  du cache, et STOP d'urgence (`pkill` avant le .pending.json = 0 $ de scoring). (2) +3 tests CLI :
+  main() dry-run bout-en-bout écrit un CSV valide ; --rescan-tech strippe les résumés stockés ;
+  --discover sans --live refuse. Suite : **194 verts**. (3) ⚠️ `data/.session_secret` était TRACKÉ
+  dans Git → retiré de l'index, fichier régénéré (auto au prochain démarrage), .gitignore couvre
+  désormais secret + artefacts de run (engine_run*.csv, discovery_candidates.csv). `main` mergé (ff)
+  = à jour avec feat/neotek-engine. RESTE (action Betty, 5 min) : créer le repo GitHub privé + push.
+  NB : run #2 ANNULÉ sur demande Betty (dépense stoppée à 1,62 $ du jour, aucun batch soumis) ;
+  les 122 candidats découverts restent prêts dans discovery_candidates.csv (non tracké).
 - 2026-07-18 — **Plan post-analyse du run lunch EXÉCUTÉ (OK Betty) : flags porteurs + 1re DÉCOUVERTE
   réelle (122 candidats) + run stratégique #2 soumis.** (1) **Fix « spéculation porteuse »**
   (commit 263dee5) : le review-flag spéculation se décide au niveau du SIGNAL scoré — flag seulement
