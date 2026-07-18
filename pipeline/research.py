@@ -421,7 +421,8 @@ def fixture_docs(path: Path) -> list[RawDoc]:
 def gather(cfg: EngineConfig, company: str,
            fixture: Path | None = None,
            use_cache: bool = True,
-           location: str | None = None) -> list[RawDoc]:
+           location: str | None = None,
+           website: str | None = None) -> list[RawDoc]:
     """Run every available source; skip cleanly what is offline.
 
     Dry-run + no fixture ⇒ empty research (valid: company scores 0).
@@ -447,10 +448,24 @@ def gather(cfg: EngineConfig, company: str,
     if cfg.eu_registry_enabled:           # conditional free source, opt-in (saves SERP quota)
         sources.append(eu_registry)
 
+    # Conditional IR fetch (design source #8): when the company website is
+    # known and the Firecrawl key is present, scrape the site (markdown) —
+    # press releases / investor-relations headlines feed the earnings-call
+    # angle. One scrape = one Firecrawl credit per company.
+    ir_url = None
+    if cfg.firecrawl_api_key and website:
+        ir_url = website if website.startswith("http") else f"https://{website}"
+
     # Europe-first locale: SERP sources get the company's market (gl/hl); the
     # neural/registry sources are locale-agnostic and take (cfg, company) only.
     gl, hl = _market_locale(location)
     serp_set = set(serp_sources)
+
+    if ir_url:
+        def _ir_source(c, _company, url=ir_url):
+            return firecrawl_fetch(c, url)
+        _ir_source.__name__ = "firecrawl_ir"
+        sources.append(_ir_source)
 
     docs: list[RawDoc] = []
     for fn in sources:

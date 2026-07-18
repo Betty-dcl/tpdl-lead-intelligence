@@ -31,9 +31,25 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT = 8  # seconds — a slow provider must not hang the page
 
-# Opus 4.8 list price (USD per MTok) — for the local cost estimate only.
+# List prices (USD per MTok, in/out) — for the local cost estimate only.
+# Rows log their `model`; costing everything at Opus price would overstate the
+# engine's Sonnet 5 extraction spend by ~2.5×.
 _OPUS_IN_PER_MTOK = 5.0
 _OPUS_OUT_PER_MTOK = 25.0
+_MODEL_PRICES: tuple[tuple[str, float, float], ...] = (
+    ("opus", 5.0, 25.0),      # Opus 4.8
+    ("sonnet", 2.0, 10.0),    # Sonnet 5 launch pricing (until 2026-08-31, then 3/15)
+    ("haiku", 1.0, 5.0),      # legacy safety net
+)
+
+
+def _price(model: str | None) -> tuple[float, float]:
+    """(in, out) USD/MTok for a logged model id; unknown/absent ⇒ Opus (agents' default)."""
+    low = (model or "").lower()
+    for key, p_in, p_out in _MODEL_PRICES:
+        if key in low:
+            return p_in, p_out
+    return _OPUS_IN_PER_MTOK, _OPUS_OUT_PER_MTOK
 
 # ── tiny in-memory TTL cache (provider endpoints shouldn't be hammered) ──
 _CACHE: dict[str, tuple[float, dict]] = {}
@@ -176,6 +192,7 @@ def anthropic_panel(db: Session) -> dict:
         rows = (db.query(ActivityLog.agent_id, ActivityLog.activity_metadata)
                 .filter(ActivityLog.activity_metadata.isnot(None)).all())
         tokens_in = tokens_out = calls = 0
+        cost = 0.0
         per_agent: dict[str, dict] = {}
         for agent_id, meta in rows:
             try:
@@ -185,29 +202,30 @@ def anthropic_panel(db: Session) -> dict:
             if "input_tokens" in data or "output_tokens" in data:
                 t_in = int(data.get("input_tokens", 0) or 0)
                 t_out = int(data.get("output_tokens", 0) or 0)
+                p_in, p_out = _price(data.get("model"))
+                row_cost = t_in / 1e6 * p_in + t_out / 1e6 * p_out
                 calls += 1
                 tokens_in += t_in
                 tokens_out += t_out
+                cost += row_cost
                 slot = per_agent.setdefault(
                     agent_id or "?", {"agent": agent_id or "?", "calls": 0,
-                                      "tokens_in": 0, "tokens_out": 0})
+                                      "tokens_in": 0, "tokens_out": 0, "cost": 0.0})
                 slot["calls"] += 1
                 slot["tokens_in"] += t_in
                 slot["tokens_out"] += t_out
-        cost = tokens_in / 1e6 * _OPUS_IN_PER_MTOK + tokens_out / 1e6 * _OPUS_OUT_PER_MTOK
-        by_agent = sorted(per_agent.values(), key=lambda a: (
-            a["tokens_in"] * _OPUS_IN_PER_MTOK + a["tokens_out"] * _OPUS_OUT_PER_MTOK),
-            reverse=True)
+                slot["cost"] += row_cost
+        by_agent = sorted(per_agent.values(), key=lambda a: a["cost"], reverse=True)
         for a in by_agent:
-            a["cost"] = round(a["tokens_in"] / 1e6 * _OPUS_IN_PER_MTOK
-                              + a["tokens_out"] / 1e6 * _OPUS_OUT_PER_MTOK, 3)
+            a["cost"] = round(a["cost"], 3)
         total_calls_all = db.query(func.count(ActivityLog.id)).scalar() or 0
         panel = _panel(
             **base,
-            plan=f"{calls} agent calls logged",
-            used=round(cost, 2), unit="USD est. (Opus 4.8 list price)",
+            plan=f"{calls} API calls logged (agents + engine)",
+            used=round(cost, 2), unit="USD est. (list price per model)",
             detail=(f"{tokens_in:,} tokens in · {tokens_out:,} tokens out — "
-                    f"LOCAL tally (activity_log, {total_calls_all} rows). "
+                    f"LOCAL tally (activity_log, {total_calls_all} rows), priced "
+                    f"per model (Opus 4.8 / Sonnet 5). "
                     f"Official billing lives on the Anthropic console."),
         )
         panel["by_agent"] = by_agent

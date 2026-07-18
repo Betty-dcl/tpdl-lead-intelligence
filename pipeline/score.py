@@ -146,6 +146,9 @@ def live_interpret(cfg: EngineConfig, block: EvidenceBlock) -> tuple[list[Interp
         if response.stop_reason == "max_tokens":
             logger.warning("[score] %s: interpretation hit max_tokens (truncated)",
                            block.company_name)
+        from pipeline.usage_log import log_anthropic_call
+        log_anthropic_call(cfg.interpretation_model, response.usage,
+                           block.company_name, "score")
         result = _parse_interpretation(text, block)
         # Empty evidence legitimately yields no signals; a parse FAILURE is
         # detected by its sentinel summary — only that case is worth a retry.

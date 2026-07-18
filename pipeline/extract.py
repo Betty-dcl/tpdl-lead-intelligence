@@ -132,6 +132,8 @@ def live_extract(cfg: EngineConfig, company: str, docs: list[RawDoc]) -> list[Ev
             # path in _parse_items still recovers every complete item.
             logger.warning("[extract] %s: chunk %d/%d hit max_tokens (truncated)",
                            company, n, len(chunks))
+        from pipeline.usage_log import log_anthropic_call
+        log_anthropic_call(cfg.extraction_model, response.usage, company, "extract")
         items.extend(_parse_items(text))
     if len(chunks) > 1:
         logger.info("[extract] %s: %d chunks → %d items before dedupe",

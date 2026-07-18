@@ -861,7 +861,8 @@ def _fake_batches(store, status="ended", scoring_json=None):
         for r in store["requests"]:
             yield SimpleNamespace(custom_id=r["custom_id"], result=SimpleNamespace(
                 type="succeeded", message=SimpleNamespace(
-                    content=[SimpleNamespace(type="text", text=scoring_json)])))
+                    content=[SimpleNamespace(type="text", text=scoring_json)],
+                    usage=SimpleNamespace(input_tokens=0, output_tokens=0))))
 
     return SimpleNamespace(messages=SimpleNamespace(batches=SimpleNamespace(
         create=create,
@@ -870,6 +871,9 @@ def _fake_batches(store, status="ended", scoring_json=None):
 
 
 def test_batch_submit_and_collect(monkeypatch, cfg):
+    from pipeline import usage_log as _ul
+    monkeypatch.setattr(_ul, "log_anthropic_call", lambda *a, **k: None)
+
     from pipeline import batch as batch_mod
     blocks = [EvidenceBlock(company_name="Acme", sector=None, tech_stack_summary=None,
               items=[EvidenceItem(quote="Blackstone completed the buyout.", source="exa_q3",
@@ -951,13 +955,17 @@ def test_dedupe_items_across_chunks():
 
 
 def test_live_extract_chunks_large_corpora(monkeypatch):
+    from pipeline import usage_log as _ul
+    monkeypatch.setattr(_ul, "log_anthropic_call", lambda *a, **k: None)
+
     calls = []
     class FakeMessages:
         def create(self, **kw):
             calls.append(kw["messages"][0]["content"])
             from types import SimpleNamespace
             return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(
-                type="text", text='{"items": []}')])
+                type="text", text='{"items": []}')],
+                usage=SimpleNamespace(input_tokens=0, output_tokens=0))
     class FakeClient:
         def __init__(self, api_key): self.messages = FakeMessages()
     import sys, types as _t
@@ -969,13 +977,17 @@ def test_live_extract_chunks_large_corpora(monkeypatch):
 
 
 def test_live_interpret_retries_on_unusable_reply(monkeypatch):
+    from pipeline import usage_log as _ul
+    monkeypatch.setattr(_ul, "log_anthropic_call", lambda *a, **k: None)
+
     replies = iter(["garbage, not json at all",
                     '{"signals": [], "signals_not_evidenced": [], "intelligence_summary": "A. B. C."}'])
     class FakeMessages:
         def create(self, **kw):
             from types import SimpleNamespace
             return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(
-                type="text", text=next(replies))])
+                type="text", text=next(replies))],
+                usage=SimpleNamespace(input_tokens=0, output_tokens=0))
     class FakeClient:
         def __init__(self, api_key): self.messages = FakeMessages()
     import sys, types as _t
@@ -1002,3 +1014,59 @@ def test_canary_flags_rich_corpus_with_zero_evidence(monkeypatch):
                                                        items=[], tech_stack_summary=None), [], []))
     block, tech, viol, flags = runner._prepare(live, "Acme", None, None, {})
     assert any("extraction anomaly" in f for f in flags)     # 40 docs + 0 items ⇒ flagged
+
+
+# ─── Usage tally: per-model pricing, engine logging, Firecrawl IR wiring ─────
+
+def test_usage_price_is_model_aware():
+    from app.tools import usage
+    assert usage._price("claude-opus-4-8") == (5.0, 25.0)
+    assert usage._price("claude-sonnet-5") == (2.0, 10.0)
+    assert usage._price(None) == (5.0, 25.0)          # unknown ⇒ Opus (agents' default)
+    # 1M in + 1M out on Sonnet must NOT be billed at Opus rates
+    p_in, p_out = usage._price("claude-sonnet-5")
+    assert p_in * 1 + p_out * 1 == 12.0
+
+
+def test_engine_usage_log_writes_activity_row():
+    from types import SimpleNamespace
+    from pipeline.usage_log import log_anthropic_call
+    from app.database import SessionLocal
+    from app.models import ActivityLog
+    import json as _json
+    log_anthropic_call("claude-sonnet-5",
+                       SimpleNamespace(input_tokens=1000, output_tokens=200),
+                       "Zzy Usage Co", "extract")
+    with SessionLocal() as db:
+        row = (db.query(ActivityLog).filter(ActivityLog.action == "engine_call")
+               .order_by(ActivityLog.id.desc()).first())
+        try:
+            assert row is not None and row.agent_id == "hugo"
+            data = _json.loads(row.activity_metadata)
+            assert data["model"] == "claude-sonnet-5" and data["input_tokens"] == 1000
+            assert data["company"] == "Zzy Usage Co" and data["stage"] == "extract"
+        finally:
+            if row is not None:
+                db.delete(row)
+                db.commit()
+
+
+def test_gather_includes_firecrawl_ir_when_key_and_website(monkeypatch):
+    live = EngineConfig(live=True, serpapi_key="k", firecrawl_api_key="fc")
+    called = {}
+    monkeypatch.setattr(research, "serpapi_news", lambda *a, **k: [])
+    monkeypatch.setattr(research, "serpapi_jobs", lambda *a, **k: [])
+    monkeypatch.setattr(research, "exa_search", lambda *a, **k: [])
+    monkeypatch.setattr(research, "perplexity_sonar", lambda *a, **k: [])
+    def fake_fc(cfg, url):
+        called["url"] = url
+        return [RawDoc(source="ir_fetch", url=url, title="IR", text="Investor news.")]
+    monkeypatch.setattr(research, "firecrawl_fetch", fake_fc)
+    docs = research.gather(live, "Acme", use_cache=False, website="acme.com")
+    assert called["url"] == "https://acme.com"         # scheme added
+    assert any(d.source == "ir_fetch" for d in docs)   # IR docs flow into research
+
+    # no website ⇒ Firecrawl never called
+    called.clear()
+    research.gather(live, "Acme", use_cache=False, website=None)
+    assert called == {}

@@ -50,8 +50,10 @@ def _prepare(cfg: EngineConfig, name: str, sector: str | None,
                     else "blocked" if ts.scan_blocked
                     else "no domain" if ts.domain_missing else "stack detected")
 
-    # Step 2 — research (Europe-first: SERP localised to the company's market)
-    docs = research.gather(cfg, name, fixture=fixture, location=identity.get("location"))
+    # Step 2 — research (Europe-first SERP locale + conditional Firecrawl IR fetch)
+    docs = research.gather(cfg, name, fixture=fixture,
+                           location=identity.get("location"),
+                           website=identity.get("website"))
     logger.info("[%s] research: %d raw docs", name, len(docs))
 
     # Step 3 — extraction (Sonnet 5) + verbatim QA + speculation flags
@@ -241,6 +243,10 @@ def main() -> None:
                         help="Skip companies already in --out (recover a crashed run)")
     parser.add_argument("--force", action="store_true",
                         help="Run even if the SerpAPI quota looks insufficient")
+    parser.add_argument("--rescan-tech", action="store_true",
+                        help="Force a fresh Apify tech scan even when the DB already "
+                             "holds a tech-stack summary (default: reuse the stored "
+                             "summary and spend nothing on Apify)")
     parser.add_argument("--max-usd", type=float, default=None,
                         help="Hard budget cap (USD): stop the run before the estimated "
                              "model spend would exceed this. Live runs only.")
@@ -255,6 +261,12 @@ def main() -> None:
     companies = _select_companies(args)
     if not companies:
         parser.error("select companies: --company / --fixture / --top N / --lunch / --names")
+
+    # --rescan-tech: drop the stored tech-stack summary so Step 1 actually
+    # scans via Apify instead of reusing the (possibly stale) DB value.
+    if args.rescan_tech:
+        for c in companies:
+            c.identity.pop("tech_stack_summary", None)
 
     from pipeline import estimate as est_mod
     est = est_mod.estimate_run(len(companies))

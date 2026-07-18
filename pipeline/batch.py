@@ -87,6 +87,9 @@ def collect_results(cfg: EngineConfig, batch_id: str, id_to_block: dict[str, Evi
             results[block.company_name] = ([], [], "Batch scoring failed for this company.")
             continue
         text = "".join(b.text for b in entry.result.message.content if b.type == "text")
+        from pipeline.usage_log import log_anthropic_call
+        log_anthropic_call(cfg.interpretation_model, entry.result.message.usage,
+                           block.company_name, "score_batch")
         signals, not_evidenced, summary = _parse_interpretation(text, block)
         scored = [score_signal(cfg, s) for s in signals]
         results[block.company_name] = (scored, not_evidenced, summary)
