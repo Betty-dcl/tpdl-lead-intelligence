@@ -17,6 +17,22 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-18 — **Plan post-analyse du run lunch EXÉCUTÉ (OK Betty) : flags porteurs + 1re DÉCOUVERTE
+  réelle (122 candidats) + run stratégique #2 soumis.** (1) **Fix « spéculation porteuse »**
+  (commit 263dee5) : le review-flag spéculation se décide au niveau du SIGNAL scoré — flag seulement
+  si TOUTE l'évidence d'un signal est hedgée (« resting entirely on speculative/hedged quotes ») ;
+  une citation hedgée parmi des citations propres ne flagge plus (le run lunch flaggait 53 % — 34/36
+  pour ce seul motif). +2 tests, 191 verts. (2) **Grifols/Geistlich vérifiés en base** (7.2/6.8, snapshots
+  juillet à jour, historique toujours 2 runs). (3) **1re découverte live** : 462 findings/8 thèmes →
+  bug de troncature corrigé (commit e363d87 : chunks de 80 + salvage — 13 entrées sauvées d'un chunk
+  tronqué) → **122 candidats NOUVEAUX** (`discovery_candidates.csv` ; qualité élevée : DocMorris,
+  Recordati, Evotec, Lundbeck, Galapagos… ; 9 earnings-call, 14 PE). (4) **Run #2 SOUMIS** (batch
+  `--submit`) : 67 lunch (recherche en cache = 0 quota SERP) + **50 candidats priorisés par thème**
+  (earnings-call > digital > PE > restructuring > hiring > leadership ; les 48 ma_expansion attendent
+  le quota d'août — SerpAPI restant : 102, sélection = 100 recherches) + `--rescan-tech` (Apify) +
+  `--force` (l'estimateur ignore le cache) + `--max-usd 12`. Sortie : `engine_run_strategic.csv` ;
+  état pending → `--fetch` quand Anthropic a fini (≤24 h). ⚠️ Reco : créer la clé SERPER (2 500
+  recherches/mois gratuites) pour débloquer les 72 candidats restants + les prochains runs larges.
 - 2026-07-18 — **Nettoyage données VOLET 1 APPLIQUÉ (OK Betty).** Fusions évidentes : « ADOR
   Diagnostics » (0.0, même site que la ligne Italy) et « NADMED (Finland) » (6.5, doublon de NADMED
   7.0) supprimées — société + signaux + snapshots (l'historique /recurring reste cohérent). Les 15
