@@ -284,3 +284,14 @@ def test_hugo_surfaces_freshness_everywhere(client):
 
         rerun = hugo._dispatch_command("/rerun")
         assert set(rerun["metadata"]) >= {"live_ready", "anthropic", "research"}
+
+
+def test_vera_universe_audit_dispatch(client):
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        vera = AGENT_CLASSES["vera"].load(db, "vera")
+        meta = vera._dispatch_command("/audit")          # no company ⇒ universe audit
+        assert meta["task_title"] == "Integrity audit — universe"
+        assert meta["metadata"]["total"] > 0
+        assert "Duplicate company groups" in meta["augmented_message"]

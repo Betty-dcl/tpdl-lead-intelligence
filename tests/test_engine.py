@@ -1108,3 +1108,39 @@ def test_exa_search_logs_actual_request_count(monkeypatch):
     monkeypatch.setattr(research, "_post_json", lambda *a, **k: {"results": []})
     research.exa_search(live, "Acme")
     assert logged == {"exa": 3}                          # Q1/Q2/Q3 all counted
+
+
+# ─── Integrity audit (Vera universe /audit) + summary-format defense ─────────
+
+def test_integrity_norm_groups_duplicates():
+    from app.tools.integrity import _norm_name
+    assert _norm_name("Sesderma (Mediderma Group)") == _norm_name("Sesderma")
+    assert _norm_name("Glenmark Pharmaceuticals Europe") == _norm_name("Glenmark Pharmaceuticals")
+    assert _norm_name("NADMED (Finland)") == _norm_name("NADMED")
+    assert _norm_name("Roche") != _norm_name("Novartis")
+
+
+def test_integrity_report_flags_and_formats():
+    from app.tools.integrity import IntegrityReport
+    rep = IntegrityReport(total=10,
+                          duplicate_groups=[["A", "A Group"]],
+                          bad_summaries=[("B", 6)],
+                          missing_location=["C"])
+    assert rep.issue_count == 3
+    text = rep.lines()
+    assert "A / A Group" in text and "B (6s)" in text and "✗" in text and "✓" in text
+
+
+def test_assemble_flags_summary_format_breach(cfg):
+    from pipeline import runner
+    sig = InterpretedSignal(category="hiring", what_happened="w", why_it_matters="y",
+                            tpdl_relevance="x", confidence="low", signal_strength=3,
+                            evidence=[_item()])
+    scored = [score.score_signal(cfg, sig, TODAY)]
+    six = "One. Two. Three. Four. Five. Six."
+    r = runner._assemble(cfg, "Acme", None, {}, None, [], [], scored, [], six)
+    assert r.review_flag and "summary format breach: 6 sentences" in (r.review_flag_reason or "")
+    # a compliant 3-sentence summary must NOT flag
+    ok = runner._assemble(cfg, "Acme", None, {}, None, [], [], scored, [],
+                          "One. Two. Three.")
+    assert not (ok.review_flag_reason or "").count("summary format")

@@ -85,6 +85,13 @@ def _assemble(cfg: EngineConfig, name: str, sector: str | None, identity: dict,
     if spec:
         extra.append(f"{len(spec)} speculative/negated quote(s) — verify event happened")
     extra.extend(anomalies)   # keep the anomaly text verbatim — it says what to check
+    # Constitution: the intelligence summary is EXACTLY 3 sentences. A summary
+    # far outside that band (when signals exist) means the interpretation
+    # drifted — flag it at the source instead of letting it age in the DB.
+    if scored and summary:
+        n_sent = len([s for s in re.split(r"(?<=[.!?])\s+", summary.strip()) if s])
+        if not (2 <= n_sent <= 4):
+            extra.append(f"summary format breach: {n_sent} sentences (constitution says 3)")
     if extra:
         review = True
         reason = "; ".join(filter(None, [reason, *extra]))

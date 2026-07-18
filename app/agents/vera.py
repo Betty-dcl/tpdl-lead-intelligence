@@ -74,13 +74,32 @@ class VeraAgent(BaseAgent):
         text = user_message.strip()
         low = text.lower()
 
-        # ── /audit [company] ─────────────────────────────────────────────
+        # ── /audit [company?] ────────────────────────────────────────────
+        # No argument ⇒ dataset-wide integrity audit (deterministic, zero cost).
+        # With a name ⇒ the per-company signal audit below.
         if low.startswith("/audit") or low.startswith("/qa"):
             parts = text.split(maxsplit=1)
             if len(parts) < 2:
+                from app.tools.integrity import run_integrity_audit
+                with SessionLocal() as db:
+                    rep = run_integrity_audit(db)
+                verdict = "NEEDS ATTENTION" if rep.issue_count else "CLEAR"
+                augmented = (
+                    f"The user ran `/audit` (no company) — the UNIVERSE-WIDE integrity "
+                    f"audit over all {rep.total} companies. Deterministic findings "
+                    f"({rep.issue_count} issue classes):\n\n{rep.lines()}\n\n"
+                    f"As Vera, give the verdict **{verdict}** first. Then walk the ✗ "
+                    f"findings in priority order: duplicates distort outreach counts "
+                    f"(same group contacted twice); summary-format breaches are legacy "
+                    f"May rows unless dated otherwise; missing locations disable the "
+                    f"Europe-first search locale. Recommend the ONE cleanup to do next. "
+                    f"Reason only from the findings above — never invent."
+                )
                 return {
-                    "augmented_message": "The user ran `/audit` with no company. Ask which company they want quality-audited.",
-                    "action": "qa_audit", "task_title": "/audit (no company)",
+                    "augmented_message": augmented, "action": "qa_audit",
+                    "task_title": "Integrity audit — universe",
+                    "metadata": {"issues": rep.issue_count, "total": rep.total,
+                                 "duplicates": len(rep.duplicate_groups)},
                 }
             name = parts[1].strip()
             name_low = name.lower()
