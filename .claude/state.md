@@ -17,6 +17,21 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-18 — **SCOPE TRANCHÉ PAR BETTY (les 6 questions) + étape DÉCOUVERTE construite + signal
+  earnings-call encodé (commit 52a10a0).** Décisions Betty (Nathalie peut amender ; doc de segmentation
+  Obsidian mis à jour §9) : taille = TOUT (pas de plancher) ; cotées/privées = TOUT ; thèmes = les
+  6 signaux existants + angle earnings-call ; dédup = AFFICHER les récurrences avec compteur (« revenu
+  2×/3× », = /recurring de Maya), jamais filtrer ; volume = ce que la veille trouve (seuil ≥8 = seul
+  filtre). Construit : (1) **`pipeline/discovery.py`** — la capacité manquante « top 35 + du NOUVEAU » :
+  8 requêtes thématiques (Exa + SERP news) → 1 appel Sonnet (noms de sociétés SUJET des findings,
+  verbatim, JSON strict, consultants/investisseurs/universités exclus) → dédup normalisé vs univers →
+  `data/csv/discovery_candidates.csv` (nom/thème/URL source). CLI `--discover` (exige `--live`,
+  <0,10 $/passe) ; les candidats se scorent ensuite via `--names`. (2) **Angle earnings-call dans les
+  prompts moteur** : extraction (digital_initiative inclut explicitement les déclarations earnings-call/
+  rapport annuel « digital = priorité board ») + scoring (bloc BOARD-LEVEL DIGITAL PRIORITY : force 4-5,
+  pas 3, traçabilité inchangée). +4 tests. Suite : **189 verts**. Reste avant le 1er run stratégique :
+  appliquer le dossier de nettoyage (doublons/localisations, en attente OK Betty/Nathalie) puis
+  `--discover --live` → scorer les candidats.
 - 2026-07-18 — **Relecture complète des sorties Hugo/Maya → audit d'intégrité PERMANENT (commit
   6b17fb4).** Audit systématique des 492 lignes (2 runs) codifié en garde-fou reproductible :
   (1) `app/tools/integrity.py` — contrôles déterministes 0 coût (doublons de sociétés normalisés,
