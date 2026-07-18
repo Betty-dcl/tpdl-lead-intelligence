@@ -144,40 +144,63 @@ def _findings_payload(findings: list[tuple[str, dict]]) -> str:
     return "\n".join(lines)
 
 
+# Findings per Sonnet call. One call over 462 findings truncated at max_tokens
+# (output hit the cap exactly → unparseable → 0 names). Chunking bounds the
+# reply size — the same defense as extraction's CHUNK_DOCS.
+CHUNK_FINDINGS = 80
+
+
+def _parse_companies(text: str) -> list[dict]:
+    m = re.search(r"\{.*\}", text, re.DOTALL)
+    candidate = m.group() if m else text
+    try:
+        return json.loads(candidate).get("companies", [])
+    except (json.JSONDecodeError, AttributeError):
+        # Truncated reply: salvage every complete {"name": ...} object.
+        out = []
+        for obj in re.finditer(r"\{[^{}]*\}", candidate):
+            try:
+                d = json.loads(obj.group())
+            except json.JSONDecodeError:
+                continue
+            if isinstance(d, dict) and d.get("name"):
+                out.append(d)
+        logger.warning("[discovery] broken JSON — salvaged %d complete entries", len(out))
+        return out
+
+
 def extract_candidates(cfg: EngineConfig,
                        findings: list[tuple[str, dict]]) -> list[Candidate]:
     if not findings:
         return []
     require_live(cfg, cfg.anthropic_api_key, "Discovery extraction (Sonnet)")
     import anthropic
+    from pipeline.usage_log import log_anthropic_call
 
     theme_by_url = {f["url"]: theme for theme, f in findings if f["url"]}
     client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
-    response = client.messages.create(
-        model=cfg.extraction_model,
-        max_tokens=4096,
-        system=DISCOVER_PROMPT,
-        messages=[{"role": "user",
-                   "content": f"FINDINGS:\n\n{_findings_payload(findings)}"}],
-    )
-    text = "".join(b.text for b in response.content if b.type == "text")
-    from pipeline.usage_log import log_anthropic_call
-    log_anthropic_call(cfg.extraction_model, response.usage, "discovery", "discover")
-    m = re.search(r"\{.*\}", text, re.DOTALL)
-    if not m:
-        return []
-    try:
-        payload = json.loads(m.group())
-    except json.JSONDecodeError:
-        logger.warning("[discovery] unparseable JSON from model")
-        return []
-    out = []
-    for raw in payload.get("companies", []):
-        name = (raw.get("name") or "").strip()
-        if name:
-            url = raw.get("url") or None
-            out.append(Candidate(name=name, url=url,
-                                 theme=theme_by_url.get(url, "unknown")))
+    out: list[Candidate] = []
+    chunks = [findings[i:i + CHUNK_FINDINGS]
+              for i in range(0, len(findings), CHUNK_FINDINGS)]
+    for n, chunk in enumerate(chunks, 1):
+        response = client.messages.create(
+            model=cfg.extraction_model,
+            max_tokens=8192,
+            system=DISCOVER_PROMPT,
+            messages=[{"role": "user",
+                       "content": f"FINDINGS:\n\n{_findings_payload(chunk)}"}],
+        )
+        text = "".join(b.text for b in response.content if b.type == "text")
+        if response.stop_reason == "max_tokens":
+            logger.warning("[discovery] chunk %d/%d hit max_tokens (truncated)",
+                           n, len(chunks))
+        log_anthropic_call(cfg.extraction_model, response.usage, "discovery", "discover")
+        for raw in _parse_companies(text):
+            name = (raw.get("name") or "").strip()
+            if name:
+                url = raw.get("url") or None
+                out.append(Candidate(name=name, url=url,
+                                     theme=theme_by_url.get(url, "unknown")))
     return out
 
 
