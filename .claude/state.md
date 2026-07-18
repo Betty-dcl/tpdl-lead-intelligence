@@ -17,6 +17,18 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-18 — **Audit de vérité des 6 agents restants + répétition générale du rituel (commit
+  ci-dessus).** (1) Iris, Marc, Julie : PROPRES. Inès (« frozen 492/35 » → lire les chiffres courants ;
+  weekly → monthly), Oliver (double vérité charte : renderers = teal legacy #094752 AUJOURD'HUI,
+  charte OFFICIELLE Nathalie = à la migration — ne jamais prétendre qu'un fichier sort en charte
+  officielle), Vera (connaît son /audit univers + les flags « porteurs » du 18/07) : CORRIGÉS +
+  re-seed. Code de dispatch exercé sur données réelles : honnête partout. (2) **Répétition générale
+  du rituel mensuel en dry-run (0 €)** : devis OK, run fixture OK (CSV 38 colonnes importable).
+  Deux enseignements réels : (a) le garde-fou quota marche — un run lunch complet avec registre UE
+  (204 recherches) DÉPASSE le quota SerpAPI restant (102) → la clé SERPER (2 500/mois gratuits)
+  devient le prérequis pratique du prochain run complet ; (b) le set --lunch est passé à 68 (le
+  remplissage des localisations du nettoyage a fait entrer PeploBio (Spain) dans le périmètre CH+ES).
+  Suite : **197 verts**. Le plan d'amélioration à coût zéro est SOLDÉ.
 - 2026-07-18 — **Hugo remis au niveau du moteur + registre UE public ACTIVÉ par défaut (commit
   7efa3c2, poussé GitHub).** Constat : hugo.md ne mentionnait NI la découverte, NI le nouveau scope,
   NI les 122 candidats (0 occurrence de « discover ») + une phrase morte « needs API keys ». Fait :
