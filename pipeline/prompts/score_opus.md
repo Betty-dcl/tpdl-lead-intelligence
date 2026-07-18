@@ -34,6 +34,12 @@ cannot point to a quote that says it plainly, lower the strength.
 - 5 very strong: entry point + identified capability gap
 - 6 exceptional: high urgency + documented gap
 
+BOARD-LEVEL DIGITAL PRIORITY: a digital_initiative evidenced by an
+earnings-call / investor statement that names digital investment or strategy
+as a company/board priority is a STRONG signal (4-5, not 3): board backing
+means budget, PMO coordination and executive attention — TPDL's core entry
+point. Still requires the quote to say it plainly (rule 5 applies).
+
 ## TPDL SERVICE AREAS (the only valid values for tpdl_relevance)
 leadership_change → Operating model / Commercial effectiveness
 hiring → Commercial effectiveness / Digital execution & activation

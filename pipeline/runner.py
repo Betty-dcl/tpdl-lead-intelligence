@@ -250,6 +250,12 @@ def main() -> None:
                         help="Skip companies already in --out (recover a crashed run)")
     parser.add_argument("--force", action="store_true",
                         help="Run even if the SerpAPI quota looks insufficient")
+    parser.add_argument("--discover", action="store_true",
+                        help="Market-watch discovery: search the 6 signal themes + the "
+                             "earnings-call angle across the broad life-science scope and "
+                             "output NEW candidate companies (not yet in the universe) to "
+                             "data/csv/discovery_candidates.csv. Requires --live "
+                             "(thematic search + one small Sonnet call, <$0.10).")
     parser.add_argument("--rescan-tech", action="store_true",
                         help="Force a fresh Apify tech scan even when the DB already "
                              "holds a tech-stack summary (default: reuse the stored "
@@ -263,6 +269,14 @@ def main() -> None:
     # ── fetch a previously-submitted batch (no company selection needed) ──
     if args.fetch is not None:
         _run_fetch(EngineConfig.load(live=True), args)
+        return
+
+    # ── discovery: find NEW companies (no company selection needed) ──
+    if args.discover:
+        if not args.live:
+            parser.error("--discover requires --live (thematic search + one Sonnet call)")
+        from pipeline import discovery
+        discovery.discover(EngineConfig.load(live=True))
         return
 
     companies = _select_companies(args)

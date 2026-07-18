@@ -1144,3 +1144,55 @@ def test_assemble_flags_summary_format_breach(cfg):
     ok = runner._assemble(cfg, "Acme", None, {}, None, [], [], scored, [],
                           "One. Two. Three.")
     assert not (ok.review_flag_reason or "").count("summary format")
+
+
+# ─── Discovery (Step -1): find NEW companies from the market watch ───────────
+
+def test_discovery_filter_drops_known_and_dupes():
+    from pipeline import discovery
+    cands = [discovery.Candidate("Roche", "pe_event", "https://a"),
+             discovery.Candidate("Novabiotic GmbH", "ma_expansion", "https://b"),
+             discovery.Candidate("NovaBiotic", "hiring", "https://c"),       # dup (norm)
+             discovery.Candidate("Sesderma (Mediderma Group)", "hiring", None)]
+    fresh = discovery.filter_new(cands, ["Roche", "Sesderma"])
+    assert [c.name for c in fresh] == ["Novabiotic GmbH"]   # known + norm-dupes dropped
+
+
+def test_discovery_extracts_names_and_themes(monkeypatch):
+    from types import SimpleNamespace
+    import sys, types as _t
+    from pipeline import discovery, usage_log as _ul
+    monkeypatch.setattr(_ul, "log_anthropic_call", lambda *a, **k: None)
+    reply = ('{"companies": [{"name": "Alpenpharm AG", "url": "https://x/news1"},'
+             '{"name": "", "url": null}]}')
+    class FakeMessages:
+        def create(self, **kw):
+            return SimpleNamespace(stop_reason="end_turn",
+                                   content=[SimpleNamespace(type="text", text=reply)],
+                                   usage=SimpleNamespace(input_tokens=0, output_tokens=0))
+    class FakeClient:
+        def __init__(self, api_key): self.messages = FakeMessages()
+    monkeypatch.setitem(sys.modules, "anthropic", _t.SimpleNamespace(Anthropic=FakeClient))
+    live = EngineConfig(live=True, anthropic_api_key="k")
+    findings = [("earnings_call_digital",
+                 {"title": "Alpenpharm boosts digital", "url": "https://x/news1",
+                  "snippet": "Alpenpharm AG names digital a board priority."})]
+    out = discovery.extract_candidates(live, findings)
+    assert len(out) == 1
+    assert out[0].name == "Alpenpharm AG"
+    assert out[0].theme == "earnings_call_digital"          # theme recovered via url
+
+
+def test_discovery_requires_live():
+    from pipeline import discovery
+    dry = EngineConfig(live=False, exa_api_key="k")
+    with pytest.raises(EngineOffline):
+        discovery.search_themes(dry)
+
+
+def test_discovery_queries_cover_all_signal_themes():
+    from pipeline import discovery
+    themes = {t for t, _ in discovery.DISCOVERY_QUERIES}
+    assert {"earnings_call_digital", "leadership_change", "ma_expansion",
+            "pe_event", "digital_initiative", "org_restructuring",
+            "hiring"} <= themes

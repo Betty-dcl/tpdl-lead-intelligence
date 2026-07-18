@@ -29,7 +29,10 @@ one of the 6 signal categories. COPY. EXACT. CHARACTERS.
 - hiring            — job openings / recruitment drives (commercial, digital, data roles)
 - ma_expansion      — M&A, acquisitions, new market/geography expansion
 - pe_event          — private-equity investment, buyout, new ownership
-- digital_initiative— CRM / data / digital-transformation programmes
+- digital_initiative— CRM / data / digital-transformation programmes; ALSO any
+                      earnings-call / annual-report / investor statement naming
+                      digital investment or digital strategy as a company or
+                      board priority (copy the exact sentence)
 - org_restructuring — reorganisation, operating-model change, cost programmes
 
 ## EXPLICITLY NOT SIGNALS (skip even if prominent)
