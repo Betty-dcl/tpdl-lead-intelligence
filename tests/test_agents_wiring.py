@@ -337,6 +337,16 @@ def test_traceability_runs_api_and_downloads(client):
     assert h.text.splitlines()[0] == "Company,Assessed Score,Coverage,Outreach Eligible,Signals Found"
     m = client.get(run["maya_csv"])
     assert m.status_code == 200 and "Trajectory" in m.text.splitlines()[0]
+    # combined Hugo x Maya CSV = both agents side by side
+    comb = client.get(run["combined_csv"])
+    assert comb.status_code == 200
+    head = comb.text.splitlines()[0]
+    assert "Hugo — Score" in head and "Maya — Movement" in head
+    # folder export writes a bundle
+    exp = client.post(f"/api/runs/{run['run_id']}/export").json()
+    assert exp["ok"] and exp["files"] == 4 and "agent_results" in exp["folder"]
+    # sharepoint link is exposed
+    assert client.get("/api/runs").json()["sharepoint_url"].startswith("https://")
     # page renders
     assert client.get("/runs").status_code == 200
 

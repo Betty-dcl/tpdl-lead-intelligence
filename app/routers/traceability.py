@@ -27,6 +27,17 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 # so the Neotek run is excluded from this page and from trajectory comparisons.
 NEOTEK_REFERENCE_RUN = "cb97cf5d50d2"
 
+# SharePoint folder where run results are collected (opens in the browser where
+# the user is already logged in). Override with SHAREPOINT_RESULTS_URL in .env.
+import os
+SHAREPOINT_FOLDER_URL = os.environ.get("SHAREPOINT_RESULTS_URL", (
+    "https://netorgft10677151.sharepoint.com/sites/"
+    "LinkedInEmailCampaignandcontent-ContentProductionforLinkeIn/Shared%20Documents/"
+    "Forms/AllItems.aspx?id=%2Fsites%2FLinkedInEmailCampaignandcontent%2D"
+    "ContentProductionforLinkeIn%2FShared%20Documents%2FContent%20Production%20for%20"
+    "LinkeIn%2F03%5FGen%20AI%20Automation%20Hub%2FTPDL%20AGENTS%20PILOT"
+    "&viewid=8a730f10%2D3831%2D4126%2Da97c%2De7679be5831d"))
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data helpers
@@ -101,7 +112,8 @@ def _maya_recap(db: Session, runs: list[dict], run: dict) -> str:
 @router.get("/runs", response_class=HTMLResponse)
 def runs_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "traceability.html",
-                                      {"active_page": "runs"})
+                                      {"active_page": "runs",
+                                       "sharepoint_url": SHAREPOINT_FOLDER_URL})
 
 
 @router.get("/api/runs")
@@ -115,8 +127,36 @@ def api_runs(db: Session = Depends(get_db)) -> dict:
             "maya_recap": _maya_recap(db, runs, run),
             "hugo_csv": f"/api/runs/{run['run_id']}/hugo.csv",
             "maya_csv": f"/api/runs/{run['run_id']}/maya.csv",
+            "combined_csv": f"/api/runs/{run['run_id']}/combined.csv",
         })
-    return {"runs": cards, "count": len(cards)}
+    return {"runs": cards, "count": len(cards), "sharepoint_url": SHAREPOINT_FOLDER_URL}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Trajectory helper (shared by maya.csv and combined.csv)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _trajectory(db: Session, run_id: str) -> dict[str, dict]:
+    """Per-company movement vs the previous TPDL-engine run (Neotek excluded)."""
+    runs = _runs_ordered(db)
+    idx = next((i for i, r in enumerate(runs) if r["run_id"] == run_id), 0)
+    cur = {r.company_name: (r.assessed_score or 0) for r in
+           db.query(RunSnapshot).filter(RunSnapshot.import_run_id == run_id).all()}
+    old = {}
+    if idx > 0:
+        old = {r.company_name: (r.assessed_score or 0) for r in
+               db.query(RunSnapshot)
+               .filter(RunSnapshot.import_run_id == runs[idx - 1]["run_id"]).all()}
+    out = {}
+    for name, score in cur.items():
+        if name in old:
+            delta = score - old[name]
+            out[name] = {"trajectory": f"{old[name]}→{score}",
+                         "movement": "RISING" if delta > 0 else "FADING" if delta < 0 else "stable",
+                         "delta": f"{delta:+.1f}"}
+        else:
+            out[name] = {"trajectory": f"{score} (new)", "movement": "NEW", "delta": ""}
+    return out
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -153,25 +193,65 @@ def hugo_csv(run_id: str, db: Session = Depends(get_db)) -> Response:
 @router.get("/api/runs/{run_id}/maya.csv")
 def maya_csv(run_id: str, db: Session = Depends(get_db)) -> Response:
     """Maya's read for one run: each company's trajectory vs the previous run."""
-    runs = _runs_ordered(db)
-    idx = next((i for i, r in enumerate(runs) if r["run_id"] == run_id), 0)
-    cur = {r.company_name: (r.assessed_score or 0) for r in
-           db.query(RunSnapshot).filter(RunSnapshot.import_run_id == run_id).all()}
-    old = {}
-    if idx > 0:
-        old = {r.company_name: (r.assessed_score or 0) for r in
-               db.query(RunSnapshot)
-               .filter(RunSnapshot.import_run_id == runs[idx - 1]["run_id"]).all()}
-    data = []
-    for name, score in sorted(cur.items(), key=lambda kv: -kv[1]):
-        if name in old:
-            delta = score - old[name]
-            traj = f"{old[name]}→{score}"
-            move = "RISING" if delta > 0 else "FADING" if delta < 0 else "stable"
-        else:
-            delta, traj, move = "", f"{score} (new)", "NEW"
-        data.append([name, score, traj, move,
-                     f"{delta:+.1f}" if delta != "" else ""])
+    traj = _trajectory(db, run_id)
+    scores = {r.company_name: (r.assessed_score or 0) for r in
+              db.query(RunSnapshot).filter(RunSnapshot.import_run_id == run_id).all()}
+    data = [[name, scores[name], traj[name]["trajectory"],
+             traj[name]["movement"], traj[name]["delta"]]
+            for name in sorted(scores, key=lambda n: -scores[n])]
     return _csv_response(data,
                          ["Company", "Current Score", "Trajectory", "Movement", "Delta"],
                          f"maya_run_{run_id[:8]}.csv")
+
+
+@router.get("/api/runs/{run_id}/combined.csv")
+def combined_csv(run_id: str, db: Session = Depends(get_db)) -> Response:
+    """Hugo × Maya side by side: what Hugo scored AND how Maya reads its movement,
+    one row per company — the 'diff' between the two agents in a single file."""
+    traj = _trajectory(db, run_id)
+    rows = (db.query(RunSnapshot)
+            .filter(RunSnapshot.import_run_id == run_id)
+            .order_by(RunSnapshot.assessed_score.desc()).all())
+    data = [[r.company_name,
+             r.assessed_score, r.coverage, "YES" if r.outreach_eligible else "no",
+             traj.get(r.company_name, {}).get("trajectory", ""),
+             traj.get(r.company_name, {}).get("movement", ""),
+             traj.get(r.company_name, {}).get("delta", "")]
+            for r in rows]
+    return _csv_response(
+        data,
+        ["Company", "Hugo — Score", "Hugo — Coverage", "Hugo — Eligible",
+         "Maya — Trajectory", "Maya — Movement", "Maya — Delta"],
+        f"hugo_x_maya_run_{run_id[:8]}.csv")
+
+
+@router.post("/api/runs/{run_id}/export")
+def export_to_folder(run_id: str, db: Session = Depends(get_db)) -> dict:
+    """Collect this run's Hugo, Maya and combined CSVs into a local folder
+    (data/agent_results/run_<date>_<id>/) — a ready-to-upload bundle. If the
+    SharePoint library is later synced via OneDrive, point AGENT_RESULTS_DIR
+    at that synced path and the export lands straight in SharePoint."""
+    from pathlib import Path
+
+    runs = _runs_ordered(db)
+    run = next((r for r in runs if r["run_id"] == run_id), None)
+    if run is None:
+        return {"ok": False, "error": "run not found"}
+
+    base = Path(os.environ.get("AGENT_RESULTS_DIR", "data/agent_results"))
+    folder = base / f"run_{run['run_date'] or 'undated'}_{run_id[:8]}"
+    folder.mkdir(parents=True, exist_ok=True)
+
+    def _dump(resp: Response, name: str):
+        (folder / name).write_bytes(resp.body)
+
+    _dump(hugo_csv(run_id, db), "hugo_scores.csv")
+    _dump(maya_csv(run_id, db), "maya_trajectory.csv")
+    _dump(combined_csv(run_id, db), "hugo_x_maya_comparison.csv")
+    (folder / "README.txt").write_text(
+        f"TPDL engine run {run['run_date']} ({run_id})\n"
+        f"{run['companies']} companies · {run['eligible']} outreach-eligible (score >= 8)\n\n"
+        f"{_hugo_recap(db, run)}\n{_maya_recap(db, runs, run)}\n\n"
+        f"Files: hugo_scores.csv (Hugo output) · maya_trajectory.csv (Maya read) "
+        f"· hugo_x_maya_comparison.csv (both side by side).\n", encoding="utf-8")
+    return {"ok": True, "folder": str(folder.resolve()), "files": 4}

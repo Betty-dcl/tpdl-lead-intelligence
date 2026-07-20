@@ -39,3 +39,4 @@ data/.session_secret
 data/csv/engine_run*.csv
 data/csv/discovery_candidates.csv
 data/csv/discovery_resurfaced.csv
+data/agent_results/
