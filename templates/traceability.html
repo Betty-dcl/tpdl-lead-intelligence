@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Traceability — TPDL{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 md:px-8 py-8" x-data="traceability()" x-init="load()">
+
+  <p class="text-xs font-mono uppercase tracking-widest text-ink-3 mb-2">Run history</p>
+  <h1 class="text-3xl md:text-4xl font-semibold font-display tracking-tight mb-2">
+    Traceability
+  </h1>
+  <p class="text-ink-2 mb-8 max-w-2xl">
+    Every engine run kept in history — what Hugo scored and what Maya read of it,
+    each with a one-line recap and a CSV download. Read straight from the
+    append-only run snapshots.
+  </p>
+
+  <template x-if="loading">
+    <p class="text-ink-3">Loading runs…</p>
+  </template>
+
+  <template x-if="!loading && runs.length === 0">
+    <div class="rounded-xl border border-line p-6 bg-white">
+      <p class="text-ink-2">No runs in history yet. Once the engine imports a run
+        (<code>python import_csv.py …</code>), it appears here.</p>
+    </div>
+  </template>
+
+  <div class="space-y-6">
+    <template x-for="run in runs" :key="run.run_id">
+      <div class="rounded-xl border border-line bg-white overflow-hidden">
+
+        <!-- header -->
+        <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-line"
+             style="background: var(--tpdl-accent-soft)">
+          <div>
+            <p class="text-lg font-semibold" x-text="run.run_date || 'unknown date'"></p>
+            <p class="text-xs font-mono text-ink-3" x-text="'run ' + run.run_id.slice(0,8)"></p>
+          </div>
+          <div class="flex gap-5 text-right">
+            <div><p class="text-2xl font-semibold" x-text="run.companies"></p>
+                 <p class="text-[11px] uppercase tracking-wide text-ink-3">companies</p></div>
+            <div><p class="text-2xl font-semibold" style="color: var(--tpdl-accent-ink)"
+                    x-text="run.eligible"></p>
+                 <p class="text-[11px] uppercase tracking-wide text-ink-3">eligible ≥8</p></div>
+          </div>
+        </div>
+
+        <!-- Hugo -->
+        <div class="px-5 py-4 border-b border-line">
+          <div class="flex items-center justify-between gap-3 mb-1">
+            <span class="text-sm font-semibold">🔎 Hugo — detection &amp; scoring</span>
+            <a :href="run.hugo_csv"
+               class="text-xs font-medium px-3 py-1.5 rounded-lg border border-line hover:bg-bg transition-colors">
+              ↓ Download scores (CSV)
+            </a>
+          </div>
+          <p class="text-sm text-ink-2" x-text="run.hugo_recap"></p>
+        </div>
+
+        <!-- Maya -->
+        <div class="px-5 py-4">
+          <div class="flex items-center justify-between gap-3 mb-1">
+            <span class="text-sm font-semibold">📊 Maya — analysis &amp; trajectory</span>
+            <a :href="run.maya_csv"
+               class="text-xs font-medium px-3 py-1.5 rounded-lg border border-line hover:bg-bg transition-colors">
+              ↓ Download trajectory (CSV)
+            </a>
+          </div>
+          <p class="text-sm text-ink-2" x-text="run.maya_recap"></p>
+        </div>
+
+      </div>
+    </template>
+  </div>
+</div>
+
+<script>
+function traceability() {
+  return {
+    runs: [], loading: true,
+    async load() {
+      try {
+        const r = await fetch('/api/runs');
+        const d = await r.json();
+        this.runs = d.runs || [];
+      } catch (e) { this.runs = []; }
+      this.loading = false;
+    }
+  };
+}
+</script>
+{% endblock %}

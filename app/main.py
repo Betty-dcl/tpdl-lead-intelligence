@@ -13,7 +13,7 @@ from app.database import init_db
 from app.routers import (
     agents, auth, briefs, chat, companies, contacts, conversations, credits, engine,
     intel, marketing, memory_api, onedrive, pages, performance, pipeline, realtime,
-    review, today, veille,
+    review, today, traceability, veille,
 )
 
 logging.basicConfig(
@@ -135,6 +135,7 @@ app.include_router(veille.router)
 app.include_router(realtime.router)
 app.include_router(onedrive.router)
 app.include_router(today.router)
+app.include_router(traceability.router)
 app.include_router(companies.team_router)
 app.include_router(briefs.router)
 

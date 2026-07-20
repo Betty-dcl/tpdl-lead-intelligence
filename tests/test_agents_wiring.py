@@ -316,3 +316,26 @@ def test_hugo_candidates_lists_discovery_output(client, tmp_path, monkeypatch):
         monkeypatch.setattr(hugo_mod, "DISCOVERY_CSV", tmp_path / "absent.csv")
         none = hugo._dispatch_command("/candidates")
         assert "none yet" in none["task_title"]
+
+
+def test_traceability_runs_api_and_downloads(client):
+    r = client.get("/api/runs")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["count"] >= 1
+    run = d["runs"][0]                                    # newest first
+    for k in ("run_id", "run_date", "companies", "eligible", "hugo_recap",
+              "maya_recap", "hugo_csv", "maya_csv"):
+        assert k in run
+    assert run["eligible"] <= run["companies"]            # sane counts
+    assert "Hugo scored" in run["hugo_recap"]
+    assert run["maya_recap"].startswith("Maya")
+    # downloads are real CSV attachments
+    h = client.get(run["hugo_csv"])
+    assert h.status_code == 200 and "text/csv" in h.headers["content-type"]
+    assert "attachment; filename=" in h.headers["content-disposition"]
+    assert h.text.splitlines()[0] == "Company,Assessed Score,Coverage,Outreach Eligible,Signals Found"
+    m = client.get(run["maya_csv"])
+    assert m.status_code == 200 and "Trajectory" in m.text.splitlines()[0]
+    # page renders
+    assert client.get("/runs").status_code == 200
