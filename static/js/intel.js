@@ -99,6 +99,7 @@ function intelPage() {
       signal_type: "",
       outreach_eligible: false,
       review_flag: false,
+      fresh_only: false,
     },
     showICP: false,
     sortKey: "assessed_score",
@@ -138,7 +139,8 @@ function intelPage() {
       const eligibleOK = (c) => !f.outreach_eligible || c.outreach_eligible;
       const reviewOK   = (c) => !f.review_flag       || c.review_flag;
       const icpOK      = (c) => this.showICP || !c.icp_flag;
-      const rows = this.companies.filter(c => sectorOK(c) && signalOK(c) && eligibleOK(c) && reviewOK(c) && icpOK(c));
+      const freshOK    = (c) => !f.fresh_only || this.isFresh(c);
+      const rows = this.companies.filter(c => sectorOK(c) && signalOK(c) && eligibleOK(c) && reviewOK(c) && icpOK(c) && freshOK(c));
       const dir = this.sortDesc ? -1 : 1;
       return [...rows].sort((a, b) => {
         const av = a[this.sortKey], bv = b[this.sortKey];
@@ -155,9 +157,26 @@ function intelPage() {
     },
 
     resetFilters() {
-      this.filters = { sector_bucket: "", signal_type: "", outreach_eligible: false, review_flag: false };
+      this.filters = { sector_bucket: "", signal_type: "", outreach_eligible: false, review_flag: false, fresh_only: false };
       this.showICP = false;
     },
+
+    /* ---- Freshness (the universe mixes vintages: latest run vs older stock) ---- */
+
+    _day(iso) { return iso ? String(iso).slice(0, 10) : null; },   // YYYY-MM-DD
+
+    // The most recent run date across the universe = "fresh".
+    get latestRunDay() {
+      if (this.stats?.pipeline?.last_run) return this._day(this.stats.pipeline.last_run);
+      const days = this.companies.map(c => this._day(c.run_date)).filter(Boolean).sort();
+      return days.length ? days[days.length - 1] : null;
+    },
+    isFresh(c) { return !!c.run_date && this._day(c.run_date) === this.latestRunDay; },
+    freshLabel(c) {
+      if (!c.run_date) return "no date";
+      return this.isFresh(c) ? "fresh" : `${this._day(c.run_date)} · stale`;
+    },
+    get freshCount() { return this.companies.filter(c => this.isFresh(c)).length; },
 
     distinctBuckets() {
       return [...new Set(this.companies.map(c => c.sector_bucket).filter(Boolean))].sort();

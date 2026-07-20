@@ -95,8 +95,10 @@
       The Lead Intelligence Pipeline
     </h1>
     <p class="text-ink-2 max-w-2xl">
-      492 European pharma, medtech, dental and life-sciences companies tracked across
-      6 commercial signal categories. Every finding traceable to a source URL.
+      Life-sciences companies (pharma, medtech, dental, diagnostics) tracked across
+      6 commercial signal categories, every finding traceable to a source URL.
+      Freshness is marked per row — only the latest run is current; the rest are
+      earlier-run scores. Use “Fresh only” to see just the current run.
     </p>
 
     <!-- Sales pipeline — 4 stages -->
@@ -247,9 +249,15 @@
         Include ICP-flagged
       </button>
 
+      <button @click="filters.fresh_only = !filters.fresh_only"
+              :class="filters.fresh_only ? 'filter-pill is-active' : 'filter-pill'">
+        ✦ Fresh only
+      </button>
+
       <span class="ml-auto text-xs text-ink-3" x-show="stats">
-        Last run: <span x-text="formatDate(stats?.pipeline.last_run)"></span>
-        · pipeline <span x-text="stats?.pipeline.pipeline_version"></span>
+        <span x-text="freshCount"></span> of <span x-text="companies.length"></span>
+        refreshed <span x-text="formatDate(stats?.pipeline.last_run)"></span> —
+        the rest carry scores from earlier runs (stale)
       </span>
     </div>
 
@@ -304,12 +312,18 @@
                   </template>
                   <span x-show="c.signals.length === 0" class="text-xs text-ink-3">—</span>
                 </div>
-                <div class="flex flex-wrap gap-1">
+                <div class="flex flex-wrap gap-1 items-center">
                   <span x-show="c.outreach_eligible" class="tpdl-badge tpdl-badge--accent">Eligible</span>
                   <span x-show="c.icp_flag" class="tpdl-badge tpdl-badge--outline"
                         style="color: #854d0e; border-color: #fde68a;">ICP</span>
                   <span x-show="c.review_flag" class="tpdl-badge tpdl-badge--outline"
                         style="color: #7f1d1d; border-color: #fecaca;">Review</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                        :title="'scored ' + (c.run_date ? c.run_date.slice(0,10) : 'unknown')"
+                        :style="isFresh(c)
+                          ? 'background: var(--tpdl-accent-soft); color: var(--tpdl-accent-ink)'
+                          : 'background:#f3f3ef; color:#8a8a8a'"
+                        x-text="freshLabel(c)"></span>
                 </div>
                 <div class="text-right text-ink-3 text-lg" x-text="expandedRow === c.name ? '−' : '+'"></div>
               </div>
@@ -583,5 +597,5 @@
 
 </div>
 
-<script src="/static/js/intel.js?v=5"></script>
+<script src="/static/js/intel.js?v=6"></script>
 {% endblock %}
