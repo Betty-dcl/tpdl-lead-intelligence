@@ -61,11 +61,12 @@
       <a href="/intel" class="tpdl-nav-link {% if active_page == 'intel' %}is-active{% endif %}">Sales</a>
       <a href="/marketing" class="tpdl-nav-link {% if active_page == 'marketing' %}is-active{% endif %}">Marketing</a>
       <a href="/contacts" class="tpdl-nav-link {% if active_page == 'contacts' %}is-active{% endif %}">Contacts</a>
-      <a href="/performance" class="tpdl-nav-link {% if active_page == 'performance' %}is-active{% endif %}">Performance</a>
       <a href="/review" class="tpdl-nav-link {% if active_page == 'review' %}is-active{% endif %}">Review</a>
       <a href="/runs" class="tpdl-nav-link {% if active_page == 'runs' %}is-active{% endif %}">Runs</a>
       <a href="/credits" class="tpdl-nav-link {% if active_page == 'credits' %}is-active{% endif %}">Usage</a>
-      <a href="/data" class="tpdl-nav-link {% if active_page == 'data' %}is-active{% endif %}">Data</a>
+      {# Performance (/performance) and Data (/data) intentionally dropped from the
+         primary nav (2026-07-18) to declutter the cockpit — meta/low-frequency
+         pages. Routes remain reachable directly. #}
 
       <!-- User badge — only shown when auth gate is ON.
            In public-demo mode the header stays clean. -->
