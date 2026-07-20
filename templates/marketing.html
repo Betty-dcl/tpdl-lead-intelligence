@@ -100,11 +100,7 @@
       </button>
       <button @click="section = 'pipeline'"
               :class="section === 'pipeline' ? 'side-link is-active' : 'side-link'">
-        ⚡ Auto Pipeline
-      </button>
-      <button @click="section = 'carousel'"
-              :class="section === 'carousel' ? 'side-link is-active' : 'side-link'">
-        ✦ Carousel Studio
+        ✦ Content Studio
       </button>
       <hr class="my-2 border-line">
       <button @click="section = 'newsletter'"
@@ -351,11 +347,12 @@
       </div>
     </section>
 
-    <!-- ============= AUTO PIPELINE ============= -->
+    <!-- ============= CONTENT STUDIO ============= -->
     <section x-show="!loading && section === 'pipeline'">
-      <h2 class="text-xl font-semibold mb-1">⚡ Auto Pipeline</h2>
+      <h2 class="text-xl font-semibold mb-1">✦ Content Studio</h2>
       <p class="text-sm text-ink-3 mb-6">
-        Iris finds the subject → Marc writes the content → Oliver produces the formats → you approve. No briefing needed.
+        One place to produce content. Type a subject, or leave it empty and Iris picks one from live trends →
+        Marc writes → Oliver shapes each format → you approve. Nothing publishes without your sign-off.
       </p>
 
       <!-- Pipeline diagram -->
@@ -512,162 +509,6 @@
           </template>
         </div>
       </div>
-
-    </section>
-
-    <!-- ============= CAROUSEL STUDIO ============= -->
-    <section x-show="!loading && section === 'carousel'">
-      <div class="flex items-start justify-between mb-1">
-        <h2 class="text-xl font-semibold">Carousel Studio</h2>
-        <img alt="" src="/static/img/avatars/marc-tpdl-content.svg"
-             class="w-10 h-10 rounded-full bg-bg-2">
-      </div>
-      <p class="text-sm text-ink-3 mb-6">
-        Brief Marc — he writes the content and Oliver shapes each format. Choose one or more formats, produced at the right depth.
-      </p>
-
-      <!-- Brief form -->
-      <div class="tpdl-card p-6 mb-6">
-        <div class="mb-4">
-          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-2">Subject / Topic</label>
-          <input x-model="carousel.subject" type="text"
-                 aria-label="Carousel subject"
-                 placeholder="e.g. AI in medical education for pharma sales reps"
-                 class="w-full border border-line rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[color:var(--tpdl-accent-ink)] bg-white">
-        </div>
-
-        <div class="mb-4">
-          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-2">Context <span class="font-normal normal-case">(optional — sector, audience, angle)</span></label>
-          <textarea x-model="carousel.context" rows="2"
-                    aria-label="Carousel context"
-                    placeholder="e.g. Focus on European pharma, medical education directors, data showing AI adoption gap"
-                    class="w-full border border-line rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[color:var(--tpdl-accent-ink)] bg-white resize-none"></textarea>
-        </div>
-
-        <div class="mb-5">
-          <label class="block text-xs font-semibold uppercase tracking-wider text-ink-3 mb-3">Format(s) — select one or more</label>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <template x-for="fmt in carousel.formatOptions" :key="fmt.id">
-              <label class="relative flex flex-col gap-1.5 p-3 rounded-lg border cursor-pointer transition-all"
-                     :class="fmt.selected
-                       ? 'border-[color:var(--tpdl-accent-ink)] bg-[color:var(--tpdl-accent-soft)]'
-                       : 'border-line bg-bg-2 hover:border-ink-3'">
-                <input type="checkbox" x-model="fmt.selected" class="sr-only">
-                <span class="text-lg leading-none" x-text="fmt.icon"></span>
-                <span class="text-xs font-semibold" x-text="fmt.label"></span>
-                <span class="text-xs text-ink-3 leading-tight" x-text="fmt.hint"></span>
-              </label>
-            </template>
-          </div>
-        </div>
-
-        <!-- Web search toggle -->
-        <div class="flex items-center gap-3 mb-5">
-          <label class="flex items-center gap-2 cursor-pointer select-none">
-            <div class="relative">
-              <input type="checkbox" x-model="carousel.webSearch" class="sr-only peer">
-              <div class="w-9 h-5 rounded-full peer-checked:bg-[color:var(--tpdl-accent-ink)] bg-gray-300 transition-colors"></div>
-              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
-            </div>
-            <span class="text-sm font-medium">🔍 Web Search</span>
-            <span class="text-xs text-ink-3">Iris searches the web for real data before Marc writes</span>
-          </label>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <button @click="generateCarousel()"
-                  :disabled="carousel.generating || !carousel.subject.trim() || carousel.formatOptions.every(f => !f.selected)"
-                  class="tpdl-btn tpdl-btn--primary"
-                  :class="(carousel.generating || !carousel.subject.trim() || carousel.formatOptions.every(f => !f.selected)) ? 'opacity-50 cursor-not-allowed' : ''">
-            <span x-show="!carousel.generating">✦ Generate with Marc</span>
-            <span x-show="carousel.generating">Marc &amp; Oliver are working…</span>
-          </button>
-          <button x-show="carousel.results" @click="carousel.results = null; carousel.subject = ''; carousel.context = ''"
-                  class="tpdl-btn tpdl-btn--ghost text-xs">
-            ↺ New brief
-          </button>
-        </div>
-
-        <template x-if="carousel.error">
-          <p class="mt-3 text-xs text-red-600" x-text="carousel.error"></p>
-        </template>
-      </div>
-
-      <!-- Results -->
-      <template x-if="carousel.results">
-        <div class="space-y-4">
-          <div class="flex items-center gap-2 mb-2">
-            <span class="text-xs text-ink-3">Generated for:</span>
-            <span class="font-medium text-sm" x-text="carousel.results.subject"></span>
-          </div>
-
-          <template x-for="fmt in carousel.formatOptions.filter(f => f.selected)" :key="fmt.id">
-            <div class="tpdl-card overflow-hidden">
-              <div class="px-6 py-4 border-b border-line flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span x-text="fmt.icon"></span>
-                  <h3 class="font-semibold text-sm" x-text="fmt.label"></h3>
-                  <template x-if="carousel.results.results[fmt.id] && carousel.results.results[fmt.id].tokens">
-                    <span class="text-xs text-ink-3"
-                          x-text="`${carousel.results.results[fmt.id].tokens} tokens`"></span>
-                  </template>
-                </div>
-                <div class="flex gap-2 flex-wrap items-center">
-                  <template x-if="carousel.results.results[fmt.id]?.review">
-                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full"
-                          :style="scoreBadgeStyle(carousel.results.results[fmt.id].review.score)"
-                          :title="carousel.results.results[fmt.id].review.verdict"
-                          x-text="`⭐ ${carousel.results.results[fmt.id].review.score}/10`"></span>
-                  </template>
-                  <template x-if="carousel.results.search_enriched">
-                    <span class="tpdl-badge tpdl-badge--outline text-xs">🔍 Web-enriched</span>
-                  </template>
-                  <button @click="copyContent(fmt.id)"
-                          class="tpdl-btn tpdl-btn--outline text-xs">
-                    ⎘ Copy
-                  </button>
-                  <button @click="downloadContent(fmt.id, carousel.results.subject)"
-                          class="tpdl-btn tpdl-btn--outline text-xs">
-                    ↓ .txt
-                  </button>
-                  <button @click="exportPDF(fmt.id)"
-                          :disabled="carousel.exportingPdf[fmt.id]"
-                          class="tpdl-btn tpdl-btn--primary text-xs"
-                          :class="carousel.exportingPdf[fmt.id] ? 'opacity-50 cursor-not-allowed' : ''">
-                    <span x-show="!carousel.exportingPdf[fmt.id]">↓ PDF</span>
-                    <span x-show="carousel.exportingPdf[fmt.id]">Generating…</span>
-                  </button>
-                </div>
-              </div>
-              <div class="px-6 py-4">
-                <template x-if="carousel.results.results[fmt.id] && carousel.results.results[fmt.id].error">
-                  <p class="text-xs text-red-600" x-text="carousel.results.results[fmt.id].error"></p>
-                </template>
-
-                <!-- Reviewer verdict -->
-                <template x-if="carousel.results.results[fmt.id]?.review">
-                  <div class="mb-3 p-3 rounded-lg border border-line bg-white text-xs space-y-1.5">
-                    <p class="text-ink-2 italic" x-text="carousel.results.results[fmt.id].review.verdict"></p>
-                    <div class="flex flex-wrap gap-x-4 gap-y-1">
-                      <template x-for="s in carousel.results.results[fmt.id].review.strengths" :key="s">
-                        <span class="text-[color:var(--tpdl-accent-ink)]">✓ <span x-text="s"></span></span>
-                      </template>
-                      <template x-for="iss in carousel.results.results[fmt.id].review.issues" :key="iss">
-                        <span class="text-amber-700">⚠ <span x-text="iss"></span></span>
-                      </template>
-                    </div>
-                  </div>
-                </template>
-
-                <template x-if="carousel.results.results[fmt.id] && carousel.results.results[fmt.id].content">
-                  <pre class="text-xs leading-relaxed whitespace-pre-wrap font-sans text-ink bg-bg-2 p-4 rounded-lg overflow-auto max-h-96"
-                       x-text="carousel.results.results[fmt.id].content"></pre>
-                </template>
-              </div>
-            </div>
-          </template>
-        </div>
-      </template>
 
     </section>
 
