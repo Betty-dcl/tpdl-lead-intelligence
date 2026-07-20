@@ -21,6 +21,12 @@ from app.models import RunSnapshot
 router = APIRouter(tags=["traceability"])
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+# The 25/05 run is the ORIGINAL Neotek engine (external reference), not a run of
+# TPDL's own rebuilt engine. Traceability tracks OUR engine only — comparing our
+# July output against Neotek-May would be apples-to-oranges (different engines),
+# so the Neotek run is excluded from this page and from trajectory comparisons.
+NEOTEK_REFERENCE_RUN = "cb97cf5d50d2"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data helpers
@@ -32,6 +38,8 @@ def _runs_ordered(db: Session) -> list[dict]:
     definition), self-consistent with the number shown everywhere else."""
     by_run: dict[str, list] = {}
     for r in db.query(RunSnapshot).all():
+        if r.import_run_id == NEOTEK_REFERENCE_RUN:
+            continue                       # exclude the external Neotek reference
         by_run.setdefault(r.import_run_id, []).append(r)
     out = []
     for run_id, rows in by_run.items():

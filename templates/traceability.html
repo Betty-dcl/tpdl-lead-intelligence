@@ -8,11 +8,44 @@
   <h1 class="text-3xl md:text-4xl font-semibold font-display tracking-tight mb-2">
     Traceability
   </h1>
-  <p class="text-ink-2 mb-8 max-w-2xl">
-    Every engine run kept in history — what Hugo scored and what Maya read of it,
-    each with a one-line recap and a CSV download. Read straight from the
-    append-only run snapshots.
+  <p class="text-ink-2 mb-6 max-w-2xl">
+    Every run of <strong>TPDL's own engine</strong> — what Hugo scored and what
+    Maya read of it, each with a one-line recap and a CSV download. Read straight
+    from the append-only run snapshots. <span class="text-ink-3">(The 25/05 Neotek
+    reference — a different, external engine — is deliberately excluded.)</span>
   </p>
+
+  <!-- legend: what each Maya-CSV column means -->
+  <details class="mb-8 rounded-lg border border-line bg-white text-sm">
+    <summary class="cursor-pointer px-4 py-2.5 font-medium select-none">
+      What the download columns mean
+    </summary>
+    <div class="px-4 pb-4 pt-1 text-ink-2 space-y-3">
+      <div>
+        <p class="font-semibold text-ink">Hugo — scores CSV</p>
+        <ul class="list-disc ml-5 space-y-0.5">
+          <li><strong>Company</strong> — the company name.</li>
+          <li><strong>Assessed Score</strong> — its 0-10 commercial score for this run
+              (signal_strength + recency + corroboration).</li>
+          <li><strong>Coverage</strong> — how many of the 6 signal types had evidence
+              (e.g. "3 of 6"). A high score with low coverage = one strong signal.</li>
+          <li><strong>Outreach Eligible</strong> — YES if score ≥ 8 (worth contacting).</li>
+          <li><strong>Signals Found</strong> — number of evidenced signals.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold text-ink">Maya — trajectory CSV</p>
+        <ul class="list-disc ml-5 space-y-0.5">
+          <li><strong>Company</strong> — the company name.</li>
+          <li><strong>Current Score</strong> — its score in this run.</li>
+          <li><strong>Trajectory</strong> — previous run → this run (e.g. "6.5→8.0"),
+              or "X (new)" on first appearance.</li>
+          <li><strong>Movement</strong> — RISING / FADING / stable / NEW.</li>
+          <li><strong>Delta</strong> — the signed change (+1.5 = gained 1.5 points).</li>
+        </ul>
+      </div>
+    </div>
+  </details>
 
   <template x-if="loading">
     <p class="text-ink-3">Loading runs…</p>
