@@ -7,7 +7,9 @@ Maya takes Hugo's scored universe (the `companies` table) and the evidenced
 
 Slash commands (read the scored DB — no API key needed for the data; Claude
 interprets):
-  - /top [N?]      → ranked shortlist (default 50) of in-scope companies.
+  - /shortlist     → the ACTIONABLE list handed to Inès: score-banded, not a
+                     fixed count (ACT NOW ≥8 · MONITOR bench 5-7), soft-capped.
+  - /top [N?]      → secondary SCAN view: the N best in-scope companies regardless.
   - /trends        → dominant signal types + TPDL service areas, latest run vs stock.
   - /recurring     → risers/faders/new across runs (needs ≥2 runs in history).
   - /generate [company] → analyst brief positioning one company in the universe
@@ -107,7 +109,63 @@ class MayaAgent(BaseAgent):
                 "metadata": {"company": c.name, "rank": rank, "score": c.assessed_score},
             }
 
-        # ── /top [N?] ────────────────────────────────────────────────────
+        # ── /shortlist — the ACTIONABLE list handed to Inès (threshold-banded) ─
+        # Quality over a fixed count: a "top 50" pads the list with score-2
+        # noise on a small run. The bar is score ≥ 8 (= outreach-eligible, the
+        # constitution's threshold). 5-7 is a "monitor bench", <5 is parked.
+        if low == "/shortlist" or low.startswith("/shortlist"):
+            SOFT_CAP = 40    # only bites when the eligible band is unusually large
+            with SessionLocal() as db:
+                rows = (db.query(Company)
+                        .filter(Company.icp_flag.is_(False))
+                        .order_by(Company.assessed_score.desc()).all())
+                latest = db.query(func.max(Company.run_date)).scalar()
+            if not rows:
+                return {
+                    "augmented_message": "The user ran `/shortlist` but the scored universe is empty. Say so and suggest Hugo runs the pipeline.",
+                    "action": "built_shortlist", "task_title": "Shortlist (empty)",
+                }
+            latest_day = latest.date() if latest else None
+
+            def _sig(c):   # tiebreakers: coverage depth, then freshness
+                cov = int((c.coverage or "0")[0]) if (c.coverage or "")[:1].isdigit() else 0
+                fresh = 1 if (c.run_date and c.run_date.date() == latest_day) else 0
+                return (c.assessed_score, cov, fresh)
+
+            def _line(c):
+                fresh = ("fresh" if c.run_date and c.run_date.date() == latest_day
+                         else f"STALE {c.run_date.date()}" if c.run_date else "no date")
+                return (f"  - {c.name} — {c.assessed_score} · {c.coverage} · "
+                        f"{c.sector_bucket or '—'} · {fresh}")
+
+            act = sorted([c for c in rows if c.assessed_score >= 8], key=_sig, reverse=True)
+            monitor = sorted([c for c in rows if 5 <= c.assessed_score < 8], key=_sig, reverse=True)
+            capped = len(act) > SOFT_CAP
+            act_shown = act[:SOFT_CAP]
+            act_str = "\n".join(_line(c) for c in act_shown) or "  (none clear ≥8 this run)"
+            mon_str = "\n".join(_line(c) for c in monitor[:20]) or "  (none)"
+            augmented = (
+                f"The user ran `/shortlist`. This is the ACTIONABLE list — quality-"
+                f"gated by score, NOT a fixed count.\n\n"
+                f"ACT NOW — outreach-eligible (score ≥ 8): {len(act)} companies"
+                f"{f' (showing top {SOFT_CAP} by score→coverage→freshness)' if capped else ''}\n"
+                f"{act_str}\n\n"
+                f"MONITOR BENCH (5-7, not yet eligible — next-run candidates): "
+                f"{len(monitor)}\n{mon_str}\n\n"
+                f"As Maya: hand the ACT NOW band to Inès for contacts, weighing a STALE "
+                f"high score as 'verify before acting'. Name the 3-5 strongest. Explain "
+                f"the monitor bench is where next month's risers come from — don't push "
+                f"them to outreach yet. If ACT NOW is empty, say so plainly: this run "
+                f"produced nothing above the bar, which is an honest outcome, not a gap to fill."
+            )
+            return {
+                "augmented_message": augmented,
+                "action": "built_shortlist",
+                "task_title": f"Shortlist — {len(act)} eligible",
+                "metadata": {"eligible": len(act), "monitor": len(monitor), "capped": capped},
+            }
+
+        # ── /top [N?] — a "give me the N best regardless" SCAN view (secondary) ─
         if low == "/top" or low.startswith("/top"):
             # Accept both "/top 5" and the glued "/top5" (the latter used to
             # silently fall through to the default 50).

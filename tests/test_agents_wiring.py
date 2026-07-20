@@ -339,3 +339,21 @@ def test_traceability_runs_api_and_downloads(client):
     assert m.status_code == 200 and "Trajectory" in m.text.splitlines()[0]
     # page renders
     assert client.get("/runs").status_code == 200
+
+
+def test_maya_shortlist_is_threshold_banded_not_fixed_count(client):
+    """The actionable shortlist is score-gated (≥8 = ACT NOW, 5-7 = MONITOR),
+    never padded to a fixed 50 with weak scores."""
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        maya = AGENT_CLASSES["maya"].load(db, "maya")
+        meta = maya._dispatch_command("/shortlist")
+    m = meta["metadata"]
+    assert meta["action"] == "built_shortlist"
+    assert "ACT NOW" in meta["augmented_message"] and "MONITOR BENCH" in meta["augmented_message"]
+    # eligible band is capped at the soft cap; monitor is separate
+    assert m["eligible"] <= 40 or m["capped"]
+    assert isinstance(m["monitor"], int)
+    # honesty: never claims a fixed count
+    assert "top 50" not in meta["augmented_message"].lower()
