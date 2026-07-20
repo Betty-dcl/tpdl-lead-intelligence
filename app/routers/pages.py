@@ -92,6 +92,27 @@ def data_view(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/intel/company", response_class=HTMLResponse)
+def company_detail(request: Request) -> HTMLResponse:
+    """Full per-company detail view. The company name arrives as ?c=<name>
+    (query param, so names with punctuation need no path escaping)."""
+    return templates.TemplateResponse(
+        request,
+        "company_detail.html",
+        {"active_page": "intel"},
+    )
+
+
+@router.get("/candidates", response_class=HTMLResponse)
+def candidates_page(request: Request) -> HTMLResponse:
+    """Discovered-but-not-yet-scored companies (the 'new pipeline')."""
+    return templates.TemplateResponse(
+        request,
+        "candidates.html",
+        {"active_page": "candidates"},
+    )
+
+
 @router.get("/agent/{agent_id}", response_class=HTMLResponse)
 def agent_profile(
     request: Request, agent_id: str, db: Session = Depends(get_db)

@@ -90,6 +90,7 @@ function intelPage() {
     companies: [],
     signals: [],
     stats: null,
+    run: null,
     activity: [],
     workspaces: {}, // company_name → { assignment, status, comments, loading }
     briefs: {},     // company_name → { agent_id → brief | null }, plus _loading: bool, _generating: Set<agent_id>
@@ -112,15 +113,17 @@ function intelPage() {
     async init() {
       this.loading = true;
       try {
-        const [companies, signals, stats, activity] = await Promise.all([
+        const [companies, signals, stats, run, activity] = await Promise.all([
           fetch("/api/intel/companies?limit=2000").then(r => r.json()),
           fetch("/api/intel/signals?limit=30").then(r => r.json()),
           fetch("/api/intel/stats").then(r => r.json()),
+          fetch("/api/intel/run").then(r => r.json()).catch(() => null),
           fetch("/api/team/activity?limit=15").then(r => r.json()).catch(() => []),
         ]);
         this.companies = companies;
         this.signals = signals;
         this.stats = stats;
+        this.run = run;
         this.activity = activity;
         this.$nextTick(() => this.renderCharts());
       } catch (e) {
@@ -194,6 +197,26 @@ function intelPage() {
       if (score === 0) return { bg: "#f3f3ef", color: "#8a8a8a" };
       return { bg: "#fee2e2", color: "#7f1d1d" };
     },
+
+    /* ---- Movement vs the Neotek May reference run ---- */
+    deltaLabel(d) {
+      if (d == null) return "new";
+      if (d === 0) return "±0";
+      return (d > 0 ? "▲ +" : "▼ ") + Number(d).toFixed(1);
+    },
+    deltaChipStyle(d) {
+      if (d == null) return "background:#e0e7ff;color:#3730a3";        // never in Neotek
+      if (d === 0)  return "background:#f3f3ef;color:#5c5c5c";
+      return d > 0 ? "background:#dcf7e7;color:#0a3a26" : "background:#fee2e2;color:#7f1d1d";
+    },
+    // Left accent that marks a company already seen in the Neotek run.
+    reappearedBorder(c) {
+      if (!c.reappeared) return "3px solid transparent";
+      if (c.delta > 0) return "3px solid #34D591";
+      if (c.delta < 0) return "3px solid #ef4444";
+      return "3px solid #94a3b8";
+    },
+    companyUrl(c) { return `/intel/company?c=${encodeURIComponent(c.name)}`; },
 
     parseTechStack,
 

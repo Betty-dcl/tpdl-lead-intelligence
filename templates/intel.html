@@ -46,11 +46,12 @@
   /* Grid row — adjusted column widths for the real CSV (longer locations etc) */
   .grid-row {
     display: grid;
-    grid-template-columns: minmax(200px, 1.6fr) 130px 160px 90px 70px 80px 110px 160px 30px;
+    grid-template-columns: minmax(190px, 1.5fr) 118px 150px 78px 64px 96px 104px 92px 150px 28px;
     gap: 0.5rem;
     align-items: center;
-    padding: 0.85rem 1rem;
+    padding: 0.85rem 1rem 0.85rem 0.75rem;
     border-bottom: 1px solid var(--tpdl-border);
+    border-left: 3px solid transparent;
     font-size: 0.875rem;
     cursor: pointer;
     transition: background 0.1s ease;
@@ -61,9 +62,9 @@
 
   .grid-head {
     display: grid;
-    grid-template-columns: minmax(200px, 1.6fr) 130px 160px 90px 70px 80px 110px 160px 30px;
+    grid-template-columns: minmax(190px, 1.5fr) 118px 150px 78px 64px 96px 104px 92px 150px 28px;
     gap: 0.5rem;
-    padding: 0.6rem 1rem;
+    padding: 0.6rem 1rem 0.6rem 0.75rem;
     background: var(--tpdl-bg-2);
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
     color: var(--tpdl-text-muted); font-weight: 500;
@@ -101,6 +102,84 @@
       earlier-run scores. Use “Fresh only” to see just the current run.
     </p>
 
+    <!-- ================================================================ -->
+    <!-- LATEST RUN COCKPIT                                               -->
+    <!-- ================================================================ -->
+    <div class="tpdl-card--dark rounded-xl p-6 mt-8" x-show="run && run.has_run" x-cloak
+         style="background:var(--tpdl-dark);color:var(--tpdl-text-on-dark)">
+      <div class="flex items-start justify-between gap-6 flex-wrap">
+        <div>
+          <div class="text-[11px] uppercase tracking-[0.2em] mb-1" style="color:var(--tpdl-accent)">Latest run</div>
+          <h2 class="text-2xl font-semibold">
+            <span x-text="formatDate(run?.run_date)"></span>
+            <span class="text-base font-normal opacity-70">· CH + ES “Lunch” set</span>
+          </h2>
+          <p class="text-sm opacity-80 mt-1">
+            <span x-text="run?.companies"></span> companies re-scored by TPDL’s rebuilt engine ·
+            top scorer <strong x-text="run?.top?.name"></strong>
+            at <span class="font-mono" x-text="run?.top?.score?.toFixed(1)"></span>
+          </p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <a href="/api/intel/export.csv?scope=run"
+             class="tpdl-btn text-xs" style="background:var(--tpdl-accent);color:#0a3a26;border:none">⬇ Run CSV (Excel)</a>
+          <a href="/runs" class="tpdl-btn text-xs" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.35)">All runs →</a>
+        </div>
+      </div>
+
+      <!-- Band counts -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+        <div class="rounded-lg p-3" style="background:rgba(52,213,145,0.15)">
+          <div class="text-2xl font-semibold" style="color:var(--tpdl-accent)" x-text="run?.bands.act_now"></div>
+          <div class="text-[11px] uppercase tracking-wider opacity-80">Act now · ≥8</div>
+        </div>
+        <div class="rounded-lg p-3" style="background:rgba(255,255,255,0.08)">
+          <div class="text-2xl font-semibold" x-text="run?.bands.monitor"></div>
+          <div class="text-[11px] uppercase tracking-wider opacity-80">Monitor · 5–7</div>
+        </div>
+        <div class="rounded-lg p-3" style="background:rgba(255,255,255,0.08)">
+          <div class="text-2xl font-semibold" x-text="run?.bands.weak"></div>
+          <div class="text-[11px] uppercase tracking-wider opacity-80">Weak · 1–4</div>
+        </div>
+        <div class="rounded-lg p-3" style="background:rgba(255,255,255,0.08)">
+          <div class="text-2xl font-semibold" x-text="run?.review_flagged"></div>
+          <div class="text-[11px] uppercase tracking-wider opacity-80">Review-flagged</div>
+        </div>
+      </div>
+
+      <!-- Movement vs Neotek -->
+      <div class="mt-4 pt-4 border-t text-sm flex flex-wrap items-center gap-x-5 gap-y-1"
+           style="border-color:rgba(255,255,255,0.15)">
+        <span class="text-[11px] uppercase tracking-wider opacity-70">Since the Neotek May run</span>
+        <span>🟢 <strong x-text="run?.neotek.risers"></strong> rising</span>
+        <span>🔴 <strong x-text="run?.neotek.faders"></strong> fading</span>
+        <span>⚪ <strong x-text="run?.neotek.stable"></strong> stable</span>
+        <span class="opacity-80" x-show="run?.neotek.top_riser">
+          Top riser <strong x-text="run?.neotek.top_riser?.name"></strong>
+          (<span x-text="'+' + run?.neotek.top_riser?.delta.toFixed(1)"></span>)
+        </span>
+        <span class="opacity-70 text-xs w-full mt-1">
+          ⚠ May = original Neotek engine, July = TPDL’s rebuilt engine — a delta mixes a real change in signal with the engine change. Rows already seen in May carry a coloured left edge.
+        </span>
+      </div>
+
+      <!-- Why everything looks 'Neotek' + where new companies live -->
+      <div class="mt-4 rounded-lg px-4 py-3 text-sm flex flex-wrap items-center gap-x-4 gap-y-1"
+           style="background:rgba(255,255,255,0.08)"
+           x-show="run && (run.discovered_candidates || run.net_new_scored === 0)">
+        <span>
+          This run re-scored existing companies —
+          <strong x-text="run?.net_new_scored"></strong> are new to Neotek,
+          which is why every row shows a delta.
+        </span>
+        <a href="/candidates" class="tpdl-btn text-xs"
+           style="background:var(--tpdl-accent);color:#0a3a26;border:none"
+           x-show="run?.discovered_candidates">
+          See <span x-text="run?.discovered_candidates"></span> new candidates (found, not scored) →
+        </a>
+      </div>
+    </div>
+
     <!-- Sales pipeline — 4 stages -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
       <a href="/agent/hugo" class="tpdl-card p-4 hover:border-ink transition-colors">
@@ -111,7 +190,7 @@
       <a href="/agent/maya" class="tpdl-card p-4 hover:border-ink transition-colors">
         <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 2</div>
         <div class="font-semibold text-sm">Maya</div>
-        <div class="text-xs text-ink-3">Top 50 &amp; trends</div>
+        <div class="text-xs text-ink-3">Shortlist &amp; trends</div>
       </a>
       <a href="/agent/ines" class="tpdl-card p-4 hover:border-ink transition-colors">
         <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 3</div>
@@ -261,10 +340,19 @@
       </span>
     </div>
 
+    <!-- Legend — how to read the table -->
+    <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mb-3 text-xs text-ink-3">
+      <span class="flex items-center gap-1.5"><span style="display:inline-block;width:3px;height:14px;background:#34D591;border-radius:2px"></span> reappeared, score up vs Neotek</span>
+      <span class="flex items-center gap-1.5"><span style="display:inline-block;width:3px;height:14px;background:#ef4444;border-radius:2px"></span> reappeared, score down</span>
+      <span class="flex items-center gap-1.5"><span style="display:inline-block;width:3px;height:14px;background:#94a3b8;border-radius:2px"></span> reappeared, no change</span>
+      <span class="flex items-center gap-1.5"><span class="score-pill" style="min-width:auto;padding:2px 6px;font-size:10px;background:#dcf7e7;color:#0a3a26">▲ +1.5</span> Δ vs Neotek May</span>
+      <span class="ml-auto">Click a company name to open its full detail page →</span>
+    </div>
+
     <!-- Grid-based "table" -->
     <div class="tpdl-card overflow-hidden">
       <div class="overflow-x-auto">
-        <div class="grid-head" style="min-width: 1150px;">
+        <div class="grid-head" style="min-width: 1200px;">
           <div class="sortable" @click="setSort('name')">Company
             <span class="sort-arrow" x-show="sortKey==='name'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
@@ -274,13 +362,16 @@
           <div class="sortable" @click="setSort('assessed_score')">Score
             <span class="sort-arrow" x-show="sortKey==='assessed_score'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
+          <div class="sortable" @click="setSort('delta')" title="Change vs the Neotek May run">Δ Neotek
+            <span class="sort-arrow" x-show="sortKey==='delta'" x-text="sortDesc ? '▼' : '▲'"></span>
+          </div>
           <div>Coverage</div>
           <div>Signals</div>
           <div>Flags</div>
           <div></div>
         </div>
 
-        <div style="min-width: 1150px;">
+        <div style="min-width: 1200px;">
           <template x-if="filteredCompanies.length === 0">
             <div class="text-center text-ink-3 py-12">No company matches the current filters.</div>
           </template>
@@ -290,10 +381,13 @@
               <!-- Main row -->
               <div class="grid-row"
                    :class="expandedRow === c.name ? 'is-expanded' : ''"
+                   :style="`border-left: ${reappearedBorder(c)}`"
                    @click="expandedRow = expandedRow === c.name ? null : c.name; if (expandedRow === c.name) loadWorkspace(c.name)">
-                <div>
-                  <div class="font-semibold text-ink" x-text="c.name"></div>
-                  <div class="text-xs text-ink-3 mt-0.5" x-text="c.website || ''"></div>
+                <div class="min-w-0">
+                  <a :href="companyUrl(c)" @click.stop
+                     class="font-semibold text-ink hover:text-[color:var(--tpdl-accent-ink)] hover:underline truncate block"
+                     :title="'Open ' + c.name + ' detail'" x-text="c.name"></a>
+                  <div class="text-xs text-ink-3 mt-0.5 truncate" x-text="c.website || ''"></div>
                 </div>
                 <div><span class="tpdl-badge tpdl-badge--outline" x-text="c.sector_bucket"></span></div>
                 <div class="text-ink-2 text-xs truncate" :title="c.location" x-text="c.location || '—'"></div>
@@ -302,6 +396,12 @@
                   <span class="score-pill"
                         :style="`background: ${scoreClass(c.assessed_score).bg}; color: ${scoreClass(c.assessed_score).color}`"
                         x-text="c.assessed_score.toFixed(1)"></span>
+                </div>
+                <div>
+                  <span class="score-pill" style="min-width:auto;padding:3px 7px;font-size:11px"
+                        :style="deltaChipStyle(c.delta)"
+                        :title="c.reappeared ? ('Neotek May: ' + c.neotek_score.toFixed(1)) : 'Not in the Neotek run'"
+                        x-text="deltaLabel(c.delta)"></span>
                 </div>
                 <div class="text-ink-2 text-xs" x-text="(c.coverage || '').split(' ').slice(0,3).join(' ')"></div>
                 <div>
@@ -330,6 +430,12 @@
 
               <!-- Expanded detail panel -->
               <div class="detail-panel" x-show="expandedRow === c.name" x-cloak>
+
+                <!-- Open full detail page -->
+                <div class="flex justify-end mb-3">
+                  <a :href="companyUrl(c)"
+                     class="tpdl-btn tpdl-btn--dark text-xs">↗ Open full detail page</a>
+                </div>
 
                 <!-- =============== Workspace (claim + status + comments) =============== -->
                 <div class="bg-white border border-line rounded-lg p-4 mb-6">
@@ -597,5 +703,5 @@
 
 </div>
 
-<script src="/static/js/intel.js?v=6"></script>
+<script src="/static/js/intel.js?v=7"></script>
 {% endblock %}

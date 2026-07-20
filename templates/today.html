@@ -54,12 +54,12 @@
         <!-- Latest veille -->
         <div class="tpdl-card overflow-hidden">
           <div class="px-6 py-4 border-b border-line flex items-center justify-between">
-            <h3 class="font-semibold text-sm">📡 Latest veille — Iris</h3>
+            <h3 class="font-semibold text-sm">📡 Latest market scan — Iris</h3>
             <a href="/marketing" class="text-xs text-ink-3 hover:underline">Auto Pipeline →</a>
           </div>
           <template x-if="!data.latest_veille">
             <div class="px-6 py-8 text-center text-sm text-ink-3">
-              No veille run yet — it runs every Monday 08:00, or trigger it from the Auto Pipeline.
+              No market scan yet — it runs monthly, or trigger it from the Auto Pipeline.
             </div>
           </template>
           <template x-if="data.latest_veille">

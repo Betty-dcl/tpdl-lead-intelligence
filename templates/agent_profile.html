@@ -3,9 +3,9 @@
 
 {% block head %}
 <style>
-  .chat-bubble-user { background: #1E3A8A; color: white; }
-  .chat-bubble-assistant { background: #f3f4f6; color: #111827; }
-  .conv-item.active { background: #eff6ff; border-color: #93c5fd; }
+  .chat-bubble-user { background: var(--tpdl-dark-ink); color: white; }
+  .chat-bubble-assistant { background: var(--tpdl-bg-2); color: var(--tpdl-text); }
+  .conv-item.active { background: var(--tpdl-accent-soft); border-color: #c8efd9; }
 </style>
 {% endblock %}
 
@@ -14,20 +14,20 @@
 <div x-data="agentProfile('{{ agent_id }}')" x-init="init()">
 
   <!-- Header -->
-  <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-6 flex items-center gap-5"
+  <div class="bg-white rounded-2xl border border-line p-6 mb-6 flex items-center gap-5"
        style="background-color: {{ agent_color }}10">
     <img src="/static/img/avatars/{{ agent_avatar_seed }}.svg"
          class="w-20 h-20 rounded-full bg-white" alt="{{ agent_name }}">
     <div class="flex-1">
-      <h1 class="text-2xl font-bold text-slate-900">{{ agent_name }}</h1>
+      <h1 class="text-2xl font-bold text-ink">{{ agent_name }}</h1>
       <p class="text-sm" style="color: {{ agent_color }}">{{ agent_role }}</p>
-      <p class="text-xs text-slate-500 mt-1">
+      <p class="text-xs text-ink-3 mt-1">
         <span x-text="conversations.length"></span> conversations ·
         <span x-text="activity.length"></span> recent activities
       </p>
     </div>
-    <a href="/" class="text-sm text-slate-500 hover:text-slate-900 px-3 py-2 rounded hover:bg-white">
-      ← Back to Open Space
+    <a href="/" class="text-sm text-ink-3 hover:text-ink px-3 py-2 rounded hover:bg-white">
+      ← Back to Home
     </a>
   </div>
 
@@ -40,21 +40,21 @@
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
     <!-- Conversations list (left) -->
-    <div class="lg:col-span-1 bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      <div class="px-5 py-4 border-b border-slate-200 bg-slate-50">
-        <h2 class="font-semibold text-slate-900 text-sm">Conversations</h2>
+    <div class="lg:col-span-1 bg-white rounded-2xl border border-line overflow-hidden">
+      <div class="px-5 py-4 border-b border-line bg-bg-2">
+        <h2 class="font-semibold text-ink text-sm">Conversations</h2>
       </div>
       <div class="max-h-[600px] overflow-y-auto">
         <template x-if="conversations.length === 0">
-          <div class="text-sm text-slate-500 p-6 text-center">No conversations yet.</div>
+          <div class="text-sm text-ink-3 p-6 text-center">No conversations yet.</div>
         </template>
         <template x-for="conv in conversations" :key="conv.id">
           <button
             @click="selectConversation(conv.id)"
             :class="conv.id === selectedConvId ? 'conv-item active' : ''"
-            class="conv-item w-full text-left px-5 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors">
-            <div class="text-sm font-medium text-slate-900 truncate" x-text="conv.title"></div>
-            <div class="text-xs text-slate-500 mt-1">
+            class="conv-item w-full text-left px-5 py-3 border-b border-line hover:bg-bg-2 transition-colors">
+            <div class="text-sm font-medium text-ink truncate" x-text="conv.title"></div>
+            <div class="text-xs text-ink-3 mt-1">
               <span x-text="conv.message_count"></span> msg ·
               <span x-text="relativeTime(conv.updated_at)"></span>
             </div>
@@ -64,9 +64,9 @@
     </div>
 
     <!-- Messages (right) -->
-    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col">
-      <div class="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-        <h2 class="font-semibold text-slate-900 text-sm">
+    <div class="lg:col-span-2 bg-white rounded-2xl border border-line overflow-hidden flex flex-col">
+      <div class="px-5 py-4 border-b border-line bg-bg-2 flex items-center justify-between">
+        <h2 class="font-semibold text-ink text-sm">
           <template x-if="selectedConvId">
             <span>Conversation #<span x-text="selectedConvId"></span></span>
           </template>
@@ -78,11 +78,11 @@
 
       <div class="flex-1 overflow-y-auto p-5 space-y-3 max-h-[600px]">
         <template x-if="loadingMessages">
-          <div class="text-sm text-slate-500 text-center py-12">Loading...</div>
+          <div class="text-sm text-ink-3 text-center py-12">Loading...</div>
         </template>
 
         <template x-if="!loadingMessages && selectedConvId && messages.length === 0">
-          <div class="text-sm text-slate-500 text-center py-12">No messages.</div>
+          <div class="text-sm text-ink-3 text-center py-12">No messages.</div>
         </template>
 
         <template x-for="msg in messages" :key="msg.id">
@@ -91,7 +91,7 @@
               <div :class="msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'"
                    class="px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap"
                    x-text="msg.content"></div>
-              <div class="text-xs text-slate-400 mt-1 px-2"
+              <div class="text-xs text-ink-3 mt-1 px-2"
                    :class="msg.role === 'user' ? 'text-right' : 'text-left'"
                    x-text="formatAbsolute(msg.created_at)"></div>
             </div>
@@ -102,13 +102,13 @@
   </div>
 
   <!-- Activity feed -->
-  <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-    <div class="px-5 py-4 border-b border-slate-200 bg-slate-50">
-      <h2 class="font-semibold text-slate-900 text-sm">Activity feed</h2>
+  <div class="bg-white rounded-2xl border border-line overflow-hidden">
+    <div class="px-5 py-4 border-b border-line bg-bg-2">
+      <h2 class="font-semibold text-ink text-sm">Activity feed</h2>
     </div>
-    <div class="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
+    <div class="divide-y divide-line max-h-[400px] overflow-y-auto">
       <template x-if="activity.length === 0">
-        <div class="text-sm text-slate-500 p-6 text-center">No activity yet.</div>
+        <div class="text-sm text-ink-3 p-6 text-center">No activity yet.</div>
       </template>
       <template x-for="entry in activity" :key="entry.id">
         <div class="px-5 py-3 flex items-start gap-3">
@@ -121,8 +121,8 @@
             <template x-if="entry.action === 'responded_to_user'"><span>💬</span></template>
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm text-slate-900" x-text="entry.label"></div>
-            <div class="text-xs text-slate-500 mt-0.5">
+            <div class="text-sm text-ink" x-text="entry.label"></div>
+            <div class="text-xs text-ink-3 mt-0.5">
               <span x-text="relativeTime(entry.created_at)"></span>
               <template x-if="entry.metadata && entry.metadata.companies">
                 <span> · <span x-text="entry.metadata.companies.join(', ')"></span></span>
@@ -138,7 +138,7 @@
               </template>
             </div>
           </div>
-          <div class="text-xs text-slate-400" x-text="formatAbsolute(entry.created_at)"></div>
+          <div class="text-xs text-ink-3" x-text="formatAbsolute(entry.created_at)"></div>
         </div>
       </template>
     </div>

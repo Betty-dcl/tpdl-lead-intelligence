@@ -14,8 +14,8 @@ from app.models import Company
 
 EXPECTED_ROSTER = {a.value for a in AgentID}  # manager + 7 specialists
 
-PAGES = ["/", "/intel", "/marketing", "/contacts", "/today",
-         "/performance", "/data", "/login"]
+PAGES = ["/", "/intel", "/intel/company?c=Roche", "/marketing", "/contacts",
+         "/today", "/runs", "/performance", "/data", "/login"]
 
 
 @pytest.fixture(scope="module")
@@ -115,12 +115,47 @@ def test_intel_stats_shape(client):
 def test_intel_company_detail(client, a_company):
     r = client.get(f"/api/intel/companies/{a_company}")
     assert r.status_code == 200
-    assert r.json()["name"] == a_company
+    body = r.json()
+    assert body["name"] == a_company
+    # Neotek-movement fields are always present (may be null if never in Neotek)
+    assert {"neotek_score", "delta", "reappeared"} <= set(body)
+    # Per-signal score derivation is exposed
+    for sig in body["signals"]:
+        assert {"points", "max", "note"} <= set(sig["corroboration"])
+
+
+def test_intel_run_summary(client):
+    data = client.get("/api/intel/run").json()
+    assert data["has_run"] is True
+    assert {"run_date", "companies", "eligible", "bands", "neotek"} <= set(data)
+    b = data["bands"]
+    assert b["act_now"] + b["monitor"] + b["weak"] + b["none"] == data["companies"]
+    # Movement vs Neotek: risers + faders + stable never exceeds reappeared
+    n = data["neotek"]
+    assert n["risers"] + n["faders"] + n["stable"] <= n["reappeared"]
+
+
+def test_intel_trajectory(client, a_company):
+    data = client.get(f"/api/intel/companies/{a_company}/trajectory").json()
+    assert data["company"] == a_company
+    # At least the current run point exists; last point is the current one
+    assert len(data["points"]) >= 1
+    assert data["points"][-1]["current"] is True
+
+
+def test_intel_export_csv(client):
+    r = client.get("/api/intel/export.csv?scope=run")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    header = r.text.splitlines()[0]
+    assert "Delta vs Neotek" in header and "Assessed Score" in header
 
 
 def test_contacts_radars(client):
     data = client.get("/api/contacts/radars").json()
-    assert {"switzerland", "spain", "counts"} <= set(data)
+    assert {"switzerland", "spain", "counts", "latest_run"} <= set(data)
+    for entry in data["switzerland"] + data["spain"]:
+        assert {"delta", "reappeared", "fresh", "run_date"} <= set(entry)
 
 
 def test_newsletter_editions_seeded(client):

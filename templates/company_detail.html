@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block title %}Company detail — TPDL{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<style>
+  .kv { display:grid; grid-template-columns: 130px 1fr; gap:.35rem 1rem; font-size:.8rem; }
+  .kv dt { color: var(--tpdl-text-muted); }
+  .kv dd { color: var(--tpdl-text); font-weight:500; }
+  .score-hero {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:92px; height:92px; border-radius:18px;
+    font-size:2.2rem; font-weight:700; font-variant-numeric:tabular-nums;
+  }
+  .formula-term {
+    border:1px solid var(--tpdl-border); border-radius:10px; padding:.75rem .9rem; background:#fff;
+  }
+  .delta-chip {
+    display:inline-flex; align-items:center; gap:.25rem;
+    padding:.15rem .5rem; border-radius:9999px; font-size:.72rem; font-weight:600;
+    font-variant-numeric:tabular-nums;
+  }
+  .signal-card { border:1px solid var(--tpdl-border); border-radius:14px; background:#fff; }
+  .signal-card__head { border-bottom:1px solid var(--tpdl-border); }
+  .news-link {
+    display:flex; gap:.5rem; align-items:flex-start; padding:.5rem .65rem;
+    border:1px solid var(--tpdl-border); border-radius:10px; background:var(--tpdl-bg);
+    font-size:.78rem; transition:border-color .12s ease, background .12s ease;
+  }
+  .news-link:hover { border-color: var(--tpdl-dark-ink); background:#fff; }
+  [x-cloak]{ display:none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="companyDetail()" x-init="init()">
+
+  <!-- Back + breadcrumb -->
+  <div class="mb-6 flex items-center gap-2 text-sm">
+    <a href="/intel" class="text-ink-3 hover:text-ink">← Sales pipeline</a>
+    <span class="text-ink-3">/</span>
+    <span class="text-ink font-medium" x-text="name"></span>
+  </div>
+
+  <template x-if="loading">
+    <div class="py-20 text-center text-ink-3">Loading company detail…</div>
+  </template>
+
+  <template x-if="error">
+    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm" x-text="error"></div>
+  </template>
+
+  <div x-show="c" x-cloak>
+
+    <!-- ============ HEADER ============ -->
+    <section class="mb-8">
+      <div class="flex items-start justify-between gap-6 flex-wrap">
+        <div class="min-w-0">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h1 class="text-3xl font-semibold" x-text="c?.name"></h1>
+            <span class="tpdl-badge tpdl-badge--outline" x-text="c?.sector_bucket"></span>
+            <span x-show="c?.outreach_eligible" class="tpdl-badge tpdl-badge--accent">Outreach eligible</span>
+            <span x-show="c?.review_flag" class="tpdl-badge tpdl-badge--outline"
+                  style="color:#7f1d1d;border-color:#fecaca;">⚑ Review</span>
+          </div>
+          <div class="mt-2 text-sm text-ink-2 flex flex-wrap gap-x-4 gap-y-1">
+            <span x-show="c?.website">
+              <a :href="normalizeUrl(c.website)" target="_blank" rel="noopener"
+                 class="text-[color:var(--tpdl-info)] hover:underline" x-text="c?.website"></a>
+            </span>
+            <span x-text="c?.location || '—'"></span>
+            <span x-show="c?.revenue" x-text="c?.revenue"></span>
+            <span class="font-mono text-xs"
+                  :style="isFresh ? 'color:var(--tpdl-accent-ink)' : 'color:#8a8a8a'"
+                  x-text="isFresh ? ('scored ' + runDay + ' · latest run') : ('scored ' + runDay + ' · earlier run')"></span>
+          </div>
+        </div>
+
+        <!-- Reappeared / delta banner -->
+        <template x-if="c?.reappeared">
+          <div class="rounded-xl border px-4 py-3 text-sm"
+               :style="bannerStyle()">
+            <div class="text-[11px] uppercase tracking-wider font-semibold mb-0.5">Seen before</div>
+            <div>
+              Already in the <strong>Neotek May run</strong> at
+              <span class="font-mono" x-text="fmt(c.neotek_score)"></span>
+              → now <span class="font-mono" x-text="fmt(c.assessed_score)"></span>
+              <span class="delta-chip ml-1" :style="deltaChipStyle(c.delta)" x-text="deltaLabel(c.delta)"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- ============ SCORE + FORMULA ============ -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+
+      <!-- Score card -->
+      <div class="tpdl-card p-6 lg:col-span-4">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-3">Assessed score</div>
+        <div class="flex items-center gap-4">
+          <div class="score-hero" :style="`background:${scoreStyle().bg};color:${scoreStyle().color}`"
+               x-text="fmt(c?.assessed_score)"></div>
+          <div>
+            <div class="font-semibold" x-text="bandLabel(c?.assessed_score)"></div>
+            <div class="text-xs text-ink-3 mt-0.5" x-text="c?.coverage"></div>
+            <div class="text-xs mt-1"
+                 :style="c?.outreach_eligible ? 'color:var(--tpdl-accent-ink)' : 'color:var(--tpdl-text-muted)'"
+                 x-text="c?.outreach_eligible ? '≥ 8 — cleared for outreach' : 'below the 8.0 outreach threshold'"></div>
+          </div>
+        </div>
+
+        <!-- Evolution curve -->
+        <div class="mt-6" x-show="traj && traj.points.length > 1">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-2">Score evolution</div>
+          <div style="height:150px"><canvas id="traj-chart"></canvas></div>
+          <p class="text-[11px] text-ink-3 mt-2 leading-relaxed">
+            Two data points so far: the Neotek May reference and this TPDL-engine run.
+            The line spans an <strong>engine change</strong>, so read it as “where this
+            company stands now vs. where Neotek left it”, not a like-for-like trend.
+          </p>
+        </div>
+      </div>
+
+      <!-- Formula explainer -->
+      <div class="tpdl-card p-6 lg:col-span-8">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-2">Where this score comes from</div>
+        <p class="text-sm text-ink-2 mb-4">
+          Every score is deterministic:
+          <span class="font-mono text-ink">score = signal&nbsp;strength (0–6) + recency (0–2) + corroboration (0–2)</span>,
+          computed per signal, then <strong>averaged over the signals actually found</strong>
+          (<span x-text="c?.signals_found"></span> here) — never over all six categories.
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="formula-term">
+            <div class="text-xs font-semibold mb-1">Signal strength · 0–6</div>
+            <p class="text-[11px] text-ink-3 leading-snug">Commercial relevance of the event, judged by the interpretation model from the isolated evidence. Shown per signal below via its confidence label.</p>
+          </div>
+          <div class="formula-term">
+            <div class="text-xs font-semibold mb-1">Recency · 0–2</div>
+            <p class="text-[11px] text-ink-3 leading-snug">≤90 days → 2 · ≤6 months → 1 · undated → 0. Open the source news below to check the date yourself.</p>
+          </div>
+          <div class="formula-term">
+            <div class="text-xs font-semibold mb-1">Corroboration · 0–2</div>
+            <p class="text-[11px] text-ink-3 leading-snug">2+ independent URLs → 2 · one verified URL → 1 · no URL → 0. Re-derived per signal below from the stored sources.</p>
+          </div>
+        </div>
+        <p class="text-[11px] text-ink-3 mt-3">
+          Only proven, dated signals are scored; unproven categories are listed as
+          <em>not evidenced</em> rather than penalised. Every claim below traces to a source URL.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ INTELLIGENCE SUMMARY ============ -->
+    <section class="tpdl-card p-6 mb-8">
+      <div class="text-xs uppercase tracking-wider text-ink-3 mb-2">Intelligence summary</div>
+      <p class="text-[15px] leading-relaxed text-ink" x-text="c?.intelligence_summary"></p>
+      <template x-if="c?.historical_context">
+        <div class="mt-4 p-3 rounded border-l-2 border-line-2 bg-bg">
+          <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Historical context</div>
+          <p class="text-xs text-ink-2" x-text="c?.historical_context"></p>
+        </div>
+      </template>
+    </section>
+
+    <!-- ============ SIGNALS ============ -->
+    <section class="mb-8">
+      <div class="flex items-baseline justify-between mb-3">
+        <h2 class="text-xl font-semibold">Scored signals
+          <span class="text-ink-3 text-base font-normal">(<span x-text="c?.signals.length"></span>)</span>
+        </h2>
+        <span class="text-xs text-ink-3">Each signal → why it matters → source news you can open</span>
+      </div>
+
+      <template x-if="c && c.signals.length === 0">
+        <div class="tpdl-card p-6 text-sm text-ink-3">
+          No commercial signal was evidenced for this company in this run — the score reflects the absence of proven, dated events, not a data gap we can act on.
+        </div>
+      </template>
+
+      <div class="space-y-4">
+        <template x-for="(sig, i) in (c?.signals || [])" :key="i">
+          <div class="signal-card">
+            <div class="signal-card__head p-4 flex items-center gap-3 flex-wrap">
+              <span class="text-xs font-mono text-ink-3">#<span x-text="i+1"></span></span>
+              <span class="tpdl-badge text-white" :style="`background:${signalColor(sig.category)}`"
+                    x-text="signalLabel(sig.category)"></span>
+              <span class="tpdl-badge" :style="`background:${confStyle(sig.confidence).bg};color:${confStyle(sig.confidence).color}`"
+                    x-text="'Confidence: ' + sig.confidence"></span>
+              <span class="tpdl-badge tpdl-badge--outline"
+                    x-text="`Corroboration ${sig.corroboration.points}/2 · ${sig.corroboration.note}`"></span>
+              <a :href="`/?drawer=hugo&prefill=` + encodeURIComponent('/company ' + name)"
+                 class="tpdl-btn tpdl-btn--outline text-xs ml-auto">💬 Ask Hugo</a>
+            </div>
+            <div class="p-4 space-y-2">
+              <div class="text-sm text-ink">
+                <span class="text-ink-3 text-xs uppercase tracking-wider">What happened — </span>
+                <span x-text="sig.what_happened"></span>
+              </div>
+              <div class="text-sm text-ink-2">
+                <span class="text-ink-3 text-xs uppercase tracking-wider">Why it matters — </span>
+                <span x-text="sig.why_it_matters"></span>
+              </div>
+              <div class="text-sm" x-show="sig.tpdl_relevance">
+                <span class="text-ink-3 text-xs uppercase tracking-wider">TPDL relevance — </span>
+                <span class="tpdl-badge tpdl-badge--dark" x-text="sig.tpdl_relevance"></span>
+              </div>
+
+              <!-- Sources / news to verify -->
+              <div class="pt-2" x-show="sig.urls.length > 0 || sig.sources.length > 0">
+                <div class="text-xs uppercase tracking-wider text-ink-3 mb-2">
+                  Verify on the web
+                  <span class="text-ink-3 normal-case" x-show="sig.sources.length">· found via <span x-text="sig.sources.join(', ')"></span></span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <template x-for="(url, idx) in sig.urls" :key="idx">
+                    <a :href="url" target="_blank" rel="noopener" class="news-link">
+                      <span>🔗</span>
+                      <span class="min-w-0">
+                        <span class="block font-medium text-ink" x-text="hostOf(url)"></span>
+                        <span class="block text-ink-3 break-all" x-text="url"></span>
+                      </span>
+                    </a>
+                  </template>
+                </div>
+                <div x-show="sig.urls.length === 0 && sig.sources.length > 0"
+                     class="text-xs text-ink-3 italic">
+                  Reported by <span x-text="sig.sources.join(', ')"></span> — no direct URL, so this signal counts 0 for corroboration.
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Not evidenced -->
+      <div class="mt-4 text-xs text-ink-3" x-show="c && c.signals_not_evidenced.length > 0">
+        <span class="uppercase tracking-wider">Signal categories not evidenced this run:</span>
+        <template x-for="sig in (c?.signals_not_evidenced || [])" :key="sig">
+          <span class="ml-2 tpdl-badge tpdl-badge--outline" x-text="signalLabel(sig)"></span>
+        </template>
+      </div>
+
+      <!-- Review reason -->
+      <div class="mt-4 text-sm p-3 rounded bg-red-50 border border-red-200 text-red-700"
+           x-show="c?.review_flag && c?.review_flag_reason">
+        ⚑ <span class="uppercase tracking-wider text-xs font-semibold">Review flag — </span>
+        <span x-text="c?.review_flag_reason"></span>
+        <span class="block text-xs text-red-600 mt-1">A 60-second manual check is recommended before acting on this company.</span>
+      </div>
+    </section>
+
+    <!-- ============ TECH STACK + EXPORT ============ -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-16">
+      <div class="tpdl-card p-6 lg:col-span-7">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-3">Tech stack (Step 1 scan)</div>
+        <dl class="kv" x-data="{ ts: parseTechStack(c?.tech_stack_summary) }">
+          <dt>CRM</dt><dd x-text="ts.crm"></dd>
+          <dt>Marketing automation</dt><dd x-text="ts.marketing_automation"></dd>
+          <dt>Analytics</dt><dd x-text="ts.analytics"></dd>
+          <dt>Advertising</dt><dd x-text="ts.advertising"></dd>
+        </dl>
+      </div>
+      <div class="tpdl-card p-6 lg:col-span-5">
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-3">Open the full data</div>
+        <p class="text-xs text-ink-2 mb-3">Everything you see here is in the run export — the same 42 columns, plus the Neotek delta, ready for Excel.</p>
+        <div class="flex flex-col gap-2">
+          <a href="/api/intel/export.csv?scope=run" class="tpdl-btn tpdl-btn--dark text-xs text-center">⬇ Download this run (CSV)</a>
+          <a href="/api/intel/export.csv?scope=all" class="tpdl-btn tpdl-btn--outline text-xs text-center">⬇ Download full universe (CSV)</a>
+          <a href="/runs" class="tpdl-btn tpdl-btn--ghost text-xs text-center">See all runs & trajectories →</a>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const SIGNAL_COLORS = { leadership_change:"#6366f1", hiring:"#10B981", ma_expansion:"#8B5CF6", pe_event:"#0EA5E9", digital_initiative:"#f97316", org_restructuring:"#d946ef" };
+const SIGNAL_LABELS = { leadership_change:"Leadership change", hiring:"Hiring", ma_expansion:"M&A / Expansion", pe_event:"PE event", digital_initiative:"Digital initiative", org_restructuring:"Org restructuring" };
+const CONF_STYLE = { high:{bg:"#dcf7e7",color:"#0a3a26"}, medium:{bg:"#fef3c7",color:"#854d0e"}, low:{bg:"#f3f3ef",color:"#5c5c5c"} };
+
+function parseTechStack(s) {
+  const out = { crm:"—", marketing_automation:"—", analytics:"—", advertising:"—" };
+  if (!s) return out;
+  s.split("|").forEach(part => {
+    const [k, ...rest] = part.split(":");
+    if (!k || rest.length === 0) return;
+    const key = k.trim().toLowerCase(), val = rest.join(":").trim();
+    if (key.startsWith("crm")) out.crm = val;
+    else if (key.startsWith("marketing")) out.marketing_automation = val;
+    else if (key.startsWith("analytics")) out.analytics = val;
+    else if (key.startsWith("advertising")) out.advertising = val;
+  });
+  return out;
+}
+
+function companyDetail() {
+  return {
+    name: "", c: null, traj: null, loading: true, error: null, chart: null,
+    parseTechStack,
+
+    async init() {
+      const params = new URLSearchParams(location.search);
+      this.name = params.get("c") || "";
+      if (!this.name) { this.error = "No company specified."; this.loading = false; return; }
+      try {
+        const [c, traj] = await Promise.all([
+          fetch(`/api/intel/companies/${encodeURIComponent(this.name)}`).then(r => { if(!r.ok) throw new Error(`Company not found (HTTP ${r.status})`); return r.json(); }),
+          fetch(`/api/intel/companies/${encodeURIComponent(this.name)}/trajectory`).then(r => r.ok ? r.json() : null).catch(() => null),
+        ]);
+        this.c = c; this.traj = traj;
+        document.title = `${c.name} — TPDL`;
+        this.$nextTick(() => this.renderChart());
+      } catch (e) { this.error = e.message; }
+      finally { this.loading = false; }
+    },
+
+    get runDay() { return this.c?.run_date ? this.c.run_date.slice(0,10) : "unknown"; },
+    get isFresh() { return this.runDay === "2026-07-17"; },  // latest run day
+
+    fmt(v) { return (v == null) ? "—" : Number(v).toFixed(1); },
+    signalColor(t){ return SIGNAL_COLORS[t] || "#5c5c5c"; },
+    signalLabel(t){ return SIGNAL_LABELS[t] || t; },
+    confStyle(x){ return CONF_STYLE[x] || CONF_STYLE.low; },
+    hostOf(u){ try { return new URL(u).hostname.replace(/^www\./,""); } catch(_) { return u; } },
+    normalizeUrl(u){ if(!u) return "#"; return /^https?:\/\//.test(u) ? u : "https://" + u; },
+
+    scoreStyle() {
+      const s = this.c?.assessed_score || 0;
+      if (s >= 8) return { bg:"#34D591", color:"#0a3a26" };
+      if (s >= 5) return { bg:"#fef3c7", color:"#854d0e" };
+      if (s === 0) return { bg:"#f3f3ef", color:"#8a8a8a" };
+      return { bg:"#fee2e2", color:"#7f1d1d" };
+    },
+    bandLabel(s) {
+      s = s || 0;
+      if (s >= 8) return "Act now";
+      if (s >= 5) return "Monitor";
+      if (s >= 1) return "Weak signal";
+      return "No signal";
+    },
+    deltaLabel(d) { if (d == null) return ""; if (d === 0) return "no change"; return (d > 0 ? "▲ +" : "▼ ") + Number(d).toFixed(1); },
+    deltaChipStyle(d) {
+      if (d == null || d === 0) return "background:#f3f3ef;color:#5c5c5c";
+      return d > 0 ? "background:#dcf7e7;color:#0a3a26" : "background:#fee2e2;color:#7f1d1d";
+    },
+    bannerStyle() {
+      const d = this.c?.delta;
+      if (d == null || d === 0) return "background:#f3f3ef;border-color:#d4d4d2;color:#5c5c5c";
+      return d > 0 ? "background:var(--tpdl-accent-soft);border-color:#c8efd9;color:#0a3a26"
+                   : "background:#fef2f2;border-color:#fecaca;color:#7f1d1d";
+    },
+
+    renderChart() {
+      const el = document.getElementById("traj-chart");
+      if (!el || typeof Chart === "undefined" || !this.traj || this.traj.points.length < 2) return;
+      if (this.chart) this.chart.destroy();
+      const pts = this.traj.points;
+      this.chart = new Chart(el, {
+        type: "line",
+        data: {
+          labels: pts.map(p => `${p.engine}\n${p.run_date || ""}`),
+          datasets: [{
+            data: pts.map(p => p.score),
+            borderColor: "#094752",
+            backgroundColor: "rgba(52,213,145,0.15)",
+            pointBackgroundColor: pts.map(p => p.current ? "#34D591" : "#094752"),
+            pointRadius: 6, pointHoverRadius: 7, fill: true, tension: 0.25,
+          }],
+        },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{display:false}, tooltip:{ callbacks:{
+            title:(items)=> pts[items[0].dataIndex].engine,
+            label:(item)=> `Score ${item.raw} · ${pts[item.dataIndex].coverage || ""}`,
+          }}},
+          scales:{
+            y:{ beginAtZero:true, max:10, grid:{color:"rgba(0,0,0,0.05)"}, ticks:{stepSize:2} },
+            x:{ grid:{display:false}, ticks:{ font:{size:10}, callback:function(v){ const l=this.getLabelForValue(v).split("\n"); return l; } } },
+          },
+        },
+      });
+    },
+  };
+}
+</script>
+{% endblock %}

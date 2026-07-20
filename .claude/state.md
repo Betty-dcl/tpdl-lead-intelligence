@@ -17,6 +17,33 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-20 — **Refonte UI « traçabilité du run » + page Découvertes + audit pré-démo (demande Betty).**
+  Objectif : présenter la plateforme demain, tout traçable/clair/pro, 0 lien cassé. Fait :
+  (1) **Backend intel** : `_neotek_baseline` + enrichissement `_serialize_company` (neotek_score/delta/
+  reappeared) + `corroboration` re-dérivée par signal (2+ URLs→2, 1→1, 0→0) ; nouveaux endpoints
+  `/api/intel/run` (cockpit : bandes act_now/monitor/weak/none, mouvement vs Neotek, net_new_scored,
+  discovered_candidates), `/companies/{n}/trajectory` (courbe mai→juillet), `/export.csv` (42 cols +
+  delta), `/candidates` (lit `discovery_candidates.csv`, 122 nouvelles, flag not-scored).
+  (2) **Sales (`/intel`)** : cockpit du run (67 sociétés, 7 ≥8, top Cantabria 8.5, 45↑/18↓/4=), colonne
+  **Δ Neotek** + bordure gauche couleur « réapparue » (vert↑/rouge↓/gris=), noms cliquables, CSV Excel,
+  ligne « 0 nouvelles → 122 candidates ».
+  (3) **Fiche société** (nouveau `/intel/company?c=`) : formule du score expliquée, courbe d'évolution
+  (Chart.js, caveat cross-engine), signaux avec confiance + corroboration + **liens news cliquables**,
+  bandeau « seen before » + delta, export CSV.
+  (4) **Contacts** : bandeau run + deltas + « act now » + fiches cliquables.
+  (5) **Runs** : carte « Since the Neotek May run » (67 réapparues, top riser/fader) — le delta cross-engine
+  que Betty voulait (avant : Neotek exclu).
+  (6) **Page Candidates (nouvelle, dans le menu)** : les 122 découvertes vendredi, étiquetées **FOUND ≠
+  SCORED** (0 scorée), filtrables par thème, liens sources. Répond à « comment voir du neuf ».
+  (7) **Audit pré-démo** : 0 lien cassé (22 pages + routes dynamiques toutes 200), 0 erreur console,
+  scoring prouvé RÉEL (63/67 diffèrent de mai, sources 2026). Polish : login (mot de passe exposé +
+  « Demo borrador » retirés), marketing (« mock/V1/V2 » → « illustrative »), Home/Sales (« Top 50/weekly »
+  → « shortlist/monthly »), Today (« veille » → « market scan », Monday→monthly), fiche agent + 404
+  re-charte + « Open Space »→« Home », Review (explication claire du garde-fou Vera), Usage (jargon `.env`/
+  dry-run adouci). +5 tests. Suite : **205 verts**.
+  RESTE (décisions Betty) : fusionner les 2 générateurs Marketing (Auto Pipeline vs Carousel Studio) ;
+  Performance & Data laissés hors menu (internes) ; rebrand cosmétique #094752→#0A0A0A + Funnel Sans
+  (migration à part, non faite).
 - 2026-07-18 — **Maya : shortlist par SEUIL/bandes, pas un top-50 figé (décision Betty).** Un « top 50 »
   bourre un petit run de scores 2 (sur ce run il descendrait à ~2). Nouvelle commande **`/shortlist`**
   (le livrable pour Inès) : **ACT NOW = in-scope ≥ 8** (seuil constitution), **MONITOR = 5-7** (les
@@ -535,8 +562,17 @@
 - Base légale RGPD pour l'enrichissement + envoi (UE/CH) avant le 1er envoi.
 
 ## Dernière session
-- Date : 2026-07-17
-- Fait : **analyse + rangement de la réunion pilote du 16/07** (Betty & Nathalie). Transcript Word
+- Date : 2026-07-20
+- Fait : **refonte UI traçabilité du run + page Découvertes + audit pré-démo** (voir log 2026-07-20 en
+  haut). Sales/Contacts/Runs remis autour du run du 17/07 avec delta vs Neotek + couleur « réapparue » ;
+  nouvelle fiche société (`/intel/company`) avec formule du score, courbe d'évolution et liens news
+  cliquables ; nouvelle page **Candidates** (122 découvertes vendredi, FOUND ≠ SCORED). Audit : **0 lien
+  cassé, 0 erreur console, scoring prouvé réel** (63/67 ≠ mai), **205 tests verts**. Polish démo (login,
+  marketing, Home/Today, fiche agent, 404, Review, Usage). Point clarifié pour Betty : le run du 17/07 a
+  **re-scoré 67 anciennes CH+ES** (toutes déjà chez Neotek, d'où « tout paraît Neotek ») ; les **122
+  nouvelles** sont **découvertes mais NON scorées** (run stratégique annulé le 18/07). Reste : fusion des
+  2 générateurs Marketing (décision Betty), rebrand cosmétique #094752→#0A0A0A (non fait).
+- Fait (session du 2026-07-17) : **analyse + rangement de la réunion pilote du 16/07** (Betty & Nathalie). Transcript Word
   résumé et stocké aux 3 endroits (Obsidian `Agents IA & Pipeline TPDL/Réunion — 16 juillet…`, `operational-context.md`,
   CLAUDE.md + state.md). Faits neufs : changement de scope moteur (veille large life science, top 35 +
   nouveau, drop des 500 ; signal earnings-call/board), coûts/cadence confirmés (40-60 €, Batch, 1/mois),

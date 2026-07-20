@@ -111,7 +111,7 @@
         <!-- Not configured -->
         <template x-if="!p.configured">
           <div class="mb-3 text-sm text-ink-3">
-            Key absent from <code class="text-xs">.env</code> — this engine stays offline.
+            API key not set up yet — this service stays offline until connected.
           </div>
         </template>
 
@@ -223,7 +223,7 @@
           <h2 class="text-lg font-semibold">Lead Intelligence engine</h2>
           <span class="provider-chip"
                 :class="engine?.live_available ? 'chip-live' : 'chip-off'"
-                x-text="engine?.live_available ? 'LIVE READY' : 'DRY-RUN ONLY'"></span>
+                x-text="engine?.live_available ? 'LIVE READY' : 'TEST MODE'"></span>
         </div>
         <p class="text-sm text-ink-2 max-w-xl" x-text="engine?.note || ''"></p>
         <p class="text-[11px] text-ink-3 mt-1" x-show="engine?.live_blocker"
@@ -231,7 +231,7 @@
       </div>
       <button class="tpdl-btn tpdl-btn--primary" @click="runSmokeTest()"
               :disabled="engineBusy">
-        <span x-text="engineBusy ? 'Running…' : 'Run smoke test (dry-run)'"></span>
+        <span x-text="engineBusy ? 'Running…' : 'Run test (no cost)'"></span>
       </button>
     </div>
 

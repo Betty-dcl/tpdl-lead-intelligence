@@ -34,6 +34,18 @@
       companies' locations — in-person targets where TPDL is present.
     </p>
 
+    <!-- Run banner — ties the radar to the latest run -->
+    <div class="mt-5 rounded-lg border border-line bg-white px-4 py-3 text-sm flex flex-wrap items-center gap-x-4 gap-y-1"
+         x-show="radars.latest_run" x-cloak>
+      <span class="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full"
+            style="background:var(--tpdl-accent-soft);color:var(--tpdl-accent-ink)">Latest run</span>
+      <span class="text-ink-2">
+        These radars read the <strong x-text="radars.counts?.fresh"></strong> companies re-scored on
+        <strong x-text="radars.latest_run"></strong> (CH + ES) —
+        <strong x-text="radars.counts?.eligible"></strong> cleared for outreach (≥ 8).
+      </span>
+    </div>
+
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
       <div class="tpdl-card p-5">
         <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Switzerland</div>
@@ -72,7 +84,9 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
       <template x-for="c in visibleRadar" :key="c.company + c.location">
-        <div class="tpdl-card p-4 flex items-center justify-between gap-3">
+        <a :href="`/intel/company?c=${encodeURIComponent(c.company)}`"
+           class="tpdl-card p-4 flex items-center justify-between gap-3 hover:border-ink transition-colors"
+           :style="`border-left:3px solid ${reappearedBorder(c)}`">
           <div class="min-w-0">
             <div class="font-medium truncate" x-text="c.company"></div>
             <div class="text-xs text-ink-3 truncate">
@@ -80,15 +94,17 @@
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <span class="text-xs px-2 py-0.5 rounded-full"
-                  style="background:#E1F5EE; color:#085041;">lunch</span>
+            <span class="text-xs px-2 py-0.5 rounded-full" x-show="c.outreach_eligible"
+                  style="background:var(--tpdl-accent);color:#0a3a26;font-weight:600">act now</span>
             <span class="text-xs px-2 py-0.5 rounded-full" x-show="c._es"
                   style="background:#FAEEDA; color:#633806;">ES</span>
+            <span class="text-[11px] px-1.5 py-0.5 rounded-full font-semibold"
+                  x-show="c.reappeared" :style="deltaChipStyle(c.delta)" x-text="deltaLabel(c.delta)"></span>
             <span class="score-pill"
                   :style="(c.outreach_eligible ? 'background:var(--tpdl-accent-soft);color:var(--tpdl-accent-ink)' : 'background:var(--tpdl-bg-2);color:var(--tpdl-text-muted)')"
-                  x-text="c.score"></span>
+                  x-text="(c.score ?? 0).toFixed ? c.score.toFixed(1) : c.score"></span>
           </div>
-        </div>
+        </a>
       </template>
     </div>
     <p class="text-xs text-ink-3 mt-3" x-show="visibleRadar.length === 0">No companies in this region.</p>
@@ -157,6 +173,22 @@
         if (this.region === 'CH') return ch;
         if (this.region === 'ES') return es;
         return [...ch, ...es].sort((a, b) => (b.score || 0) - (a.score || 0));
+      },
+      deltaLabel(d) {
+        if (d == null) return "new";
+        if (d === 0) return "±0";
+        return (d > 0 ? "▲ +" : "▼ ") + Number(d).toFixed(1);
+      },
+      deltaChipStyle(d) {
+        if (d == null) return "background:#e0e7ff;color:#3730a3";
+        if (d === 0)  return "background:#f3f3ef;color:#5c5c5c";
+        return d > 0 ? "background:#dcf7e7;color:#0a3a26" : "background:#fee2e2;color:#7f1d1d";
+      },
+      reappearedBorder(c) {
+        if (!c.reappeared) return "transparent";
+        if (c.delta > 0) return "#34D591";
+        if (c.delta < 0) return "#ef4444";
+        return "#94a3b8";
       },
     };
   }

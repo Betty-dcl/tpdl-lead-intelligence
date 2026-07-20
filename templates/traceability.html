@@ -11,9 +11,43 @@
   <p class="text-ink-2 mb-4 max-w-2xl">
     Every run of <strong>TPDL's own engine</strong> — what Hugo scored and what
     Maya read of it, each with a one-line recap and a CSV download. Read straight
-    from the append-only run snapshots. <span class="text-ink-3">(The 25/05 Neotek
-    reference — a different, external engine — is deliberately excluded.)</span>
+    from the append-only run snapshots. The <strong>run-to-run</strong> trajectory
+    below compares TPDL-engine runs only (like-for-like); the card just underneath
+    shows how the latest run moved <strong>vs. the original Neotek May reference</strong>.
   </p>
+
+  <!-- Since the Neotek May reference (cross-engine movement) -->
+  <div class="rounded-xl border border-line bg-white overflow-hidden mb-6" x-show="neo" x-cloak>
+    <div class="px-5 py-4 border-b border-line" style="background: var(--tpdl-accent-soft)">
+      <p class="text-lg font-semibold">Since the Neotek May run</p>
+      <p class="text-xs text-ink-3">
+        Latest run <span x-text="neo?.run_date"></span> vs the original Neotek reference (2026-05-25)
+      </p>
+    </div>
+    <div class="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+      <div><p class="text-2xl font-semibold" x-text="neo?.neotek.reappeared"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">reappeared</p></div>
+      <div><p class="text-2xl font-semibold" style="color:#0a3a26" x-text="neo?.neotek.risers"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">rising</p></div>
+      <div><p class="text-2xl font-semibold" style="color:#7f1d1d" x-text="neo?.neotek.faders"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">fading</p></div>
+      <div><p class="text-2xl font-semibold text-ink-3" x-text="neo?.neotek.stable"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">stable</p></div>
+    </div>
+    <div class="px-5 pb-4 text-sm text-ink-2 flex flex-wrap gap-x-6 gap-y-1">
+      <span x-show="neo?.neotek.top_riser">Top riser
+        <strong x-text="neo?.neotek.top_riser?.name"></strong>
+        (<span x-text="'+' + neo?.neotek.top_riser?.delta.toFixed(1)"></span>)</span>
+      <span x-show="neo?.neotek.top_fader">Top fader
+        <strong x-text="neo?.neotek.top_fader?.name"></strong>
+        (<span x-text="neo?.neotek.top_fader?.delta.toFixed(1)"></span>)</span>
+    </div>
+    <p class="px-5 pb-4 text-[11px] text-ink-3">
+      ⚠ Cross-engine: May = original Neotek, July = TPDL's rebuilt engine. A delta reflects both a real
+      change in signal and the engine change — read it as “where each company stands now vs. where Neotek left it”.
+      Per-company detail & the two-point curve live on each <a href="/intel" class="underline">Sales</a> company page.
+    </p>
+  </div>
 
   <a :href="sharepointUrl" target="_blank" rel="noopener"
      class="inline-flex items-center gap-2 mb-6 text-sm font-medium px-4 py-2 rounded-lg text-white"
@@ -133,7 +167,7 @@
 <script>
 function traceability() {
   return {
-    runs: [], loading: true,
+    runs: [], loading: true, neo: null,
     sharepointUrl: {{ sharepoint_url | tojson }},
     async load() {
       try {
@@ -142,6 +176,10 @@ function traceability() {
         this.runs = d.runs || [];
         if (d.sharepoint_url) this.sharepointUrl = d.sharepoint_url;
       } catch (e) { this.runs = []; }
+      try {
+        const run = await fetch('/api/intel/run').then(x => x.json());
+        if (run && run.has_run && run.neotek) this.neo = run;
+      } catch (e) {}
       this.loading = false;
     },
     async exportRun(run) {
