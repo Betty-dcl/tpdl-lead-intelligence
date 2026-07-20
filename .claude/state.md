@@ -17,6 +17,13 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-18 — **Maya : shortlist par SEUIL/bandes, pas un top-50 figé (décision Betty).** Un « top 50 »
+  bourre un petit run de scores 2 (sur ce run il descendrait à ~2). Nouvelle commande **`/shortlist`**
+  (le livrable pour Inès) : **ACT NOW = in-scope ≥ 8** (seuil constitution), **MONITOR = 5-7** (les
+  risers du mois prochain), <5 parké ; départage couverture puis fraîcheur ; plafond souple 40 qui ne
+  mord que si la bande ≥8 explose ; ACT NOW vide = dit honnêtement, jamais rembourré. `/top [N]` reste
+  la vue SCAN secondaire (« N meilleurs quoi qu'il arrive »). Vérifié live : 23 ACT NOW + 170 monitor,
+  fraîches devant STALE à score égal. maya.md + docstring recadrés, re-seed. +1 test. Suite : **200 verts**.
 - 2026-07-18 — **Audit de vérité des 6 agents restants + répétition générale du rituel (commit
   ci-dessus).** (1) Iris, Marc, Julie : PROPRES. Inès (« frozen 492/35 » → lire les chiffres courants ;
   weekly → monthly), Oliver (double vérité charte : renderers = teal legacy #094752 AUJOURD'HUI,
