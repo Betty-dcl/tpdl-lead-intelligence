@@ -212,18 +212,36 @@ def _norm(name: str) -> str:
 
 def filter_new(candidates: list[Candidate],
                known_names: list[str]) -> list[Candidate]:
-    """Drop candidates already in the scored universe (normalised match) and
-    dedupe within the batch."""
+    """Candidates NOT already in the scored universe (normalised), deduped.
+    This is the point of discovery: bring NEW companies, never re-surface last
+    month's list."""
+    return partition_candidates(candidates, known_names)[0]
+
+
+def partition_candidates(candidates: list[Candidate], known_names: list[str]
+                         ) -> tuple[list[Candidate], list[Candidate]]:
+    """Split the watch's findings into (fresh, resurfaced):
+      - fresh      = genuinely NEW companies → the discovery output to score.
+      - resurfaced = companies ALREADY tracked that reappeared in the watch this
+        month → NOT re-scored, but worth flagging ("this account is back in the
+        news"). Each deduped within its group."""
     known = {_norm(n) for n in known_names}
-    seen: set[str] = set()
+    seen_new: set[str] = set()
+    seen_old: set[str] = set()
     fresh: list[Candidate] = []
+    resurfaced: list[Candidate] = []
     for c in candidates:
         key = _norm(c.name)
-        if not key or key in known or key in seen:
+        if not key:
             continue
-        seen.add(key)
-        fresh.append(c)
-    return fresh
+        if key in known:
+            if key not in seen_old:
+                seen_old.add(key)
+                resurfaced.append(c)
+        elif key not in seen_new:
+            seen_new.add(key)
+            fresh.append(c)
+    return fresh, resurfaced
 
 
 def known_universe() -> list[str]:
@@ -242,21 +260,37 @@ def known_universe() -> list[str]:
 # Entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
-def discover(cfg: EngineConfig, out: Path = DEFAULT_OUT) -> list[Candidate]:
-    """Full discovery pass → CSV of NEW candidate companies (not scored)."""
-    findings = search_themes(cfg)
-    candidates = extract_candidates(cfg, findings)
-    fresh = filter_new(candidates, known_universe())
+RESURFACED_OUT = Path("data/csv/discovery_resurfaced.csv")
+
+
+def _write_candidates(rows: list[Candidate], out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["Company Name", "Theme", "Source URL"])
-        for c in fresh:
+        for c in rows:
             w.writerow([c.name, c.theme, c.url or ""])
-    logger.info("[discovery] %d findings → %d names → %d NEW candidates → %s",
-                len(findings), len(candidates), len(fresh), out)
+
+
+def discover(cfg: EngineConfig, out: Path = DEFAULT_OUT) -> list[Candidate]:
+    """Full discovery pass. Writes NEW candidates (to score) to `out`, and the
+    already-tracked companies that RESURFACED in the watch to a separate file
+    (informational — never auto-scored)."""
+    findings = search_themes(cfg)
+    candidates = extract_candidates(cfg, findings)
+    fresh, resurfaced = partition_candidates(candidates, known_universe())
+    _write_candidates(fresh, out)
+    _write_candidates(resurfaced, RESURFACED_OUT)
+    logger.info("[discovery] %d findings → %d names → %d NEW candidates (%s) + "
+                "%d resurfaced/already-tracked (%s)",
+                len(findings), len(candidates), len(fresh), out,
+                len(resurfaced), RESURFACED_OUT)
     if fresh:
         names = ";".join(c.name for c in fresh[:20])
-        logger.info("[discovery] score them with:\n"
+        logger.info("[discovery] score the NEW ones with:\n"
                     '    python -m pipeline.runner --names "%s" --live --max-usd 5', names)
+    if resurfaced:
+        logger.info("[discovery] %d existing accounts are back in the news this "
+                    "month (flag for Maya, not re-scored): %s", len(resurfaced),
+                    ", ".join(c.name for c in resurfaced[:10]))
     return fresh

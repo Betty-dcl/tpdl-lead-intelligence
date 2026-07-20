@@ -1295,3 +1295,18 @@ def test_estimate_counts_registry_search():
     from pipeline import estimate as est_mod
     est = est_mod.estimate_run(10)
     assert est.serp_searches == 30                        # News + Jobs + registry
+
+
+def test_discovery_partition_new_vs_resurfaced():
+    """The watch's goal is NEW companies; a known one that reappears is not
+    re-scored but flagged as resurfaced."""
+    from pipeline import discovery
+    cands = [discovery.Candidate("Novabiotic GmbH", "ma_expansion", "https://a"),  # new
+             discovery.Candidate("Roche", "pe_event", "https://b"),               # known
+             discovery.Candidate("NovaBiotic", "hiring", "https://c"),            # dup of new
+             discovery.Candidate("Roche Holding", "digital_initiative", "https://d")]  # dup of known
+    fresh, resurfaced = discovery.partition_candidates(cands, ["Roche"])
+    assert [c.name for c in fresh] == ["Novabiotic GmbH"]        # only genuinely new, deduped
+    assert [c.name for c in resurfaced] == ["Roche"]            # known reappearance, deduped
+    # filter_new stays backward-compatible (fresh only)
+    assert [c.name for c in discovery.filter_new(cands, ["Roche"])] == ["Novabiotic GmbH"]
