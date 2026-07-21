@@ -19,15 +19,13 @@
 
     <div>
       <label class="block text-xs uppercase tracking-wider text-ink-3 mb-2">I am</label>
-      <div class="grid grid-cols-5 gap-2">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {% for u in users %}
         <button type="button"
                 @click="username = '{{ u.username }}'"
                 :class="username === '{{ u.username }}' ? 'border-ink bg-bg-2' : 'border-line'"
-                class="border-2 rounded-lg p-2 text-center transition-colors hover:border-ink">
-          <img src="/static/img/avatars/{{ u.avatar_seed }}.svg"
-               class="w-12 h-12 rounded-full bg-bg-2 mx-auto" alt="{{ u.display_name }}">
-          <div class="text-xs mt-1 font-medium">{{ u.display_name }}</div>
+                class="border-2 rounded-lg py-3 px-2 text-center transition-colors hover:border-ink">
+          <div class="text-sm font-medium">{{ u.display_name }}</div>
         </button>
         {% endfor %}
       </div>

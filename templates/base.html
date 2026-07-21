@@ -75,8 +75,6 @@
         <div class="ml-3 pl-3 border-l border-line" x-data="userBadge()">
           <template x-if="me">
             <div class="flex items-center gap-2">
-              <img :src="`/static/img/avatars/${me.avatar_seed}.svg`"
-                   class="w-8 h-8 rounded-full bg-bg-2 border border-line" :alt="me.display_name">
               <span class="text-sm font-medium" x-text="me.display_name"></span>
               <button @click="logout"
                       class="text-xs text-ink-3 hover:text-ink ml-1"
