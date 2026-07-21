@@ -43,10 +43,10 @@
     vertical-align: middle;
   }
 
-  /* Grid row — adjusted column widths for the real CSV (longer locations etc) */
+  /* Grid row — leading rank column, then the real-CSV columns */
   .grid-row {
     display: grid;
-    grid-template-columns: minmax(190px, 1.5fr) 118px 150px 78px 64px 96px 104px 92px 150px 28px;
+    grid-template-columns: 38px minmax(180px, 1.5fr) 118px 150px 78px 64px 96px 104px 92px 150px 28px;
     gap: 0.5rem;
     align-items: center;
     padding: 0.85rem 1rem 0.85rem 0.75rem;
@@ -60,9 +60,16 @@
   .grid-row.is-expanded { background: var(--tpdl-bg); cursor: default; }
   .grid-row.is-expanded:hover { background: var(--tpdl-bg); }
 
+  .rank-num {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px; font-weight: 600;
+    color: var(--tpdl-text-muted);
+    text-align: right; padding-right: 2px;
+  }
+
   .grid-head {
     display: grid;
-    grid-template-columns: minmax(190px, 1.5fr) 118px 150px 78px 64px 96px 104px 92px 150px 28px;
+    grid-template-columns: 38px minmax(180px, 1.5fr) 118px 150px 78px 64px 96px 104px 92px 150px 28px;
     gap: 0.5rem;
     padding: 0.6rem 1rem 0.6rem 0.75rem;
     background: var(--tpdl-bg-2);
@@ -285,8 +292,11 @@
       <div>
         <h2 class="text-xl font-semibold">Scored companies</h2>
         <p class="text-xs text-ink-3 mt-1">
-          <span x-text="filteredCompanies.length"></span> of <span x-text="companies.length"></span> shown
-          · click any row to see the full Intelligence Summary + signal detail
+          <span x-text="displayedCompanies.length"></span> shown
+          <span x-show="topN > 0" class="text-ink-3">(top <span x-text="topN"></span>)</span>
+          of <span x-text="filteredCompanies.length"></span> matching
+          · <span x-text="companies.length"></span> total
+          · click any row for the full detail
         </p>
       </div>
       <button @click="resetFilters()"
@@ -311,6 +321,14 @@
         <option value="pe_event">PE event</option>
         <option value="digital_initiative">Digital initiative</option>
         <option value="org_restructuring">Org restructuring</option>
+      </select>
+
+      <select x-model="filters.geo_region" aria-label="Filter by location"
+              class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink">
+        <option value="">All locations</option>
+        <template x-for="r in distinctRegions()" :key="r">
+          <option :value="r" x-text="regionLabel(r)"></option>
+        </template>
       </select>
 
       <button @click="filters.outreach_eligible = !filters.outreach_eligible"
@@ -349,10 +367,120 @@
       <span class="ml-auto">Click a company name to open its full detail page →</span>
     </div>
 
+    <!-- ============ RUN COMPARISON (period picker) ============ -->
+    <div class="tpdl-card p-5 mb-4" x-show="runs.length >= 2" x-cloak>
+      <div class="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h3 class="font-semibold text-sm flex items-center gap-2">
+            📊 Compare runs
+            <span class="text-xs font-normal text-ink-3">— pick a period, like a bank statement</span>
+          </h3>
+          <p class="text-xs text-ink-3 mt-1">
+            See what changed between any two runs: new companies, risers, faders — the delta
+            recomputes for whatever period you choose.
+          </p>
+        </div>
+        <button @click="toggleCompare()"
+                :class="compare.on ? 'filter-pill is-active' : 'filter-pill'">
+          <span x-text="compare.on ? '● Comparison on' : '○ Turn comparison on'"></span>
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-end gap-3 mt-4">
+        <label class="text-xs text-ink-3">
+          <div class="mb-1">From run (baseline)</div>
+          <select x-model="compare.from_run" @change="onCompareRunChange()"
+                  aria-label="Comparison baseline run"
+                  class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink min-w-[190px]">
+            <template x-for="r in runs" :key="r.run_id">
+              <option :value="r.run_id" x-text="`${r.label} · ${r.companies} co.`"></option>
+            </template>
+          </select>
+        </label>
+        <span class="text-ink-3 pb-2">→</span>
+        <label class="text-xs text-ink-3">
+          <div class="mb-1">To run (later period)</div>
+          <select x-model="compare.to_run" @change="onCompareRunChange()"
+                  aria-label="Comparison later run"
+                  class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink min-w-[190px]">
+            <template x-for="r in runs" :key="r.run_id">
+              <option :value="r.run_id" x-text="`${r.label} · ${r.companies} co.`"></option>
+            </template>
+          </select>
+        </label>
+
+        <button x-show="compare.on"
+                @click="filters.new_only = !filters.new_only"
+                :class="filters.new_only ? 'filter-pill is-active' : 'filter-pill'">
+          ✦ New in period only
+        </button>
+        <span x-show="runs.length < 3" class="text-[11px] text-ink-3 pb-2">
+          Only two runs so far — more periods unlock as new runs land.
+        </span>
+      </div>
+
+      <!-- Comparison summary tiles -->
+      <div x-show="compare.on && compare.summary" x-cloak
+           class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 pt-4 border-t border-line">
+        <div class="rounded-lg p-3" style="background:var(--tpdl-accent-soft)">
+          <div class="text-xl font-semibold" style="color:var(--tpdl-accent-ink)" x-text="compare.summary?.new"></div>
+          <div class="text-[11px] uppercase tracking-wider" style="color:var(--tpdl-accent-ink)">New companies</div>
+        </div>
+        <div class="rounded-lg p-3 bg-bg-2">
+          <div class="text-xl font-semibold text-ink" x-text="compare.summary?.rising"></div>
+          <div class="text-[11px] uppercase tracking-wider text-ink-3">Rising 🟢</div>
+        </div>
+        <div class="rounded-lg p-3 bg-bg-2">
+          <div class="text-xl font-semibold text-ink" x-text="compare.summary?.fading"></div>
+          <div class="text-[11px] uppercase tracking-wider text-ink-3">Fading 🔴</div>
+        </div>
+        <div class="rounded-lg p-3 bg-bg-2">
+          <div class="text-xl font-semibold text-ink" x-text="compare.summary?.stable"></div>
+          <div class="text-[11px] uppercase tracking-wider text-ink-3">Stable ⚪</div>
+        </div>
+        <div class="rounded-lg p-3 bg-bg-2">
+          <div class="text-xl font-semibold text-ink" x-text="compare.summary?.common"></div>
+          <div class="text-[11px] uppercase tracking-wider text-ink-3">In both runs</div>
+        </div>
+      </div>
+      <div x-show="compare.on && compare.summary && (compare.summary?.top_riser || compare.summary?.top_fader)" x-cloak
+           class="text-xs text-ink-3 mt-3 flex flex-wrap gap-x-5 gap-y-1">
+        <span x-show="compare.summary?.top_riser">
+          Top riser <strong class="text-ink" x-text="compare.summary?.top_riser?.company"></strong>
+          (<span x-text="'+' + compare.summary?.top_riser?.delta.toFixed(1)"></span>)
+        </span>
+        <span x-show="compare.summary?.top_fader">
+          Top fader <strong class="text-ink" x-text="compare.summary?.top_fader?.company"></strong>
+          (<span x-text="compare.summary?.top_fader?.delta.toFixed(1)"></span>)
+        </span>
+        <span class="w-full opacity-80" x-show="compare.meta">
+          ⚠ Comparing <strong x-text="compare.meta?.from?.label"></strong> →
+          <strong x-text="compare.meta?.to?.label"></strong>. A May→July delta also spans an engine change (Neotek → TPDL).
+        </span>
+      </div>
+    </div>
+
+    <!-- ============ TOP-N picker ============ -->
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <span class="text-xs uppercase tracking-wider text-ink-3 mr-1">Show</span>
+      <template x-for="n in [10, 20, 35, 50, 200]" :key="n">
+        <button @click="setTopN(n)"
+                :class="topN === n ? 'filter-pill is-active' : 'filter-pill'"
+                x-text="'Top ' + n"></button>
+      </template>
+      <button @click="topN = 0"
+              :class="topN === 0 ? 'filter-pill is-active' : 'filter-pill'">All</button>
+      <span class="text-xs text-ink-3 ml-2">
+        by <span x-text="sortKey === 'delta' ? 'Δ' : 'score'"></span>,
+        <span x-text="sortDesc ? 'high → low' : 'low → high'"></span>
+      </span>
+    </div>
+
     <!-- Grid-based "table" -->
     <div class="tpdl-card overflow-hidden">
       <div class="overflow-x-auto">
-        <div class="grid-head" style="min-width: 1200px;">
+        <div class="grid-head" style="min-width: 1250px;">
+          <div class="rank-num">#</div>
           <div class="sortable" @click="setSort('name')">Company
             <span class="sort-arrow" x-show="sortKey==='name'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
@@ -362,7 +490,9 @@
           <div class="sortable" @click="setSort('assessed_score')">Score
             <span class="sort-arrow" x-show="sortKey==='assessed_score'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
-          <div class="sortable" @click="setSort('delta')" title="Change vs the Neotek May run">Δ Neotek
+          <div class="sortable" @click="setSort('delta')"
+               :title="compare.on ? 'Change over the selected period' : 'Change vs the Neotek May run'">
+            <span x-text="compare.on ? 'Δ period' : 'Δ Neotek'"></span>
             <span class="sort-arrow" x-show="sortKey==='delta'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
           <div>Coverage</div>
@@ -371,18 +501,19 @@
           <div></div>
         </div>
 
-        <div style="min-width: 1200px;">
-          <template x-if="filteredCompanies.length === 0">
+        <div style="min-width: 1250px;">
+          <template x-if="displayedCompanies.length === 0">
             <div class="text-center text-ink-3 py-12">No company matches the current filters.</div>
           </template>
 
-          <template x-for="c in filteredCompanies" :key="c.name">
+          <template x-for="(c, idx) in displayedCompanies" :key="c.name">
             <div>
               <!-- Main row -->
               <div class="grid-row"
                    :class="expandedRow === c.name ? 'is-expanded' : ''"
                    :style="`border-left: ${reappearedBorder(c)}`"
                    @click="expandedRow = expandedRow === c.name ? null : c.name; if (expandedRow === c.name) loadWorkspace(c.name)">
+                <div class="rank-num" x-text="idx + 1"></div>
                 <div class="min-w-0">
                   <a :href="companyUrl(c)" @click.stop
                      class="font-semibold text-ink hover:text-[color:var(--tpdl-accent-ink)] hover:underline truncate block"
@@ -399,9 +530,9 @@
                 </div>
                 <div>
                   <span class="score-pill" style="min-width:auto;padding:3px 7px;font-size:11px"
-                        :style="deltaChipStyle(c.delta)"
-                        :title="c.reappeared ? ('Neotek May: ' + c.neotek_score.toFixed(1)) : 'Not in the Neotek run'"
-                        x-text="deltaLabel(c.delta)"></span>
+                        :style="deltaChipStyle(effDelta(c))"
+                        :title="effReappeared(c) ? ('Baseline: ' + effBaseline(c).toFixed(1)) : 'Not in the baseline run'"
+                        x-text="deltaLabel(effDelta(c))"></span>
                 </div>
                 <div class="text-ink-2 text-xs" x-text="(c.coverage || '').split(' ').slice(0,3).join(' ')"></div>
                 <div>
@@ -703,5 +834,5 @@
 
 </div>
 
-<script src="/static/js/intel.js?v=7"></script>
+<script src="/static/js/intel.js?v=8"></script>
 {% endblock %}

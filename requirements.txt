@@ -13,5 +13,7 @@ python-pptx>=1.0.0   # Oliver's branded PPTX deck renderer (app/tools/pptx_expor
 apscheduler>=3.10.0
 supabase>=2.0.0
 websockets>=13,<14   # pin: uvicorn[standard] needs websockets.legacy (removed in 15.x)
+gunicorn>=21.2.0     # prod process manager (Azure App Service) — runs uvicorn workers
+psycopg[binary]>=3.1 # prod Postgres driver (Azure Database for PostgreSQL); unused on SQLite
 pytest>=8.0          # dev — smoke suite in tests/ (make test)
 

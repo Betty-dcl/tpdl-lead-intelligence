@@ -116,6 +116,63 @@ def runs_page(request: Request) -> HTMLResponse:
                                        "sharepoint_url": SHAREPOINT_FOLDER_URL})
 
 
+def _scores_for(db: Session, run_id: str) -> dict[str, float]:
+    return {r.company_name: (r.assessed_score or 0) for r in
+            db.query(RunSnapshot).filter(RunSnapshot.import_run_id == run_id).all()}
+
+
+def _latest_tpdl_run(db: Session) -> dict | None:
+    """The newest run that ISN'T the Neotek reference."""
+    runs = _runs_ordered(db)   # excludes Neotek, oldest→newest
+    return runs[-1] if runs else None
+
+
+def _neotek_compare(db: Session) -> dict:
+    """Companies present in BOTH the Neotek May reference and the latest TPDL
+    run — each with its Neotek score, its TPDL score and the delta. Answers
+    'how did our own engine re-score the companies Neotek already covered?'"""
+    tpdl = _latest_tpdl_run(db)
+    if tpdl is None:
+        return {"available": False, "reason": "no TPDL run yet"}
+    neo = _scores_for(db, NEOTEK_REFERENCE_RUN)
+    cur = _scores_for(db, tpdl["run_id"])
+    if not neo:
+        return {"available": False, "reason": "no Neotek reference in history"}
+    common = []
+    for name in cur:
+        if name in neo:
+            delta = round(cur[name] - neo[name], 1)
+            common.append({
+                "company": name, "neotek": neo[name], "tpdl": cur[name],
+                "delta": delta,
+                "movement": "higher" if delta > 0 else "lower" if delta < 0 else "same",
+            })
+    common.sort(key=lambda c: c["delta"])   # biggest drops first, biggest rises last
+    return {
+        "available": True,
+        "neotek_run": {"label": "Neotek (25/05)", "companies": len(neo)},
+        "tpdl_run": {"label": f"TPDL ({tpdl['run_date']})", "companies": tpdl["companies"]},
+        "common_count": len(common),
+        "tpdl_only": sorted(n for n in cur if n not in neo),
+        "companies": common,
+    }
+
+
+@router.get("/api/runs/compare")
+def api_compare(db: Session = Depends(get_db)) -> dict:
+    return _neotek_compare(db)
+
+
+@router.get("/api/runs/compare.csv")
+def compare_csv(db: Session = Depends(get_db)) -> Response:
+    cmp = _neotek_compare(db)
+    rows = [[c["company"], c["neotek"], c["tpdl"], f"{c['delta']:+.1f}", c["movement"]]
+            for c in cmp.get("companies", [])]
+    return _csv_response(
+        rows, ["Company", "Neotek score (25/05)", "TPDL score (Jul)", "Delta", "Movement"],
+        "neotek_vs_tpdl.csv")
+
+
 @router.get("/api/runs")
 def api_runs(db: Session = Depends(get_db)) -> dict:
     runs = _runs_ordered(db)

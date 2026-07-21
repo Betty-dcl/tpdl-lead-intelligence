@@ -98,14 +98,20 @@ function intelPage() {
     filters: {
       sector_bucket: "",
       signal_type: "",
+      geo_region: "",
       outreach_eligible: false,
       review_flag: false,
       fresh_only: false,
+      new_only: false,
     },
     showICP: false,
+    topN: 0,                 // 0 = show all; otherwise 10/20/35/50/200
     sortKey: "assessed_score",
     sortDesc: true,
     expandedRow: null,
+    // Run comparison ("bank-statement" period picker)
+    runs: [],
+    compare: { on: false, from_run: "", to_run: "", data: {}, summary: null, meta: null, loading: false },
     charts: { score: null, signals: null, sectors: null },
     loading: true,
     error: null,
@@ -113,18 +119,25 @@ function intelPage() {
     async init() {
       this.loading = true;
       try {
-        const [companies, signals, stats, run, activity] = await Promise.all([
+        const [companies, signals, stats, run, activity, runs] = await Promise.all([
           fetch("/api/intel/companies?limit=2000").then(r => r.json()),
           fetch("/api/intel/signals?limit=30").then(r => r.json()),
           fetch("/api/intel/stats").then(r => r.json()),
           fetch("/api/intel/run").then(r => r.json()).catch(() => null),
           fetch("/api/team/activity?limit=15").then(r => r.json()).catch(() => []),
+          fetch("/api/intel/runs").then(r => r.json()).catch(() => ({ runs: [] })),
         ]);
         this.companies = companies;
         this.signals = signals;
         this.stats = stats;
         this.run = run;
         this.activity = activity;
+        this.runs = runs.runs || [];
+        // Default the comparison to oldest → newest run.
+        if (this.runs.length >= 2) {
+          this.compare.from_run = this.runs[0].run_id;
+          this.compare.to_run = this.runs[this.runs.length - 1].run_id;
+        }
         this.$nextTick(() => this.renderCharts());
       } catch (e) {
         this.error = `Couldn't load market intel: ${e.message}`;
@@ -133,20 +146,73 @@ function intelPage() {
       }
     },
 
+    /* ---- Run comparison (period picker) ---- */
+
+    runLabel(id) {
+      const r = this.runs.find(x => x.run_id === id);
+      return r ? r.label : id;
+    },
+    async loadCompare() {
+      if (!this.compare.from_run || !this.compare.to_run) return;
+      this.compare.loading = true;
+      try {
+        const url = `/api/intel/compare?from_run=${encodeURIComponent(this.compare.from_run)}&to_run=${encodeURIComponent(this.compare.to_run)}`;
+        const d = await fetch(url).then(r => r.json());
+        const map = {};
+        (d.companies || []).forEach(c => { map[c.company] = c; });
+        this.compare.data = map;
+        this.compare.summary = d.summary;
+        this.compare.meta = { from: d.from, to: d.to };
+      } catch (e) {
+        console.error("compare load failed:", e);
+      } finally {
+        this.compare.loading = false;
+      }
+    },
+    toggleCompare() {
+      this.compare.on = !this.compare.on;
+      if (this.compare.on && !this.compare.summary) this.loadCompare();
+    },
+    onCompareRunChange() {
+      // Re-pull whenever a picker changes (only matters while compare is on).
+      this.loadCompare();
+    },
+    // Entry for a company in the currently-selected period (or null).
+    cmp(c) { return this.compare.on ? (this.compare.data[c.name] || null) : null; },
+    // Effective delta / baseline / status — period-aware.
+    effDelta(c)     { const e = this.cmp(c); return this.compare.on ? (e ? e.delta : null) : c.delta; },
+    effBaseline(c)  { const e = this.cmp(c); return this.compare.on ? (e ? e.from_score : null) : c.neotek_score; },
+    effReappeared(c){ const e = this.cmp(c); return this.compare.on ? !!(e && e.from_score != null) : c.reappeared; },
+    effStatus(c)    { const e = this.cmp(c); return e ? e.status : null; },
+
     /* ---- Filtering / sorting ---- */
 
     get filteredCompanies() {
       const f = this.filters;
       const sectorOK = (c) => !f.sector_bucket || c.sector_bucket === f.sector_bucket;
       const signalOK = (c) => !f.signal_type || c.signals.some(s => s.category === f.signal_type);
+      const geoOK    = (c) => !f.geo_region || c.geo_region === f.geo_region;
       const eligibleOK = (c) => !f.outreach_eligible || c.outreach_eligible;
       const reviewOK   = (c) => !f.review_flag       || c.review_flag;
       const icpOK      = (c) => this.showICP || !c.icp_flag;
       const freshOK    = (c) => !f.fresh_only || this.isFresh(c);
-      const rows = this.companies.filter(c => sectorOK(c) && signalOK(c) && eligibleOK(c) && reviewOK(c) && icpOK(c) && freshOK(c));
+      // In compare mode, only show companies present in the "to" period, and
+      // (optionally) only the ones that are new in that period.
+      const compareOK  = (c) => {
+        if (!this.compare.on) return true;
+        const e = this.compare.data[c.name];
+        if (!e || e.to_score == null) return false;     // not in the later run
+        if (f.new_only && e.status !== "new") return false;
+        return true;
+      };
+      const rows = this.companies.filter(c =>
+        sectorOK(c) && signalOK(c) && geoOK(c) && eligibleOK(c) &&
+        reviewOK(c) && icpOK(c) && freshOK(c) && compareOK(c));
       const dir = this.sortDesc ? -1 : 1;
+      const key = this.sortKey;
+      const val = (c) => (key === "delta" && this.compare.on) ? this.effDelta(c) : c[key];
       return [...rows].sort((a, b) => {
-        const av = a[this.sortKey], bv = b[this.sortKey];
+        const av = val(a), bv = val(b);
         if (av === bv) return 0;
         if (av == null) return 1;
         if (bv == null) return -1;
@@ -154,14 +220,37 @@ function intelPage() {
       });
     },
 
+    // Top-N slice of the sorted list (0 = all). This is what the table renders,
+    // and the rank number shown is the position in THIS list.
+    get displayedCompanies() {
+      const rows = this.filteredCompanies;
+      return this.topN > 0 ? rows.slice(0, this.topN) : rows;
+    },
+
     setSort(key) {
       if (this.sortKey === key) this.sortDesc = !this.sortDesc;
       else { this.sortKey = key; this.sortDesc = true; }
     },
 
+    setTopN(n) { this.topN = (this.topN === n) ? 0 : n; },
+
+    distinctRegions() {
+      const order = ["CH", "ES", "USA", "Middle East", "Europe", "APAC", "Other"];
+      const present = new Set(this.companies.map(c => c.geo_region).filter(Boolean));
+      return order.filter(r => present.has(r));
+    },
+    regionLabel(r) {
+      return { CH: "Switzerland", ES: "Spain", USA: "USA",
+               "Middle East": "Middle East", Europe: "Europe (rest)",
+               APAC: "APAC", Other: "Other / unknown" }[r] || r;
+    },
+
     resetFilters() {
-      this.filters = { sector_bucket: "", signal_type: "", outreach_eligible: false, review_flag: false, fresh_only: false };
+      this.filters = { sector_bucket: "", signal_type: "", geo_region: "",
+                       outreach_eligible: false, review_flag: false,
+                       fresh_only: false, new_only: false };
       this.showICP = false;
+      this.topN = 0;
     },
 
     /* ---- Freshness (the universe mixes vintages: latest run vs older stock) ---- */
@@ -209,11 +298,13 @@ function intelPage() {
       if (d === 0)  return "background:#f3f3ef;color:#5c5c5c";
       return d > 0 ? "background:#dcf7e7;color:#0a3a26" : "background:#fee2e2;color:#7f1d1d";
     },
-    // Left accent that marks a company already seen in the Neotek run.
+    // Left accent that marks a company already seen in the baseline run
+    // (period-aware: reflects the selected comparison when compare mode is on).
     reappearedBorder(c) {
-      if (!c.reappeared) return "3px solid transparent";
-      if (c.delta > 0) return "3px solid #34D591";
-      if (c.delta < 0) return "3px solid #ef4444";
+      if (!this.effReappeared(c)) return "3px solid transparent";
+      const d = this.effDelta(c);
+      if (d > 0) return "3px solid #34D591";
+      if (d < 0) return "3px solid #ef4444";
       return "3px solid #94a3b8";
     },
     companyUrl(c) { return `/intel/company?c=${encodeURIComponent(c.name)}`; },

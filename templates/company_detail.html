@@ -80,13 +80,25 @@
         <template x-if="c?.reappeared">
           <div class="rounded-xl border px-4 py-3 text-sm"
                :style="bannerStyle()">
-            <div class="text-[11px] uppercase tracking-wider font-semibold mb-0.5">Seen before</div>
+            <div class="text-[11px] uppercase tracking-wider font-semibold mb-0.5">
+              <span x-text="movementWord(c.delta)"></span> since Neotek
+            </div>
             <div>
               Already in the <strong>Neotek May run</strong> at
               <span class="font-mono" x-text="fmt(c.neotek_score)"></span>
               → now <span class="font-mono" x-text="fmt(c.assessed_score)"></span>
               <span class="delta-chip ml-1" :style="deltaChipStyle(c.delta)" x-text="deltaLabel(c.delta)"></span>
             </div>
+          </div>
+        </template>
+        <!-- New (not in the Neotek reference) -->
+        <template x-if="c && !c.reappeared">
+          <div class="rounded-xl border px-4 py-3 text-sm"
+               style="background:#e0e7ff;border-color:#c7d2fe;color:#3730a3">
+            <div class="text-[11px] uppercase tracking-wider font-semibold mb-0.5">New this run</div>
+            <div>Not in the Neotek May reference — first scored at
+              <span class="font-mono" x-text="fmt(c.assessed_score)"></span>.
+              No prior point yet, so the curve starts here.</div>
           </div>
         </template>
       </div>
@@ -110,14 +122,20 @@
           </div>
         </div>
 
-        <!-- Evolution curve -->
-        <div class="mt-6" x-show="traj && traj.points.length > 1">
+        <!-- Evolution curve — always drawn (a single point if there's only one run) -->
+        <div class="mt-6" x-show="traj && traj.points.length >= 1">
           <div class="text-xs uppercase tracking-wider text-ink-3 mb-2">Score evolution</div>
           <div style="height:150px"><canvas id="traj-chart"></canvas></div>
-          <p class="text-[11px] text-ink-3 mt-2 leading-relaxed">
+          <p class="text-[11px] text-ink-3 mt-2 leading-relaxed"
+             x-show="traj && traj.points.length > 1">
             Two data points so far: the Neotek May reference and this TPDL-engine run.
             The line spans an <strong>engine change</strong>, so read it as “where this
             company stands now vs. where Neotek left it”, not a like-for-like trend.
+          </p>
+          <p class="text-[11px] text-ink-3 mt-2 leading-relaxed"
+             x-show="traj && traj.points.length === 1">
+            One run so far for this company — the curve extends automatically as new
+            runs are imported.
           </p>
         </div>
       </div>
@@ -347,6 +365,7 @@ function companyDetail() {
       return "No signal";
     },
     deltaLabel(d) { if (d == null) return ""; if (d === 0) return "no change"; return (d > 0 ? "▲ +" : "▼ ") + Number(d).toFixed(1); },
+    movementWord(d) { if (d == null) return "New"; if (d > 0) return "Up"; if (d < 0) return "Down"; return "Unchanged"; },
     deltaChipStyle(d) {
       if (d == null || d === 0) return "background:#f3f3ef;color:#5c5c5c";
       return d > 0 ? "background:#dcf7e7;color:#0a3a26" : "background:#fee2e2;color:#7f1d1d";
@@ -360,9 +379,13 @@ function companyDetail() {
 
     renderChart() {
       const el = document.getElementById("traj-chart");
-      if (!el || typeof Chart === "undefined" || !this.traj || this.traj.points.length < 2) return;
+      // Draw whenever there's at least one point (a single run renders as one
+      // marker; the curve fills in as more runs land). Only bail if there's
+      // genuinely nothing to plot.
+      if (!el || typeof Chart === "undefined" || !this.traj || this.traj.points.length < 1) return;
       if (this.chart) this.chart.destroy();
       const pts = this.traj.points;
+      const single = pts.length === 1;
       this.chart = new Chart(el, {
         type: "line",
         data: {
@@ -372,7 +395,8 @@ function companyDetail() {
             borderColor: "#094752",
             backgroundColor: "rgba(52,213,145,0.15)",
             pointBackgroundColor: pts.map(p => p.current ? "#34D591" : "#094752"),
-            pointRadius: 6, pointHoverRadius: 7, fill: true, tension: 0.25,
+            pointRadius: single ? 8 : 6, pointHoverRadius: single ? 9 : 7,
+            fill: true, tension: 0.25,
           }],
         },
         options: {

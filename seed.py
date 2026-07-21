@@ -29,16 +29,25 @@ PROMPTS_DIR = Path(__file__).resolve().parent / "app" / "agents" / "prompts"
 # BD users — collaborative layer
 # ============================================================================
 
+# Real team members (login = pick your name + the shared TPDL_TEAM_PASSWORD).
+# Same rights for everyone (no admin/user roles for now — editable later).
+# avatar_seed reuses existing SVGs in static/img/avatars/ so no image breaks.
 USERS_SEED = [
-    {"username": "marie",  "display_name": "Marie",  "avatar_seed": "marie-user",  "color": "#1E3A8A"},
-    {"username": "pierre", "display_name": "Pierre", "avatar_seed": "pierre-user", "color": "#10B981"},
-    {"username": "sophie", "display_name": "Sophie", "avatar_seed": "sophie-user", "color": "#8B5CF6"},
-    {"username": "lea",    "display_name": "Léa",    "avatar_seed": "lea-user",    "color": "#F59E0B"},
-    {"username": "tomas",  "display_name": "Tomás",  "avatar_seed": "tomas-user",  "color": "#EC4899"},
+    {"username": "andres",   "display_name": "Andrés",   "avatar_seed": "pierre-user", "color": "#1E3A8A"},
+    {"username": "paula",    "display_name": "Paula",    "avatar_seed": "sophie-user", "color": "#8B5CF6"},
+    {"username": "nathalie", "display_name": "Nathalie", "avatar_seed": "marie-user",  "color": "#EC4899"},
+    {"username": "betty",    "display_name": "Betty",    "avatar_seed": "lea-user",    "color": "#F59E0B"},
 ]
 
 
 def seed_users() -> None:
+    """Upsert the team members and prune anyone no longer in the roster (keeping
+    'guest'). Pruning also clears that user's collaborative rows so the fresh
+    login picker shows exactly the current team — no stale demo names."""
+    from app.models import (Comment, CompanyAssignment, CompanyStatus,
+                            SpecialistOutput, TeamActivity)
+
+    keep = {u["username"] for u in USERS_SEED} | {"guest"}
     with SessionLocal() as db:
         for data in USERS_SEED:
             existing = db.query(User).filter(User.username == data["username"]).first()
@@ -49,6 +58,19 @@ def seed_users() -> None:
                 for k, v in data.items():
                     setattr(existing, k, v)
                 logger.info("[seed] updated user: %s", data["username"])
+        db.commit()
+
+        stale = db.query(User).filter(User.username.notin_(keep)).all()
+        for u in stale:
+            db.query(CompanyAssignment).filter(CompanyAssignment.user_id == u.id).delete()
+            db.query(Comment).filter(Comment.user_id == u.id).delete()
+            db.query(TeamActivity).filter(TeamActivity.user_id == u.id).delete()
+            db.query(CompanyStatus).filter(CompanyStatus.updated_by_user_id == u.id)\
+              .update({CompanyStatus.updated_by_user_id: None})
+            db.query(SpecialistOutput).filter(SpecialistOutput.generated_by_user_id == u.id)\
+              .update({SpecialistOutput.generated_by_user_id: None})
+            db.delete(u)
+            logger.info("[seed] pruned stale user: %s", u.username)
         db.commit()
 
 logging.basicConfig(

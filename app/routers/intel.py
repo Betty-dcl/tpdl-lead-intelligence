@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Company, RunSnapshot
+from app.tools.radars import geo_region
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/intel", tags=["intel"])
@@ -96,6 +97,7 @@ def _serialize_company(c: Company, baseline: Optional[dict[str, float]] = None) 
         "sector_bucket": c.sector_bucket,
         "website":       c.website,
         "location":      c.location,
+        "geo_region":    geo_region(c.location),
         "revenue":       c.revenue,
         "assessed_score":     c.assessed_score,
         "coverage":           c.coverage,
@@ -525,4 +527,103 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
         "new_to_universe": new_count,
         "candidates": rows,
         "by_theme": by_theme,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Run comparison — pick any two runs (a "from" and a "to") and see what moved,
+# like filtering a bank statement to a date range. Today there are two runs
+# (Neotek May reference + the July TPDL run); the moment more runs land, the
+# pickers grow automatically — nothing here is hard-coded to two.
+# ---------------------------------------------------------------------------
+
+def _run_label(run_id: str, day: Optional[str]) -> str:
+    engine = "Neotek" if run_id == NEOTEK_REFERENCE_RUN else "TPDL"
+    return f"{engine} · {day}" if day else engine
+
+
+@router.get("/runs")
+def list_runs(db: Session = Depends(get_db)) -> dict:
+    """Every run in history, oldest → newest, for the comparison pickers.
+    INCLUDES the Neotek May reference (the user explicitly wants to diff
+    against it), unlike the /runs traceability page which tracks TPDL only."""
+    by_run: dict[str, list[RunSnapshot]] = {}
+    for r in db.query(RunSnapshot).all():
+        by_run.setdefault(r.import_run_id, []).append(r)
+    runs = []
+    for run_id, rows in by_run.items():
+        dates = [r.run_date for r in rows if r.run_date]
+        day = min(dates).date().isoformat() if dates else None
+        runs.append({
+            "run_id":    run_id,
+            "run_date":  day,
+            "label":     _run_label(run_id, day),
+            "companies": len(rows),
+            "is_neotek": run_id == NEOTEK_REFERENCE_RUN,
+        })
+    runs.sort(key=lambda r: r["run_date"] or "")
+    return {"runs": runs, "count": len(runs)}
+
+
+@router.get("/compare")
+def compare_runs(
+    from_run: str,
+    to_run: str,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Per-company movement between ANY two runs. `from_run` is the baseline,
+    `to_run` the later period. Returns each company with its from/to score,
+    the delta, and a status: new (only in `to`), dropped (only in `from`),
+    rising / fading / stable (present in both)."""
+    def scores(run_id: str) -> dict[str, float]:
+        return {r.company_name: (r.assessed_score or 0.0) for r in
+                db.query(RunSnapshot).filter(RunSnapshot.import_run_id == run_id).all()}
+
+    a = scores(from_run)
+    b = scores(to_run)
+    if not b and not a:
+        raise HTTPException(status_code=404, detail="Unknown run id(s)")
+
+    companies = []
+    for name in sorted(set(a) | set(b)):
+        fa = a.get(name)
+        fb = b.get(name)
+        if fa is not None and fb is not None:
+            delta = round(fb - fa, 1)
+            status = "rising" if delta > 0 else "fading" if delta < 0 else "stable"
+        elif fb is not None:      # in `to` only
+            delta, status = None, "new"
+        else:                     # in `from` only
+            delta, status = None, "dropped"
+        companies.append({
+            "company":    name,
+            "from_score": fa,
+            "to_score":   fb,
+            "delta":      delta,
+            "status":     status,
+        })
+
+    def _cnt(s: str) -> int:
+        return sum(1 for c in companies if c["status"] == s)
+
+    both = [c for c in companies if c["delta"] is not None]
+    top_riser = max((c for c in both if c["delta"] > 0), key=lambda c: c["delta"], default=None)
+    top_fader = min((c for c in both if c["delta"] < 0), key=lambda c: c["delta"], default=None)
+
+    # run metadata for labels
+    runs = {r["run_id"]: r for r in list_runs(db)["runs"]}
+    return {
+        "from": runs.get(from_run, {"run_id": from_run}),
+        "to":   runs.get(to_run,   {"run_id": to_run}),
+        "summary": {
+            "new":     _cnt("new"),
+            "dropped": _cnt("dropped"),
+            "rising":  _cnt("rising"),
+            "fading":  _cnt("fading"),
+            "stable":  _cnt("stable"),
+            "common":  len(both),
+            "top_riser": {"company": top_riser["company"], "delta": top_riser["delta"]} if top_riser else None,
+            "top_fader": {"company": top_fader["company"], "delta": top_fader["delta"]} if top_fader else None,
+        },
+        "companies": companies,
     }

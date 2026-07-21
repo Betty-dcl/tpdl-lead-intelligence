@@ -143,6 +143,55 @@ def test_intel_trajectory(client, a_company):
     assert data["points"][-1]["current"] is True
 
 
+def test_intel_company_has_geo_region(client, a_company):
+    body = client.get(f"/api/intel/companies/{a_company}").json()
+    assert body["geo_region"] in {"CH", "ES", "USA", "Middle East",
+                                  "Europe", "APAC", "Other"}
+
+
+def test_geo_region_bucketing():
+    from app.tools.radars import geo_region
+    assert geo_region("Basel, Switzerland") == "CH"
+    assert geo_region("Barcelona, Spain") == "ES"
+    assert geo_region("Dubai, UAE") == "Middle East"
+    assert geo_region("San Diego, California, USA") == "USA"
+    assert geo_region("Tokyo, Japan") == "APAC"
+    assert geo_region("Munich, Germany") == "Europe"
+    assert geo_region("Toronto, Ontario, Canada") == "Other"
+    assert geo_region(None) == "Other"
+
+
+def test_intel_runs_list(client):
+    data = client.get("/api/intel/runs").json()
+    assert data["count"] >= 1
+    for r in data["runs"]:
+        assert {"run_id", "run_date", "label", "companies", "is_neotek"} <= set(r)
+    # oldest → newest
+    dates = [r["run_date"] for r in data["runs"] if r["run_date"]]
+    assert dates == sorted(dates)
+
+
+def test_intel_compare_two_runs(client):
+    runs = client.get("/api/intel/runs").json()["runs"]
+    if len(runs) < 2:
+        pytest.skip("need at least two runs to compare")
+    frm, to = runs[0]["run_id"], runs[-1]["run_id"]
+    d = client.get(f"/api/intel/compare?from_run={frm}&to_run={to}").json()
+    s = d["summary"]
+    assert {"new", "dropped", "rising", "fading", "stable", "common"} <= set(s)
+    # every company carries a status; delta is null exactly for new/dropped
+    for c in d["companies"]:
+        assert c["status"] in {"new", "dropped", "rising", "fading", "stable"}
+        assert (c["delta"] is None) == (c["status"] in {"new", "dropped"})
+    # a company only in the later run is "new"; only in baseline is "dropped"
+    assert s["rising"] + s["fading"] + s["stable"] == s["common"]
+
+
+def test_intel_compare_unknown_runs_404(client):
+    r = client.get("/api/intel/compare?from_run=nope&to_run=nada")
+    assert r.status_code == 404
+
+
 def test_intel_export_csv(client):
     r = client.get("/api/intel/export.csv?scope=run")
     assert r.status_code == 200

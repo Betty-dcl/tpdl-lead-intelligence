@@ -3,8 +3,10 @@
 > C'est LE fichier qui bouge le plus. Après chaque session, mettre à jour « Dernière session »
 > et la checklist des blocages. Claude Code doit PROPOSER de le faire.
 
-> 📘 **Mise en production** : chemin clé-en-main ordonné dans `.claude/go-live-runbook.md`
+> 📘 **Mise en production (moteur/run)** : chemin clé-en-main dans `.claude/go-live-runbook.md`
 > (quelle clé débloque quoi, commandes exactes, garde-fous, gate RGPD). Chargé à la demande.
+> 🌐 **Déploiement de l'APP web partagée** : `.claude/azure-deploy-runbook.md` (Azure App Service +
+> Postgres, conteneur Docker, mot de passe équipe, pas-à-pas `az`). Ajouté le 2026-07-21.
 
 ## Où on en est
 - Phase : **Step 3 (workflow) largement FAIT en code** — le moteur Neotek est reconstruit dans
@@ -17,6 +19,24 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-21 — **Filtres Sales enrichis + comparaison de runs + prépa déploiement Azure (demande Betty).**
+  UI Sales ([intel.html]/[intel.js]/[intel.py]) : (1) **filtre localisation** (CH/ES/USA/Middle East/
+  Europe/APAC/Other) via `geo_region()` déterministe ajouté à `app/tools/radars.py` (bucketing free-text) ;
+  (2) **frise comparaison de runs** « comme un relevé bancaire » : sélecteurs From→To, résumé new/rising/
+  fading/stable + top riser/fader, **delta recalculé pour la période** ; endpoints génériques `/api/intel/runs`
+  + `/api/intel/compare?from_run&to_run` (s'étendent seuls dès un 3e run, rien codé en dur pour 2 runs) ;
+  (3) **frise Top-N** (10/20/35/50/200/All) + **colonne de rang `#`**. Fiche société ([company_detail.html]) :
+  delta **toujours affiché** (Up/Down/Unchanged/New) + **courbe toujours tracée** (`renderChart` dessine dès
+  1 point ; testé 1pt=15 040 px, 2pt=169 450 px — le fix protège les futures sociétés net-new, les 122
+  candidats une fois scorés). +5 tests → **210 verts**, 0 erreur console, vérifié en live.
+  **Utilisateurs remplacés** (`seed.py`) : Marie/Pierre/Sophie/Léa/Tomás → **Andrés, Paula, Nathalie, Betty**
+  (mêmes droits, code équipe **TPDL**, modifiable ensuite) ; `seed_users` purge désormais les users obsolètes
+  (nettoie assignments/comments/activity/status/briefs). **Prépa déploiement Azure App Service** (choix Betty,
+  vraie app web multi-utilisateurs, pas de rôles) : `Dockerfile` (1 worker gunicorn+uvicorn — scheduler+WS en
+  mémoire) + `.dockerignore` + `gunicorn`/`psycopg[binary]` dans requirements + `.claude/azure-deploy-runbook.md`
+  (pas-à-pas `az`, Postgres, amorçage, variables d'env). L'app était **déjà Postgres-ready** (`DATABASE_URL` +
+  couche DB bi-dialecte). Commande de prod validée en local (gunicorn boote, port en écoute) ; build image non
+  testé (Docker absent de la machine). RESTE (action Betty/Alfredo, compte Azure) : lancer le runbook.
 - 2026-07-20 — **Refonte UI « traçabilité du run » + page Découvertes + audit pré-démo (demande Betty).**
   Objectif : présenter la plateforme demain, tout traçable/clair/pro, 0 lien cassé. Fait :
   (1) **Backend intel** : `_neotek_baseline` + enrichissement `_serialize_company` (neotek_score/delta/
@@ -562,8 +582,17 @@
 - Base légale RGPD pour l'enrichissement + envoi (UE/CH) avant le 1er envoi.
 
 ## Dernière session
-- Date : 2026-07-20
-- Fait : **refonte UI traçabilité du run + page Découvertes + audit pré-démo** (voir log 2026-07-20 en
+- Date : 2026-07-21
+- Fait : **filtres Sales (localisation, comparaison de runs, Top-N + rang) + fiche société (delta + courbe
+  toujours tracée) + utilisateurs réels + prépa déploiement Azure** (voir log 2026-07-21 en haut). Filtre
+  localisation via `geo_region()` ; frise « compare runs » From→To (delta recalculé, s'étend seule dès un 3e
+  run) ; Top-N + colonne `#`. Fiche société : delta toujours affiché, courbe tracée dès 1 point. Users →
+  **Andrés, Paula, Nathalie, Betty** (code équipe **TPDL**, mêmes droits, purge des anciens). Déploiement :
+  `Dockerfile` + `.dockerignore` + `azure-deploy-runbook.md` (Azure App Service + Postgres, mot de passe
+  équipe). Commande prod gunicorn validée en local. **210 tests verts**, 0 erreur console. RESTE : Betty/Alfredo
+  lancent le runbook Azure avec le compte Azure de TPDL ; (optionnel) tester le build image sur une machine
+  avec Docker ; SSO Microsoft plus tard.
+- Fait (session du 2026-07-20) : **refonte UI traçabilité du run + page Découvertes + audit pré-démo** (voir log 2026-07-20 en
   haut). Sales/Contacts/Runs remis autour du run du 17/07 avec delta vs Neotek + couleur « réapparue » ;
   nouvelle fiche société (`/intel/company`) avec formule du score, courbe d'évolution et liens news
   cliquables ; nouvelle page **Candidates** (122 découvertes vendredi, FOUND ≠ SCORED). Audit : **0 lien
