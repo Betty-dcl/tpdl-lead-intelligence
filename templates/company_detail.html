@@ -247,7 +247,13 @@
            x-show="c?.review_flag && c?.review_flag_reason">
         ⚑ <span class="uppercase tracking-wider text-xs font-semibold">Review flag — </span>
         <span x-text="c?.review_flag_reason"></span>
-        <span class="block text-xs text-red-600 mt-1">A 60-second manual check is recommended before acting on this company.</span>
+        <div class="flex items-center justify-between gap-3 flex-wrap mt-2">
+          <span class="text-xs text-red-600">A 60-second manual check is recommended before acting on this company.</span>
+          <a :href="`/review?company=${encodeURIComponent(name)}`"
+             class="tpdl-btn text-xs shrink-0" style="background:#b23c3c;color:#fff;border:none">
+            → Review this company
+          </a>
+        </div>
       </div>
     </section>
 
