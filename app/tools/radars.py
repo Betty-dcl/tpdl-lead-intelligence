@@ -114,6 +114,48 @@ def geo_region(location: str | None) -> str:
     return "Other"
 
 
+# Broader country detection for SERP localisation (does NOT change detect_country,
+# which stays CH/ES-only for Inès's lunch/language radars). Ordered: first hit wins.
+_COUNTRY_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("CH", _SWISS_HINTS),
+    ("ES", _SPAIN_HINTS),
+    ("FR", ("france", "paris", "lyon", "les ulis", "toulouse", "marseille", "strasbourg")),
+    ("DE", ("germany", "deutschland", "berlin", "munich", "münchen", "hamburg", "frankfurt", "tuttlingen")),
+    ("IT", ("italy", "italia", "milan", "milano", "rome", "roma", "turin")),
+    ("GB", ("united kingdom", " uk", ",uk", "england", "london", "cambridge, uk", "cardiff", "scotland")),
+    ("IE", ("ireland", "dublin", "bray")),
+    ("NL", ("netherlands", "amsterdam", "rotterdam", "utrecht", "leiden")),
+    ("BE", ("belgium", "brussels", "bruxelles", "ghent", "leuven")),
+    ("AT", ("austria", "vienna", "wien")),
+    ("PT", ("portugal", "lisbon", "lisboa", "porto")),
+    ("SE", ("sweden", "stockholm", "gothenburg", "uppsala")),
+    ("DK", ("denmark", "copenhagen", "hellerup")),
+    ("NO", ("norway", "oslo")),
+    ("FI", ("finland", "helsinki")),
+    ("GR", ("greece", "athens")),
+    # Middle East (phase 2 — in scope)
+    ("AE", ("uae", "united arab emirates", "dubai", "abu dhabi", "sharjah")),
+    ("SA", ("saudi", "riyadh", "jeddah")),
+    ("EG", ("egypt", "cairo")),
+    ("IL", ("israel", "tel aviv")),
+    ("TR", ("turkey", "türkiye", "istanbul", "ankara")),
+    ("QA", ("qatar", "doha")),
+)
+
+
+def detect_market_country(location: str | None) -> str | None:
+    """Map a free-text location to an ISO-ish country code for SERP localisation
+    (CH/ES/FR/DE/IT/GB/IE/NL/BE/AT/PT/SE/DK/NO/FI/GR/AE/SA/EG/IL/TR/QA), or None
+    if unknown. Broader than detect_country (which stays CH/ES for Inès)."""
+    if not location:
+        return None
+    low = location.lower()
+    for code, hints in _COUNTRY_HINTS:
+        if any(h in low for h in hints):
+            return code
+    return None
+
+
 def is_spanish_name(full_name: str | None) -> bool:
     if not full_name:
         return False

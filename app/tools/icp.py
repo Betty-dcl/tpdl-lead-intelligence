@@ -22,6 +22,14 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from app.tools.radars import geo_region
+
+# Phase-1/2 geography (Betty, 2026-07-22): Switzerland, Spain, Middle East and the
+# rest of Europe are IN scope now. USA and APAC are phase 3 — deprioritised, so
+# flagged out of the current ICP (not excluded forever). Unknown/other locations
+# are NOT geo-excluded (benefit of the doubt — could be European).
+_PHASE3_GEOS = {"USA", "APAC"}
+
 # The confirmed campaign targets — never excluded (safety net against a hint
 # matching a real target's description).
 CONFIRMED_TARGETS = {
@@ -144,7 +152,8 @@ def revenue_below_floor(revenue: str | None, floor_musd: float = 100.0) -> bool:
 def assess_icp(name: str | None,
                sector: str | None = None,
                sector_bucket: str | None = None,
-               revenue: str | None = None) -> dict:
+               revenue: str | None = None,
+               location: str | None = None) -> dict:
     """Return {'out_of_scope': bool, 'reason': str|None}. `out_of_scope=True`
     maps to Company.icp_flag=True (ICP-flagged / not a target)."""
     n = _norm(name)
@@ -163,5 +172,8 @@ def assess_icp(name: str | None,
         return {"out_of_scope": True, "reason": "CDMO / contract manufacturing — out of ICP"}
     if revenue_below_floor(revenue):
         return {"out_of_scope": True, "reason": "revenue below €100M floor"}
+    if location and geo_region(location) in _PHASE3_GEOS:
+        return {"out_of_scope": True,
+                "reason": f"{geo_region(location)} HQ — phase 3 (outside CH/ES/Middle East/Europe)"}
 
     return {"out_of_scope": False, "reason": None}

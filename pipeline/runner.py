@@ -116,8 +116,9 @@ def _assemble(cfg: EngineConfig, name: str, sector: str | None, identity: dict,
         signals_not_evidenced=not_evidenced,
         tech_stack_summary=tech_stack,
         historical_context=identity.get("historical_context"),
-        icp_flag=bool(identity.get("icp_flag", False)) or _icp.assess_icp(
-            name, sector, identity.get("sector_bucket"), identity.get("revenue")
+        icp_flag=_icp.assess_icp(
+            name, sector, identity.get("sector_bucket"),
+            identity.get("revenue"), identity.get("location"),
         )["out_of_scope"],
         review_flag=review,
         review_flag_reason=reason,

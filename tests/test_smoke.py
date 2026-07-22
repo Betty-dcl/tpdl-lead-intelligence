@@ -185,6 +185,24 @@ def test_icp_targeting_classifier():
     assert assess_icp("Laboratoires Pierre Fabre")["out_of_scope"] is False
     # no short-substring false positives ("ey"/"cgi" must not match journey/Berkeley words)
     assert assess_icp("Journey Medical")["out_of_scope"] is False
+    # geo: CH/ES/Middle East/Europe are phase-1/2 (in); USA/APAC are phase 3 (out)
+    assert assess_icp("Some Pharma", location="Dubai, UAE")["out_of_scope"] is False   # ME in
+    assert assess_icp("Some Pharma", location="Barcelona, Spain")["out_of_scope"] is False
+    assert assess_icp("Some Pharma", location="Munich, Germany")["out_of_scope"] is False
+    assert assess_icp("Some Pharma", location="Boston, USA")["out_of_scope"] is True    # phase 3
+    assert assess_icp("Some Pharma", location="Tokyo, Japan")["out_of_scope"] is True   # phase 3
+
+
+def test_market_country_detection():
+    from app.tools.radars import detect_market_country, detect_country
+    assert detect_market_country("Munich, Germany") == "DE"
+    assert detect_market_country("Milan, Italy") == "IT"
+    assert detect_market_country("Dubai, UAE") == "AE"
+    assert detect_market_country("Copenhagen, Denmark") == "DK"
+    assert detect_market_country("Nowhere") is None
+    # detect_country stays CH/ES-only (Inès radars unchanged)
+    assert detect_country("Munich, Germany") is None
+    assert detect_country("Basel, Switzerland") == "CH"
 
 
 def test_intel_runs_list(client):

@@ -140,17 +140,24 @@ _MARKET_LOCALE: dict[str, tuple[str, str | None]] = {
     "CH": ("ch", None), "ES": ("es", "es"), "FR": ("fr", "fr"),
     "DE": ("de", "de"), "IT": ("it", "it"), "GB": ("uk", "en"),
     "UK": ("uk", "en"), "BE": ("be", None), "NL": ("nl", "nl"),
-    "AT": ("at", "de"), "PT": ("pt", "pt"),
+    "AT": ("at", "de"), "PT": ("pt", "pt"), "IE": ("ie", "en"),
+    "SE": ("se", "sv"), "DK": ("dk", "da"), "NO": ("no", "no"),
+    "FI": ("fi", "fi"), "GR": ("gr", "el"),
+    # Middle East (phase 2 — in scope)
+    "AE": ("ae", "en"), "SA": ("sa", "ar"), "EG": ("eg", "ar"),
+    "IL": ("il", "he"), "TR": ("tr", "tr"), "QA": ("qa", "en"),
 }
 
 
 def _market_locale(location: str | None) -> tuple[str | None, str | None]:
-    """(gl, hl) for a company location, or (None, None) if unknown/non-European."""
+    """(gl, hl) for a company location, or (None, None) if unknown. Uses the
+    broad market-country detector so FR/DE/IT/Nordics/Middle East localise too,
+    not just CH/ES."""
     if not location:
         return (None, None)
     try:
-        from app.tools.radars import detect_country
-        return _MARKET_LOCALE.get(detect_country(location) or "", (None, None))
+        from app.tools.radars import detect_market_country
+        return _MARKET_LOCALE.get(detect_market_country(location) or "", (None, None))
     except Exception:
         return (None, None)
 
