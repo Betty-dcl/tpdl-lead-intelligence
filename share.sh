@@ -2,14 +2,14 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # share.sh — met l'app en ligne sur un LIEN PUBLIC gratuit (Cloudflare tunnel).
 #
-#   ./share.sh
+#   ./share.sh          (ou double-clic sur « Partager TPDL.command »)
 #
-# Donne une URL https://….trycloudflare.com à partager avec l'équipe.
-# Chacun se connecte : choisit son prénom + mot de passe d'équipe (TPDL).
+# Affiche une URL https://….trycloudflare.com, LA COPIE dans le presse-papier,
+# et la garde en ligne. Chacun se connecte : prénom + mot de passe d'équipe (TPDL).
 #
 # ⚠️  Le lien marche TANT QUE cette fenêtre reste ouverte et que ton Mac est
 #     allumé. Ferme la fenêtre (Ctrl+C) = le lien s'éteint. À chaque relance,
-#     l'URL trycloudflare change (lien gratuit, non permanent).
+#     l'URL change (lien gratuit, non permanent).
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -23,9 +23,16 @@ PORT="${PORT:-8000}"
 source .venv/bin/activate 2>/dev/null || true
 
 APP_PID=""
-cleanup() { [ -n "$APP_PID" ] && kill "$APP_PID" 2>/dev/null || true; }
+CF_PID=""
+cleanup() {
+  echo
+  echo "▶ Arrêt du partage…"
+  [ -n "$CF_PID" ]  && kill "$CF_PID"  2>/dev/null || true
+  [ -n "$APP_PID" ] && kill "$APP_PID" 2>/dev/null || true
+}
 trap cleanup EXIT INT TERM
 
+# 1. App
 if lsof -ti:"$PORT" >/dev/null 2>&1; then
   echo "▶ App déjà lancée sur le port $PORT."
 else
@@ -38,10 +45,35 @@ else
   done
 fi
 
-echo
+# 2. Tunnel Cloudflare (en tâche de fond, journal capté pour récupérer l'URL)
+LOG="$(mktemp -t tpdl-share)"
 echo "▶ Ouverture du lien public (Cloudflare)…"
-echo "   → Partage l'URL https://….trycloudflare.com affichée ci-dessous."
-echo "   → Connexion : prénom + mot de passe  TPDL"
-echo "   → Garde cette fenêtre ouverte tant que l'équipe l'utilise."
+cloudflared tunnel --url "http://localhost:$PORT" > "$LOG" 2>&1 &
+CF_PID=$!
+
+# 3. Attendre l'URL, l'afficher en grand + la copier dans le presse-papier
+URL=""
+for _ in $(seq 1 60); do
+  URL="$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG" | head -1 || true)"
+  [ -n "$URL" ] && break
+  sleep 0.5
+done
+
 echo
-cloudflared tunnel --url "http://localhost:$PORT"
+if [ -n "$URL" ]; then
+  printf '%s' "$URL" | pbcopy 2>/dev/null || true
+  echo "══════════════════════════════════════════════════════════════"
+  echo "  ✅  TON LIEN À PARTAGER (déjà copié dans le presse-papier) :"
+  echo
+  echo "      $URL"
+  echo
+  echo "  → Colle-le (Cmd+V) dans un message à Andrés / Paula / Nathalie."
+  echo "  → Connexion : prénom + mot de passe  TPDL"
+  echo "  → LAISSE CETTE FENÊTRE OUVERTE. Pour arrêter : Ctrl+C."
+  echo "══════════════════════════════════════════════════════════════"
+else
+  echo "⚠️  Lien pas encore prêt — regarde le journal : $LOG"
+fi
+
+# 4. Garder le tunnel en vie jusqu'à Ctrl+C / fermeture de la fenêtre
+wait "$CF_PID"
