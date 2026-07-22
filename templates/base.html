@@ -39,7 +39,7 @@
   };
 </script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-<script defer src="/static/js/auth.js?v=3"></script>
+<script defer src="/static/js/auth.js?v=4"></script>
 <script defer src="/static/js/realtime.js"></script>
 <link rel="stylesheet" href="/static/css/custom.css?v=5">
 
@@ -70,23 +70,13 @@
          primary nav (2026-07-18) to declutter the cockpit — meta/low-frequency
          pages. Routes remain reachable directly. #}
 
-      <!-- User badge — only shown when auth gate is ON.
-           In public-demo mode the header stays clean. -->
-      <template x-if="$store.me?.loaded && $store.me?.authGate">
-        <div class="ml-3 pl-3 border-l border-line" x-data="userBadge()">
-          <template x-if="me">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium" x-text="me.display_name"></span>
-              <button @click="logout"
-                      class="text-xs text-ink-3 hover:text-ink ml-1"
-                      title="Sign out">↩</button>
-            </div>
-          </template>
-          <template x-if="!me">
-            <a href="/login" class="tpdl-nav-link">Sign in</a>
-          </template>
-        </div>
-      </template>
+      <!-- User badge — visible only when the auth gate is ON and someone is
+           signed in (x-cloak prevents any flash before Alpine loads). In public
+           demo mode the gate is off, so this stays hidden. -->
+      <!-- User badge — populated by plain JS from /api/me (no Alpine reactivity
+           dependency, so it always renders once we know who's signed in). -->
+      <div id="tpdl-user-badge" class="ml-3 pl-3 border-l border-line items-center gap-3"
+           style="display:none"></div>
     </nav>
   </div>
 </header>
@@ -120,6 +110,34 @@
       el.src = "/static/img/avatar-fallback.svg";
     }
   }, true);
+</script>
+
+<script>
+  // Header user badge — plain JS, no framework reactivity. Shows "Signed in —
+  // <name>" + a Sign out button whenever the auth gate is on and a user is
+  // logged in. Sign out clears the session and returns to the login page.
+  (function () {
+    fetch("/api/me").then(function (r) { return r.json(); }).then(function (me) {
+      if (!me || !me.authenticated || !me.auth_gate) return;
+      var el = document.getElementById("tpdl-user-badge");
+      if (!el) return;
+      el.style.display = "flex";
+      el.innerHTML =
+        '<span class="text-sm whitespace-nowrap">' +
+          '<span class="text-ink-3">Signed in — </span>' +
+          '<span class="font-medium" data-name></span>' +
+        '</span>' +
+        '<button type="button" title="Sign out — back to the login page" ' +
+          'class="text-xs font-medium border border-line rounded-full px-3 py-1 ' +
+          'hover:border-ink hover:bg-bg-2 transition-colors whitespace-nowrap">↩ Sign out</button>';
+      el.querySelector("[data-name]").textContent = me.display_name || me.username || "";
+      el.querySelector("button").addEventListener("click", function () {
+        fetch("/api/logout", { method: "POST" }).finally(function () {
+          location.href = "/login";
+        });
+      });
+    }).catch(function () {});
+  })();
 </script>
 </body>
 </html>

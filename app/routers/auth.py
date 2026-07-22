@@ -23,8 +23,12 @@ api_router = APIRouter(prefix="/api", tags=["auth"])
 
 @page_router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    """Render the login page with the 5 BD users as picker options."""
-    users = db.query(User).order_by(User.username).all()
+    """Render the login page with the team members as picker options — in a
+    fixed display order, and without the internal 'guest' fallback user."""
+    display_order = ["andres", "nathalie", "paula", "betty"]
+    users = [u for u in db.query(User).all() if u.username != "guest"]
+    users.sort(key=lambda u: display_order.index(u.username)
+               if u.username in display_order else len(display_order))
     me = get_current_user_optional(request, db)
     return templates.TemplateResponse(
         request,

@@ -32,10 +32,11 @@ PROMPTS_DIR = Path(__file__).resolve().parent / "app" / "agents" / "prompts"
 # Real team members (login = pick your name + the shared TPDL_TEAM_PASSWORD).
 # Same rights for everyone (no admin/user roles for now — editable later).
 # avatar_seed reuses existing SVGs in static/img/avatars/ so no image breaks.
+# Order here is the display order on the login picker: Andrés → Nathalie → Paula → Betty.
 USERS_SEED = [
     {"username": "andres",   "display_name": "Andrés",   "avatar_seed": "pierre-user", "color": "#1E3A8A"},
-    {"username": "paula",    "display_name": "Paula",    "avatar_seed": "sophie-user", "color": "#8B5CF6"},
     {"username": "nathalie", "display_name": "Nathalie", "avatar_seed": "marie-user",  "color": "#EC4899"},
+    {"username": "paula",    "display_name": "Paula",    "avatar_seed": "sophie-user", "color": "#8B5CF6"},
     {"username": "betty",    "display_name": "Betty",    "avatar_seed": "lea-user",    "color": "#F59E0B"},
 ]
 
