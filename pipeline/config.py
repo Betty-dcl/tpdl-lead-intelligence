@@ -87,6 +87,9 @@ class EngineConfig:
                                          # since 2026-07-18 (decision Betty); costs 1 extra
                                          # SERP search/company. Kill switch:
                                          # EU_REGISTRY_ENABLED=0 or CLI --no-eu-registry.
+    enrich_revenue: bool = False         # opt-in (--enrich-revenue): 1 Perplexity call/company
+                                         # to fill an unknown revenue so the €100M ICP floor can
+                                         # apply. Fail-open (any error → revenue stays unknown).
 
     # ── scoring weights (from scoring_config.yaml) ──────────────────────
     recency: dict = field(default_factory=lambda: {

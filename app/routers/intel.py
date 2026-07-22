@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Company, RunSnapshot
+from app.tools.icp import market_tier
 from app.tools.radars import geo_region
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,7 @@ def _serialize_company(c: Company, baseline: Optional[dict[str, float]] = None) 
         "website":       c.website,
         "location":      c.location,
         "geo_region":    geo_region(c.location),
+        "market_tier":   market_tier(c.location),   # core (CH/ES/ME/Europe) | world
         "revenue":       c.revenue,
         "assessed_score":     c.assessed_score,
         "coverage":           c.coverage,

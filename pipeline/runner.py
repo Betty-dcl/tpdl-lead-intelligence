@@ -77,6 +77,15 @@ def _assemble(cfg: EngineConfig, name: str, sector: str | None, identity: dict,
               tech_stack: str | None, violations: list[str], flags: list[str],
               scored, not_evidenced, summary) -> CompanyResult:
     """Step 4 assembly: attach deterministic scores + review flags."""
+    # Opt-in revenue enrichment (fail-open): fill an unknown revenue so the €100M
+    # ICP floor can triage it. Never raises — worst case revenue stays unknown.
+    _rev = (identity.get("revenue") or "").strip().lower()
+    if cfg.enrich_revenue and (not _rev or _rev in {"na", "n/a", "none", "unknown", "-"}):
+        from pipeline import enrich
+        est = enrich.estimate_revenue(cfg, name)
+        if est:
+            identity = {**identity, "revenue": est}
+
     review, reason = score.review_flag(scored)
     extra = []
     if violations:
@@ -269,6 +278,9 @@ def main() -> None:
                              "output NEW candidate companies (not yet in the universe) to "
                              "data/csv/discovery_candidates.csv. Requires --live "
                              "(thematic search + one small Sonnet call, <$0.10).")
+    parser.add_argument("--enrich-revenue", action="store_true",
+                        help="fill unknown revenues via 1 Perplexity call/company "
+                             "(fail-open) so the €100M ICP floor can triage them")
     parser.add_argument("--no-eu-registry", action="store_true",
                         help="Disable the free public EU-registry source for this run "
                              "(default ON; saves 1 SERP search/company when quota is tight)")
@@ -330,6 +342,8 @@ def main() -> None:
     cfg = EngineConfig.load(live=args.live)
     if args.no_eu_registry:
         cfg.eu_registry_enabled = False
+    if getattr(args, "enrich_revenue", False):
+        cfg.enrich_revenue = True
     mode = "LIVE (spending enabled)" if cfg.live else "DRY-RUN (zero cost)"
     logger.info("Engine mode: %s · extraction=%s · interpretation=%s",
                 mode, cfg.extraction_model, cfg.interpretation_model)

@@ -185,12 +185,35 @@ def test_icp_targeting_classifier():
     assert assess_icp("Laboratoires Pierre Fabre")["out_of_scope"] is False
     # no short-substring false positives ("ey"/"cgi" must not match journey/Berkeley words)
     assert assess_icp("Journey Medical")["out_of_scope"] is False
-    # geo: CH/ES/Middle East/Europe are phase-1/2 (in); USA/APAC are phase 3 (out)
-    assert assess_icp("Some Pharma", location="Dubai, UAE")["out_of_scope"] is False   # ME in
-    assert assess_icp("Some Pharma", location="Barcelona, Spain")["out_of_scope"] is False
-    assert assess_icp("Some Pharma", location="Munich, Germany")["out_of_scope"] is False
-    assert assess_icp("Some Pharma", location="Boston, USA")["out_of_scope"] is True    # phase 3
-    assert assess_icp("Some Pharma", location="Tokyo, Japan")["out_of_scope"] is True   # phase 3
+    # geography NEVER excludes — everything is in scope (Betty wants the world too)
+    for loc in ("Dubai, UAE", "Barcelona, Spain", "Munich, Germany", "Boston, USA", "Tokyo, Japan"):
+        assert assess_icp("Some Pharma", location=loc)["out_of_scope"] is False, loc
+
+
+def test_revenue_parser_and_failopen():
+    from pipeline.enrich import parse_revenue, estimate_revenue
+    from pipeline.config import EngineConfig
+    assert parse_revenue("€250 million") == "~€250M (estimated)"
+    assert parse_revenue("about $1.2 billion in 2024") == "~$1.2B (estimated)"
+    assert parse_revenue("CHF 300M") == "~CHF300M (estimated)"
+    assert parse_revenue("revenue of 45 million euros") == "~€45M (estimated)"
+    assert parse_revenue("unknown") is None
+    assert parse_revenue("") is None
+    assert parse_revenue(None) is None
+    # estimate_revenue is fail-open: dry-run (not live) → None, never raises
+    assert estimate_revenue(EngineConfig(live=False), "Whatever Co") is None
+
+
+def test_market_tier():
+    from app.tools.icp import market_tier
+    # core market = CH / ES / Middle East / rest of Europe
+    assert market_tier("Basel, Switzerland") == "core"
+    assert market_tier("Barcelona, Spain") == "core"
+    assert market_tier("Dubai, UAE") == "core"
+    assert market_tier("Munich, Germany") == "core"
+    # world = still in scope, just lower priority
+    assert market_tier("Boston, USA") == "world"
+    assert market_tier("Tokyo, Japan") == "world"
 
 
 def test_market_country_detection():

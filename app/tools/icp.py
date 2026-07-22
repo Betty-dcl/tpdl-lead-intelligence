@@ -24,11 +24,18 @@ import unicodedata
 
 from app.tools.radars import geo_region
 
-# Phase-1/2 geography (Betty, 2026-07-22): Switzerland, Spain, Middle East and the
-# rest of Europe are IN scope now. USA and APAC are phase 3 — deprioritised, so
-# flagged out of the current ICP (not excluded forever). Unknown/other locations
-# are NOT geo-excluded (benefit of the doubt — could be European).
-_PHASE3_GEOS = {"USA", "APAC"}
+# Geography is a PRIORITY signal, NOT an exclusion (Betty, 2026-07-22 pm): the core
+# market is Switzerland / Spain / Middle East / rest of Europe, but she wants
+# everything from the rest of the world too — nothing is geo-excluded. Use
+# market_tier() below for prioritisation; icp_flag is driven only by company TYPE
+# (consulting/CDMO/CRO/tools/distributor) and the <€100M revenue floor.
+_CORE_MARKET_GEOS = {"CH", "ES", "Middle East", "Europe"}
+
+
+def market_tier(location: str | None) -> str:
+    """'core' (CH/ES/Middle East/Europe = TPDL's market, prioritise) or 'world'
+    (everything else — still in scope, just lower priority). Never excludes."""
+    return "core" if geo_region(location) in _CORE_MARKET_GEOS else "world"
 
 # The confirmed campaign targets — never excluded (safety net against a hint
 # matching a real target's description).
@@ -172,8 +179,6 @@ def assess_icp(name: str | None,
         return {"out_of_scope": True, "reason": "CDMO / contract manufacturing — out of ICP"}
     if revenue_below_floor(revenue):
         return {"out_of_scope": True, "reason": "revenue below €100M floor"}
-    if location and geo_region(location) in _PHASE3_GEOS:
-        return {"out_of_scope": True,
-                "reason": f"{geo_region(location)} HQ — phase 3 (outside CH/ES/Middle East/Europe)"}
 
+    # NB: geography never excludes — see market_tier() for prioritisation.
     return {"out_of_scope": False, "reason": None}

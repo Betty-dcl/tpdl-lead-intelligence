@@ -16,14 +16,19 @@
 - **ICP « Market Intel July 2026 » (officiel, v1.0)** — prochaine étape du top-35 Neotek. **6 cibles
   nommées** : Cantabria Labs, Mediderma (Sesderma Group), Ferrer, ISDIN, Leti Pharma, Biologix —
   **mid-size espagnoles**, **dermato/esthétique + specialty pharma + biologics**.
-- **GÉO par phases (précisé Betty 22/07 soir)** : **phase 1-2 = Suisse + Espagne + Moyen-Orient +
-  reste de l'Europe** (tous in-scope au même niveau) ; **phase 3 = USA + APAC + monde** (dépriorisés,
-  pas exclus définitivement). ⚠️ **Le Moyen-Orient est RÉINTÉGRÉ** (était exclu en hérité Neotek) :
-  reconcile base → 64 sociétés réintégrées (61 ME dont Julphar), 26 nouvellement sorties (18 APAC + 8
-  USA). Encodé : `assess_icp(…, location)` exclut USA/APAC (`geo_region`), garde CH/ES/ME/Europe ;
-  `pipeline/runner.py` fait de `assess_icp` la **source de vérité** de `icp_flag` (plus de report du
-  flag CSV). **Recherche localisée par HQ étendue** (`detect_market_country` + `_MARKET_LOCALE`) :
-  FR/DE/IT/UK/IE/NL/BE/AT/PT/Nordics + Moyen-Orient (AE/SA/EG/IL/TR/QA), plus seulement CH/ES.
+- **GÉO = PRIORITÉ, PAS EXCLUSION (précisé Betty 22/07 soir).** Betty veut **de tout, tout le monde**
+  in-scope ; CH/Espagne/Moyen-Orient/Europe = **notre marché (priorité)**, le reste du monde reste
+  in-scope mais **déprioritisé**. ⚠️ **La géo n'exclut RIEN** : `assess_icp` ne filtre que sur le TYPE
+  (conseil/CDMO/CRO/tools/distributeur) + le plancher **CA < 100 M€**. La priorité géo est portée par
+  `market_tier(location)` → **core** (CH/ES/ME/Europe) | **world** (reste), exposé dans le serializer.
+  Reconcile base : le Moyen-Orient (Julphar…) ET les USA/APAC hérités Neotek sont **tous réintégrés**
+  → base 490, **out 77** (type + <100M€ uniquement), **in-scope 413**. `runner.py` : `assess_icp` =
+  source de vérité de `icp_flag`. **Recherche localisée par HQ étendue** (`detect_market_country` +
+  `_MARKET_LOCALE`) : FR/DE/IT/UK/IE/NL/BE/AT/PT/Nordics + Moyen-Orient (AE/SA/EG/IL/TR/QA), plus
+  seulement CH/ES.
+- **Enrichissement CA (opt-in, `--enrich-revenue`)** : `pipeline/enrich.py` — 1 appel Perplexity/société
+  pour les CA inconnus (parser déterministe testé + **fail-open** : toute erreur → CA reste inconnu,
+  ne casse jamais un run). Défaut OFF. But : que le plancher 100 M€ puisse trier les inconnus.
 - **Run du 24/07 (gros lunch 24 h) = SCORE TOUT** (décision Betty) : les 122 candidats + tout ce que la
   découverte trouve, SANS pré-filtre ICP (l'`icp_flag` marque les hors-cible dans le résultat, ne les
   retire pas du scoring). Filtre candidats appliqué en amont = **annotation** (42/122 hors-ICP), pas
