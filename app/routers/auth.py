@@ -33,6 +33,7 @@ def login_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
             "active_page": None,
             "users": users,
             "already_logged_in": me is not None,
+            "hide_chrome": True,   # login is the front door — no nav/footer
         },
     )
 

@@ -47,6 +47,7 @@
 </head>
 <body class="bg-bg text-ink min-h-screen antialiased">
 
+{% if not hide_chrome %}
 <header class="border-b border-line bg-bg/90 backdrop-blur-md sticky top-0 z-40">
   <div class="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-3 flex-wrap">
     <a href="/" class="flex items-center gap-2.5 text-ink hover:opacity-90 transition-opacity shrink-0">
@@ -89,11 +90,13 @@
     </nav>
   </div>
 </header>
+{% endif %}
 
-<main class="max-w-7xl mx-auto px-8 py-12">
+<main class="{% if not hide_chrome %}max-w-7xl mx-auto px-8 py-12{% else %}min-h-screen flex items-center justify-center px-4 py-12{% endif %}">
 {% block content %}{% endblock %}
 </main>
 
+{% if not hide_chrome %}
 <footer class="mt-20 border-t border-line bg-bg/60">
   <div class="max-w-7xl mx-auto px-8 py-8 flex items-center justify-between text-xs text-ink-3 font-mono">
     <span class="flex items-center gap-2">
@@ -103,6 +106,7 @@
     <span>Powered by Claude</span>
   </div>
 </footer>
+{% endif %}
 
 <script>
   // Resilience: avatars are local pixel-art SVGs (scripts/gen_avatars.py). If a

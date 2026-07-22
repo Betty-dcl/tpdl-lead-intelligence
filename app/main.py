@@ -52,19 +52,19 @@ app = FastAPI(title="TPDL — AI Team", version="2.0.0", lifespan=lifespan)
 
 
 # ---------------------------------------------------------------------------
-# Auth gate — redirect / 401 protected paths when not logged in.
-# Public  : /, /login, /marketing, /api/login, /api/me, /api/agents,
-#           /api/intel/stats, /static/*, /favicon.ico, /healthz
-# Protected: /intel, /api/chat/*, /api/companies/*, /api/conversations/*,
-#            /api/team/*, /agent/*
+# Auth gate — when ON, the sign-in page is the FRONT DOOR: every page and API
+# requires a login first. Only the login page itself, the auth endpoints and
+# static assets are reachable unauthenticated. (In public-demo mode — gate OFF —
+# the middleware short-circuits and this whitelist is irrelevant.)
+# Public  : /login, /api/login, /api/me, /api/logout, /static/*, /favicon, /healthz
+# Protected: everything else (/, /intel, /marketing, /agent/*, all other /api/*)
 # ---------------------------------------------------------------------------
 
 PUBLIC_PREFIXES = (
     "/static", "/healthz",
     "/login", "/api/login", "/api/me", "/api/logout",
-    "/api/agents", "/api/intel/stats", "/api/marketing",
 )
-PUBLIC_EXACT = {"/", "/marketing"}
+PUBLIC_EXACT: set[str] = set()
 
 
 def _is_public(path: str) -> bool:
