@@ -101,7 +101,7 @@ function intelPage() {
       geo_region: "",
       outreach_eligible: false,
       review_flag: false,
-      fresh_only: false,
+      vintage: "",          // "" all · "refreshed" (Jul run) · "neotek_may"
       new_only: false,
     },
     showICP: false,
@@ -195,7 +195,7 @@ function intelPage() {
       const eligibleOK = (c) => !f.outreach_eligible || c.outreach_eligible;
       const reviewOK   = (c) => !f.review_flag       || c.review_flag;
       const icpOK      = (c) => this.showICP || !c.icp_flag;
-      const freshOK    = (c) => !f.fresh_only || this.isFresh(c);
+      const vintageOK  = (c) => !f.vintage || c.vintage === f.vintage;
       // In compare mode, only show companies present in the "to" period, and
       // (optionally) only the ones that are new in that period.
       const compareOK  = (c) => {
@@ -207,7 +207,7 @@ function intelPage() {
       };
       const rows = this.companies.filter(c =>
         sectorOK(c) && signalOK(c) && geoOK(c) && eligibleOK(c) &&
-        reviewOK(c) && icpOK(c) && freshOK(c) && compareOK(c));
+        reviewOK(c) && icpOK(c) && vintageOK(c) && compareOK(c));
       const dir = this.sortDesc ? -1 : 1;
       const key = this.sortKey;
       const val = (c) => (key === "delta" && this.compare.on) ? this.effDelta(c) : c[key];
@@ -248,7 +248,7 @@ function intelPage() {
     resetFilters() {
       this.filters = { sector_bucket: "", signal_type: "", geo_region: "",
                        outreach_eligible: false, review_flag: false,
-                       fresh_only: false, new_only: false };
+                       vintage: "", new_only: false };
       this.showICP = false;
       this.topN = 0;
     },
