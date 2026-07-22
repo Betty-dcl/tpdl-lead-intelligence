@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # ─────────────────────────────────────────────────────────────────────────────
 # share.sh — met l'app en ligne sur un LIEN PUBLIC gratuit (Cloudflare tunnel).
 #
@@ -10,25 +10,35 @@
 # ⚠️  Le lien marche TANT QUE cette fenêtre reste ouverte et que ton Mac est
 #     allumé. Ferme la fenêtre (Ctrl+C) = le lien s'éteint. À chaque relance,
 #     l'URL change (lien gratuit, non permanent).
+#
+# NB : volontairement SANS `set -euo pipefail` — c'est un lanceur grand public
+# qui doit tourner sous le bash 3.2 de macOS sans jamais planter en cryptique.
 # ─────────────────────────────────────────────────────────────────────────────
-set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit 1
 
-# Charger le .env dans l'environnement (gate d'auth + clés) — auth.py lit os.environ.
-set -a; [ -f .env ] && . ./.env; set +a
+# Homebrew dans le PATH (cloudflared) même lancé par /bin/bash non-login.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 PORT="${PORT:-8000}"
 
-# venv
-# shellcheck disable=SC1091
-source .venv/bin/activate 2>/dev/null || true
+# Charger le .env dans l'environnement (gate d'auth + clés) — auth.py lit os.environ.
+if [ -f .env ]; then
+  set -a
+  . ./.env
+  set +a
+fi
+
+# Python du venv en direct (pas d'`activate`, plus robuste).
+PY=".venv/bin/python"
+[ -x "$PY" ] || PY="python3"
 
 APP_PID=""
 CF_PID=""
 cleanup() {
   echo
   echo "▶ Arrêt du partage…"
-  [ -n "$CF_PID" ]  && kill "$CF_PID"  2>/dev/null || true
-  [ -n "$APP_PID" ] && kill "$APP_PID" 2>/dev/null || true
+  [ -n "$CF_PID" ]  && kill "$CF_PID"  2>/dev/null
+  [ -n "$APP_PID" ] && kill "$APP_PID" 2>/dev/null
 }
 trap cleanup EXIT INT TERM
 
@@ -37,15 +47,22 @@ if lsof -ti:"$PORT" >/dev/null 2>&1; then
   echo "▶ App déjà lancée sur le port $PORT."
 else
   echo "▶ Démarrage de l'app sur le port $PORT…"
-  python -m uvicorn app.main:app --port "$PORT" --log-level warning &
+  "$PY" -m uvicorn app.main:app --port "$PORT" --log-level warning &
   APP_PID=$!
-  for _ in $(seq 1 40); do
+  n=0
+  while [ "$n" -lt 40 ]; do
     lsof -ti:"$PORT" >/dev/null 2>&1 && break
     sleep 0.5
+    n=$((n + 1))
   done
 fi
 
 # 2. Tunnel Cloudflare (en tâche de fond, journal capté pour récupérer l'URL)
+if ! command -v cloudflared >/dev/null 2>&1; then
+  echo "⚠️  cloudflared introuvable. Installe-le une fois : brew install cloudflared"
+  read -r -p "Entrée pour fermer…"
+  exit 1
+fi
 LOG="$(mktemp -t tpdl-share)"
 echo "▶ Ouverture du lien public (Cloudflare)…"
 cloudflared tunnel --url "http://localhost:$PORT" > "$LOG" 2>&1 &
@@ -53,15 +70,17 @@ CF_PID=$!
 
 # 3. Attendre l'URL, l'afficher en grand + la copier dans le presse-papier
 URL=""
-for _ in $(seq 1 60); do
-  URL="$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG" | head -1 || true)"
+n=0
+while [ "$n" -lt 60 ]; do
+  URL="$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG" | head -1)"
   [ -n "$URL" ] && break
   sleep 0.5
+  n=$((n + 1))
 done
 
 echo
 if [ -n "$URL" ]; then
-  printf '%s' "$URL" | pbcopy 2>/dev/null || true
+  printf '%s' "$URL" | pbcopy 2>/dev/null
   echo "══════════════════════════════════════════════════════════════"
   echo "  ✅  TON LIEN À PARTAGER (déjà copié dans le presse-papier) :"
   echo
@@ -72,7 +91,8 @@ if [ -n "$URL" ]; then
   echo "  → LAISSE CETTE FENÊTRE OUVERTE. Pour arrêter : Ctrl+C."
   echo "══════════════════════════════════════════════════════════════"
 else
-  echo "⚠️  Lien pas encore prêt — regarde le journal : $LOG"
+  echo "⚠️  Lien pas encore prêt. Dernières lignes du journal :"
+  tail -8 "$LOG"
 fi
 
 # 4. Garder le tunnel en vie jusqu'à Ctrl+C / fermeture de la fenêtre
