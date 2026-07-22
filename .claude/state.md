@@ -19,6 +19,24 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-22 — **File Review nettoyée (36 → 9) : suppression des faux flags hérités + BLOCAGE SDK
+  identifié (demande Betty).** Betty a remarqué des signaux `confidence=high` toujours en review et
+  a demandé s'il y avait erreur. Diagnostic : **non, pas une erreur de conception** — les 36 flags
+  dataient TOUS du run du 17/07 et **34/36 relevaient de l'ANCIENNE règle « per-quote speculation »**
+  (flag dès qu'une citation était hedgée, même noyée dans des sources solides), remplacée le 18/07
+  par « resting entirely on hedged quotes » mais **jamais re-passée sur ces données** = dette de
+  données. **Option A (re-score exact ~2 $) tentée mais IMPOSSIBLE dans cette session Claude Code** :
+  le client `httpx` du SDK `anthropic` **bloque systématiquement** (>120 s, timeout non déclenché),
+  y compris machine au repos (load 1,16) — ce n'est NI la RAM, NI les clés, NI le réseau (un appel
+  API direct via `urllib` répond en 1,8 s ; `claude-sonnet-5` valide). ⚠️ **LEÇON OPÉRATIONNELLE :
+  les runs LIVE du moteur doivent être lancés depuis le TERMINAL macOS, pas depuis cette session**
+  (le SDK y bloque). **Option B appliquée (0 $, insensible au SDK — pur SQLite)** : levé le
+  `review_flag` des **27 sociétés** au motif 100 % spéculatif (Cantabria, Roche, Ypsomed…) ; **gardé
+  les 9 vrais flags** de la règle actuelle (8 « QA verbatim », 1 « no date » = Sandoz). Réversible :
+  sauvegarde `data/review_flags_backup_2026-07-22.json` + note d'audit sur chaque société levée.
+  ⚠️ B = pansement cosmétique de l'affichage ; le prochain **run batch 24h le régénère/écrase de zéro
+  (aucune heuristique)**. Aucun code modifié, aucune migration ; la table `companies` reflète le
+  nettoyage.
 - 2026-07-22 — **ICP « Market Intel July 2026 » FORMALISÉ + répercuté partout (5 docs analysés).**
   Betty a fourni 5 docs (2 transcripts du 22/07, le brief ICP, les thèmes de contenu, l'email
   scrapping Nathalie→Marketeering.ai). La segmentation moteur passe de « brouillon à valider » à
