@@ -48,12 +48,17 @@
   scoring = Opus 4.8**.
 - Outils : **Serper** (← SerpAPI), **Kaspr** (← Apollo), Firecrawl, Perplexity, Bouncer, Lemlist.
 - Campagne Lunch : 48 entreprises CH + 19 ES.
-- ⚠️ **SCOPE MOTEUR RÉVISÉ (réunion 16/07, Nathalie) — À FORMALISER, pas encore répercuté dans le
-  code.** On quitte la base FERMÉE de 500 (diagnostic/dermato/dental + CRM = « irrelevant ») pour une
-  **veille de marché large** : critère principal **life science & pharmaceutical** (+ sous-cat.
-  dental/derm/diagnostics) ; base de départ = **top 35 + du NOUVEAU crawlé**, pas les 500. Signal
-  fort = **earnings calls / priorité digitale du board**. Doc de segmentation à écrire (Betty +
-  Nathalie) AVANT de toucher l'ICP de Hugo / `scoring_config.yaml`. Détail : `operational-context.md`.
+- ✅ **SCOPE MOTEUR FORMALISÉ (22/07/2026 — ICP « Market Intel July 2026 », Nathalie).** Le brouillon
+  de segmentation est devenu l'ICP officiel (prochaine étape du top-35 Neotek). Modèle à 2 couches
+  (décision Betty 22/07) : **découverte LARGE** (veille life-science européenne, CH+ES prioritaire,
+  earnings-call/board angle) **+ ICP = filtre de CIBLAGE** par-dessus. **6 cibles nommées** : Cantabria
+  Labs, Mediderma (Sesderma Group), Ferrer, ISDIN, Leti Pharma, Biologix — mid-size espagnoles,
+  dermato/esthétique + specialty pharma + biologics. **Exclusions dures** (→ `icp_flag`) : conseil,
+  CDMO/CRO/manufacturing, CA connu < 100 M€ (privées à CA inconnu GARDÉES). Encodé dans
+  **`app/tools/icp.py`** (déterministe) + `pipeline/runner.py` ; recompute base = 17 sociétés passées
+  hors-ICP (dont Zühlke & Lonza). Cadre rôles/séniorité contacts + process SDR (Marketeering.ai) +
+  5 thèmes de contenu (Deyasini) : détail dans `operational-context.md` (MàJ 22/07) et les prompts
+  (hugo §2b, ines §3b, julie §3b, maya §4b, iris §6b).
 
 ## ROADMAP MACRO (4 steps — on avance petit à petit)
 1. **Abonnements / API** : décider quoi payer (Anthropic, Firecrawl, Perplexity, Serper, Kaspr,

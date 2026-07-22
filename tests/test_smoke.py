@@ -161,6 +161,23 @@ def test_geo_region_bucketing():
     assert geo_region(None) == "Other"
 
 
+def test_icp_targeting_classifier():
+    from app.tools.icp import assess_icp, revenue_below_floor
+    # confirmed campaign targets are never excluded
+    assert assess_icp("Cantabria Labs", "Dermatology", "Dermatology", "~€200M")["out_of_scope"] is False
+    assert assess_icp("Leti Pharma", "Pharma", "Pharma", "€200M–300M")["out_of_scope"] is False
+    # hard exclusions
+    assert assess_icp("Zuhlke", "Unknown", "Unknown", "CHF 300M+")["out_of_scope"] is True
+    assert assess_icp("Lonza", "Unknown", "Unknown", "~$6B+")["out_of_scope"] is True
+    assert assess_icp("Tiny Diagnostics", "Diagnostics", "Diagnostics", "~€45M")["out_of_scope"] is True
+    # private / undisclosed revenue is KEPT; billions kept; regional partials kept
+    assert assess_icp("Ferrer", "Pharma", "Pharma", "NA")["out_of_scope"] is False
+    assert revenue_below_floor("~$6B+") is False
+    assert revenue_below_floor("~$77.3M (regional listing)") is False
+    assert revenue_below_floor("private") is False
+    assert revenue_below_floor("~€45M") is True
+
+
 def test_intel_runs_list(client):
     data = client.get("/api/intel/runs").json()
     assert data["count"] >= 1

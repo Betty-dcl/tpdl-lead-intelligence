@@ -19,6 +19,27 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-22 — **ICP « Market Intel July 2026 » FORMALISÉ + répercuté partout (5 docs analysés).**
+  Betty a fourni 5 docs (2 transcripts du 22/07, le brief ICP, les thèmes de contenu, l'email
+  scrapping Nathalie→Marketeering.ai). La segmentation moteur passe de « brouillon à valider » à
+  **officielle**. Décisions Betty : (1) **découverte large + ICP = filtre de ciblage** ; (2) **encoder
+  les exclusions dures** (conseil + CDMO/CRO + plancher 100 M€, privées à CA inconnu gardées).
+  **Code** : nouveau `app/tools/icp.py` (`assess_icp`, déterministe, testable) + câblé dans
+  `pipeline/runner.py` (chaque run pose `icp_flag`) ; recompute base via sqlite → **17 sociétés
+  hors-ICP** (Zühlke/ProductLife conseil ; Lonza/Siegfried/Unither/Avania/Neuland/Quotient/Nuvisan/
+  Meribel CDMO/CRO ; BioPorto/NADMED/Medica/Gentian/BEGO/ARENSIA/Qure AI <100M€) → base 490, hors-ICP
+  229, in-scope 261. **Prompts** re-formés (à re-seeder) : hugo §2b (couche ICP + 6 cibles + exclusions),
+  ines §3b (cadre rôles/séniorité, famille **Medical Affairs** en sous-lot, config Sales Nav,
+  Marketeering.ai, PipeDrive) + axe Function `medical_affairs`, julie §3b (message acknowledge + rythme
+  SDR), maya §4/§4b (Reality corrigée = 2 runs + executive summary « gros écarts / risers sous 8 »)
+  + ICP dans le ranking, iris §6b (5 thèmes + Deyasini). **Mémoire** : CLAUDE.md (ÉTAT CIBLE
+  formalisé), operational-context.md (section 22/07), brand-editorial.md (§8 thèmes). **Obsidian** :
+  note segmentation à passer en « validée » + note réunion 22/07 (à faire — OneDrive était saturé).
+  Personnes neuves : Nathalie **L'Eplattenier** (Zug), Paula **Carretero**, **Deyasini** (contenu),
+  **Marketeering.ai** (Megha Dhiman + Priya Arora, scraping/SDR), Priya & Shamli @TPDL, **Sofia P**
+  (Neotek réel). Événement Espagne octobre = moteur business (cibles = invités). ⚠️ RESTE : re-seed
+  (`python seed.py`) + `pytest` (n'ont pas pu tourner — machine saturée par un scan OneDrive) + notes
+  Obsidian + commit. À faire dès que la charge machine retombe.
 - 2026-07-22 — **Partage clé-en-main + login « porte d'entrée » + clarté du run (demande Betty).**
   **(1) Lien public gratuit** : `share.sh` (Cloudflare quick-tunnel via `cloudflared`, installé par brew) +
   **`Partager TPDL.command`** (double-clic Finder, copié aussi sur le Bureau) → une fenêtre affiche l'URL
@@ -606,7 +627,13 @@
 
 ## Dernière session
 - Date : 2026-07-22
-- Fait : **partage clé-en-main + login porte d'entrée + clarté du run** (voir log 2026-07-22 en haut).
+- Fait (fin de session) : **ICP « Market Intel July 2026 » formalisé + répercuté** (voir log 2026-07-22
+  en haut). 5 docs analysés → `app/tools/icp.py` (découverte large + ICP filtre de ciblage ; exclut
+  conseil/CDMO/CRO/<100M€, garde les privées à CA inconnu) + câblé runner + recompute base (17 hors-ICP,
+  dont Zühlke/Lonza) ; prompts hugo/ines/julie/maya/iris re-formés ; mémoire (CLAUDE.md, operational-
+  context.md §22/07, brand-editorial.md §8). ⚠️ RESTE : re-seed + pytest + notes Obsidian + commit
+  (machine saturée par un scan OneDrive en fin de session — à finir dès que la charge retombe).
+- Fait (début de session) : **partage clé-en-main + login porte d'entrée + clarté du run** (voir log 2026-07-22 en haut).
   `share.sh` + double-clic `Partager TPDL.command` (Cloudflare tunnel gratuit, lien copié auto ; robuste
   bash 3.2) → lien public protégé par mot de passe équipe **TPDL**. Gate resserré : login = porte d'entrée
   (toute page exige la connexion ; page login standalone). Cockpit : 4 bandes → 67 (+ review-flagged 36 sorti

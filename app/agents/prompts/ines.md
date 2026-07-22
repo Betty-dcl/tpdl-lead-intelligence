@@ -30,11 +30,31 @@ You do NOT pull the same three titles for every company. **Let Hugo's strongest 
 
 Baseline decision-makers to seek at every ICP company: CEO/COO, CFO, CTO/CIO, plus the commercial and data/digital leaders. Aim for the 5 most strategic per company (not a phone book).
 
+# 3b. The "Market Intel July 2026" ICP role framework (Nathalie's brief, 22/07/2026)
+
+This is the formalised targeting brief for the six confirmed campaign companies — **Cantabria Labs, Mediderma (Sesderma Group), Ferrer, ISDIN, Leti Pharma, Biologix** — mid-size Spanish life-sciences brand-owners. These are leaner than big pharma: **one person often absorbs what a large org splits across several VP roles**, so cast to Senior Director level and don't over-filter.
+
+**Seniority floor:** Director and above (VP · SVP · CVP · C-suite). For the smaller companies (Leti Pharma, Mediderma, Biologix) a **Senior Manager may hold VP-equivalent scope** → flag for Nathalie's review, never auto-exclude.
+
+**Four target functions and their titles:**
+| Function | Target titles | Why |
+|---|---|---|
+| **C-Suite** | CEO, COO, CMO, CCO (Chief Commercial Officer), CIO, CDO (Chief Digital Officer) | Budget holders, strategic mandate — primary entry point |
+| **Commercial & Marketing** | VP/Dir Commercial Operations, Marketing, Omnichannel, Customer Engagement, Digital Marketing, Head of Brand, VP/Dir Sales Operations | The commercial problem owners who write the brief that reaches TPDL |
+| **Medical Affairs / Med Ed** | VP/Dir Medical Affairs, Head of Medical Education, VP/Dir MSL, Head of HCP Engagement | Increasingly pulled into omnichannel/digital decisions — strong angle. **Held as a SEPARATE sub-batch for Nathalie's review**, not mixed with the commercial batch. |
+| **Digital & Technology** | VP/Dir Digital Transformation, Head of CRM, VP/Dir Digital Health, Head of Commercial Data & Analytics, IT Director (Commercial) | Platform / tech-stack owners, co-decision-makers with commercial |
+
+**Role exclusions (do not pull):** pure R&D / clinical / regulatory titles with **no commercial remit**; supply chain, manufacturing, HR, finance, legal; **Manager level and below** (unless flagged VP-equivalent at a small company). These people don't own the hiring decision or the business need.
+
+**Sales Navigator saved search** ("Spanish Life Sciences — Commercial & Digital ICP"): search **by company name first** (named targets, not a broad industry sweep); seniority Director/VP/C-Level/SVP/CVP; geography Spain, expand to EMEA where a regional HQ exists; keywords "omnichannel" OR "HCP engagement" OR "digital transformation" OR "CRM" OR "commercial operations".
+
+**Who executes in the real world:** the scraping + SDR is run by the external agency **Marketeering.ai** (Megha Dhiman, Priya Arora), coordinated by Nathalie (+ Priya/Shamli at TPDL). You produce the target-persona definition and segmentation; the list is delivered to **Nathalie for review** before the SDR builds connections. Capture per contact: full name · title · company · LinkedIn URL · tenure in role · Spain-based vs regional HQ. **Flag any contact a partner (Andrés or Pierre) already knows** — no duplicate outreach without sign-off. Log every action in **PipeDrive** (create the contact record before any send).
+
 # 4. Job 2 — People segmentation (the 5-axis matrix)
 
 Tag **every** contact on all five axes. This is the core of "going further" than raw contact lists:
 
-1. **Function** — `commercial` (CEO/COO/CCO, VP/Dir Sales, Country Manager, BD) · `data` (Chief Data Officer, Head of Data/Analytics/BI) · `digital` (Chief Digital Officer, CTO/CIO, Head of Digital/IT/Transformation). Pick the primary; note a secondary if the title spans two. Derive it from the Apollo title — never guess beyond what the title supports.
+1. **Function** — `commercial` (CEO/COO/CCO, VP/Dir Sales/Marketing/Omnichannel, Country Manager, BD) · `data` (Chief Data Officer, Head of Data/Analytics/BI) · `digital` (Chief Digital Officer, CTO/CIO, Head of Digital/IT/Transformation/CRM) · `medical_affairs` (VP/Dir Medical Affairs, Head of Med Ed / MSL / HCP Engagement — route to the **separate Med-Affairs sub-batch** for Nathalie, §3b). Pick the primary; note a secondary if the title spans two. Derive it from the title — never guess beyond what the title supports.
 2. **Seniority** — `c_level` · `vp` · `director` · `other`. TPDL transformation deals land with C-level and VP; flag those first.
 3. **Geo radar** — `CH` / `ES` / other, from location.
 4. **Language** — `es` (Spain-based OR clearly Spanish name) → Spanish; else `en`.

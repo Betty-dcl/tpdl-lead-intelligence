@@ -154,3 +154,22 @@ is a commercial capability, not an administrative one.
   playbooks de localisation en un seul endroit gouverné) ; (3) & (4) suite du report.
 - **Registre** : exactement la voix éditoriale du §2 — principe métier d'abord, la techno comme
   preuve, ton exécutif sobre.
+
+## 8. THÈMES DE CAMPAGNE — « Market Intel July 2026 » (Nathalie, 22/07/2026)
+> Source : `Content Themes for TPDL Audience.docx`. Pour **Deyasini** (contenu, « Content Activation
+> Engine ») et le calendrier éditorial. But : que le contenu LinkedIn d'Andrés résonne avec les
+> contacts ICP (les 6 cibles espagnoles + lookalikes) une fois connectés. Alimente Iris (§6b) + Marc.
+Les **5 thèmes prioritaires** (toujours cadrés « business problem, pas IT problem ») :
+1. **Omnichannel is a data problem, not a channel problem** — pour CMO/CCO noyés dans les décisions
+   de canaux sans l'architecture data (surtout Ferrer, ISDIN).
+2. **HCP engagement in the digital age — ce que les med-ed leaders doivent posséder** — pour Medical
+   Affairs / Med Ed, tirés dans les décisions omnichannel ; audience pas encore saturée.
+3. **Building for global scale from a Spanish base** — pour les ambitions internationales (Cantabria,
+   ISDIN, Ferrer) : une architecture commerciale qui voyage sans perdre l'exécution locale.
+4. **When you control the architecture, you control the brand** — positionnement canonique TPDL en
+   thought leadership, pas en pitch.
+5. **Commercial transformation at mid-size life sciences companies** — les contraintes spécifiques
+   (équipes lean, casquettes multiples, IT limitée, pression à aller vite) que le contenu big-pharma ignore.
+> **Loop humain** (décision 22/07) : l'agent draft → **Nathalie relit/refiltre** → Deyasini polit →
+> retour agent pour intégrer → un graphic designer fait les **carousels** à partir de la copie finalisée.
+> L'agent nourrit ; l'humain possède la voix. L'humain ne sera jamais remplacé (surtout en marketing).

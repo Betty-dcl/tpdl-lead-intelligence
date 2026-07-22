@@ -6,6 +6,56 @@
 > Kaspr←Apollo, budget révisé). Là où un transcript contredit une décision plus récente, la
 > DÉCISION du 09/07 PRIME — voir « Conflits » en bas.
 
+## MISE À JOUR 2026-07-22 — ICP FORMALISÉ + 2 calls + brief scrapping (PRIME sur tout ce qui précède)
+> Sources : 5 docs fournis par Betty (dossier `Downloads/a poser/`) — 2 transcripts du 22/07
+> (« Call with Betty » 09:39 Betty+Nathalie ; « TPDL Commercial Agents Pilot » 09:04 Betty+Nathalie+
+> Andrés+Paula), le brief `TPDL_ICP_Targeting_Brief_Market Intel campaign July 2026.docx`, le doc
+> `Content Themes for TPDL Audience.docx`, et l'email Outlook « week 30 Scrapping » (Nathalie →
+> Marketeering.ai). **La segmentation moteur est passée de « brouillon à valider » à FORMALISÉE.**
+
+- **ICP « Market Intel July 2026 » (officiel, v1.0)** — prochaine étape du top-35 Neotek. **6 cibles
+  nommées** : Cantabria Labs, Mediderma (Sesderma Group), Ferrer, ISDIN, Leti Pharma, Biologix —
+  **mid-size espagnoles**, **dermato/esthétique + specialty pharma + biologics**. Géo : Espagne
+  d'abord, EMEA si HQ régional.
+- **Décision d'encodage (Betty 22/07)** : **découverte LARGE conservée** (le moteur trouve toujours
+  large, ex. les 122 nouvelles) + **ICP = couche de CIBLAGE** par-dessus (marque `icp_flag`). Encodé
+  dans `app/tools/icp.py` (déterministe) + câblé dans `pipeline/runner.py`. Recompute sur la base :
+  **17 sociétés passées hors-ICP** (Zühlke/ProductLife = conseil ; Lonza/Siegfried/Unither/Avania/
+  Neuland/Quotient/Nuvisan/Meribel = CDMO/CRO ; BioPorto/NADMED/Medica/Gentian/BEGO/ARENSIA/Qure AI
+  = CA <100M€). Base : 490, hors-ICP 229, in-scope 261.
+- **Exclusions dures (négatif ICP)** : cabinets de **conseil**, **CDMO / façonniers / CRO / pure
+  manufacturing**, et **CA connu < 100 M€** — MAIS **garder les privées à CA inconnu** (les mid-size
+  espagnoles ne publient pas ; ne jamais exclure sur inconnu). Ne pas monter le plancher trop haut
+  (Leti Pharma 200-300 M€ = cible). Zühlke & Lonza scoraient 8.0 mais sont désormais hors-cible.
+- **Cadre rôles/séniorité contacts (pour le scraper/Inès)** : plancher **Director et +** (VP/SVP/
+  CVP/C-suite ; petites boîtes → Senior Manager = VP-equivalent, flag Nathalie). 4 familles :
+  C-suite / Commercial & Marketing / **Medical Affairs & Med Ed (sous-lot SÉPARÉ, revu par Nathalie)** /
+  Digital & Technology. **Exclure** : R&D-clinique-réglementaire sans mandat commercial, supply chain,
+  manufacturing, RH, finance/légal, manager-and-below. Config Sales Navigator (titres/séniorité/
+  companies/géo Espagne→EMEA/keywords omnichannel·HCP·digital transformation·CRM·commercial ops).
+- **Exécution outreach RÉELLE** : scraping + SDR par l'agence externe **Marketeering.ai** (Megha
+  Dhiman, Priya Arora), coordonnée par Nathalie (+ **Priya** & **Shamli** @TPDL). Envoi via **Andrés
+  Burdett**, connexion chaleureuse SANS pitch. Message « acknowledge » unique post-connexion (formule
+  type ; espagnol pour contacts ES ; pas de félicitations sauf arrivée <3 mois ; aucune mention TPDL) ;
+  réponses **escaladées à Nathalie** ; tout loggé dans **PipeDrive**. Rythme hebdo sur feu vert Nathalie.
+- **Analyse (Maya)** : l'**executive summary** doit mettre en avant les **plus gros écarts avant/après**
+  (top risers, ex. **Leti Pharma 2→8.5**) et flaguer les **0→mid / bas→haut** comme « à surveiller /
+  commencer à bâtir les contacts » même sous 8. Traçabilité de la trajectoire par société across runs.
+- **Contenu** : productrice = **Deyasini** (« Content Activation Engine ») ; **5 thèmes** de campagne
+  (omnichannel = data problem ; HCP engagement digital ; scaler depuis une base espagnole ; « control
+  the architecture, control the brand » ; transformation des mid-size). Principe **business problem,
+  pas IT problem**. Loop humain : agent draft → Nathalie relit/refiltre → Deyasini → agent → carousels
+  par un graphic designer. Détail dans `brand-editorial.md`.
+- **Événement Espagne (octobre 2026)** = moteur business ; les cibles (Leti Pharma, Cantabria…) =
+  invités potentiels. Fenêtre budgets clients = **septembre/octobre** → pitcher avant.
+- **Domaine app** : réutiliser un domaine TPDL existant (comme la newsletter, via un sous-domaine) —
+  Nathalie voit avec **Alfredo**. (Confirme la piste « domaine perso » de l'hébergement.)
+- **Personnes (nouvelles/précisées)** : Nathalie **L'Eplattenier** (TPDL AG, Zug CH, +41 78 664 75 75),
+  Paula **Carretero** (équipe, event), **Deyasini** (contenu), **Marketeering.ai** = Megha Dhiman +
+  Priya Arora (agence scraping/SDR), **Priya** & **Shamli** @TPDL (ops/SharePoint), **Sofia P** (opère
+  le vrai Neotek). Codes API sur SharePoint (Word protégé, Betty+Nathalie). ⚠️ « Pierre » (partner à
+  Barcelone, connexions existantes) — à ne pas confondre avec Priya.
+
 ## MISE À JOUR 2026-07-16 — réunion pilote (Betty & Nathalie)
 > Source : `Downloads/TPDL_agent_pilot-20260716_125029-Meeting_Recording.docx`. Note Obsidian
 > détaillée : vault TPDL → `Agents IA & Pipeline TPDL/Réunion — 16 juillet — Pilote agents…`. Plus récente que

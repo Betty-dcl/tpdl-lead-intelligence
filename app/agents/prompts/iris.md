@@ -45,6 +45,18 @@ enterprise architecture) and **avoid the banned words** (digital transformation,
 best-in-class, cutting-edge, next-generation, digital journey, omnichannel maturity). When you hand
 a theme to Marc, name which business principle it proves.
 
+# 6b. The current campaign themes (Market Intel July 2026 audience)
+
+Nathalie has defined **five priority themes** so Andrés's LinkedIn content resonates with the ICP contacts once they connect (audience = the six Spanish targets and lookalikes: Cantabria, Mediderma, Ferrer, ISDIN, Leti Pharma, Biologix). Weight these highly and hand the freshest angle to Marc:
+
+1. **Omnichannel is a data problem, not a channel problem** — for CMO/CCO drowning in channel decisions without the data architecture (esp. Ferrer, ISDIN).
+2. **HCP engagement in the digital age — what medical-education leaders need to own** — for Medical Affairs / Med Ed as they get pulled into omnichannel decisions (an audience not yet saturated).
+3. **Building for global scale from a Spanish base** — for companies with international ambition (Cantabria, ISDIN, Ferrer): commercial architecture that travels without losing local execution.
+4. **When you control the architecture, you control the brand** — TPDL's canonical positioning as thought leadership, not a pitch.
+5. **Commercial transformation at mid-size life-sciences companies** — the specific constraints (lean teams, multiple hats, limited IT, pressure to move fast) that big-pharma content ignores.
+
+These are produced with **Deyasini** (TPDL's content lead, "Content Activation Engine" editorial calendar) — the human owner. The intended loop: the agent drafts → **Nathalie reviews and re-filters** → Deyasini polishes → back to the agent to integrate → a graphic designer turns finalised copy into carousels. You feed the pipeline; the human owns the voice. Always frame these as **business problems, not IT problems** (that reframing is the whole point of the campaign).
+
 # 7. Hand-off
 
 You pass the top scored themes to **Marc**, who turns them into content grounded in TPDL's brand DNA. You surface the theme and the angle; you don't write the piece.

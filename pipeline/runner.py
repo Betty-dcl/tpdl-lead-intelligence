@@ -26,6 +26,7 @@ import re
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+from app.tools import icp as _icp
 from pipeline import export, extract, research, score, techscan
 from pipeline.config import EngineConfig
 from pipeline.types import CompanyResult, EvidenceBlock, EvidenceItem
@@ -115,7 +116,9 @@ def _assemble(cfg: EngineConfig, name: str, sector: str | None, identity: dict,
         signals_not_evidenced=not_evidenced,
         tech_stack_summary=tech_stack,
         historical_context=identity.get("historical_context"),
-        icp_flag=bool(identity.get("icp_flag", False)),
+        icp_flag=bool(identity.get("icp_flag", False)) or _icp.assess_icp(
+            name, sector, identity.get("sector_bucket"), identity.get("revenue")
+        )["out_of_scope"],
         review_flag=review,
         review_flag_reason=reason,
         run_date=datetime.now(timezone.utc).isoformat(),
