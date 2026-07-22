@@ -266,7 +266,8 @@ function intelPage() {
     isFresh(c) { return !!c.run_date && this._day(c.run_date) === this.latestRunDay; },
     freshLabel(c) {
       if (!c.run_date) return "no date";
-      return this.isFresh(c) ? "fresh" : `${this._day(c.run_date)} · stale`;
+      // Vintage, stated as the run month — no pejorative "stale".
+      return this.isFresh(c) ? "refreshed Jul" : "May run";
     },
     get freshCount() { return this.companies.filter(c => this.isFresh(c)).length; },
 

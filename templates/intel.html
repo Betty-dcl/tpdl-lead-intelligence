@@ -375,7 +375,8 @@
       <span class="flex items-center gap-1.5"><span style="display:inline-block;width:3px;height:14px;background:#34D591;border-radius:2px"></span> reappeared, score up vs Neotek</span>
       <span class="flex items-center gap-1.5"><span style="display:inline-block;width:3px;height:14px;background:#ef4444;border-radius:2px"></span> reappeared, score down</span>
       <span class="flex items-center gap-1.5"><span style="display:inline-block;width:3px;height:14px;background:#94a3b8;border-radius:2px"></span> reappeared, no change</span>
-      <span class="flex items-center gap-1.5"><span class="score-pill" style="min-width:auto;padding:2px 6px;font-size:10px;background:#dcf7e7;color:#0a3a26">▲ +1.5</span> Δ vs Neotek May</span>
+      <span class="flex items-center gap-1.5"><span class="score-pill" style="min-width:auto;padding:2px 6px;font-size:10px;background:#dcf7e7;color:#0a3a26">▲ +1.5</span> re-scored since May — change shown</span>
+      <span class="flex items-center gap-1.5"><span class="score-pill" style="min-width:auto;padding:2px 6px;font-size:10px;background:transparent;color:#8a8a8a">—</span> still on its May score (not re-scored yet)</span>
       <span class="ml-auto">Click a company name to open its full detail page →</span>
     </div>
 
@@ -503,8 +504,8 @@
             <span class="sort-arrow" x-show="sortKey==='assessed_score'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
           <div class="sortable" @click="setSort('delta')"
-               :title="compare.on ? 'Change over the selected period' : 'Change vs the Neotek May run'">
-            <span x-text="compare.on ? 'Δ period' : 'Δ Neotek'"></span>
+               :title="compare.on ? 'Change over the selected period' : 'Score change for companies RE-SCORED since May. “—” = still on its May score (not re-scored yet).'">
+            <span x-text="compare.on ? 'Δ period' : 'Δ since May'"></span>
             <span class="sort-arrow" x-show="sortKey==='delta'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
           <div>Coverage</div>
@@ -842,5 +843,5 @@
 
 </div>
 
-<script src="/static/js/intel.js?v=9"></script>
+<script src="/static/js/intel.js?v=10"></script>
 {% endblock %}
