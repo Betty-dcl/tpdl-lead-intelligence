@@ -19,6 +19,29 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-22 — **Partage clé-en-main + login « porte d'entrée » + clarté du run (demande Betty).**
+  **(1) Lien public gratuit** : `share.sh` (Cloudflare quick-tunnel via `cloudflared`, installé par brew) +
+  **`Partager TPDL.command`** (double-clic Finder, copié aussi sur le Bureau) → une fenêtre affiche l'URL
+  `…trycloudflare.com`, **la copie dans le presse-papier** (pbcopy). Robuste sous le bash 3.2 de macOS (pas de
+  `set -euo pipefail`, PATH Homebrew forcé, python du venv en direct). ⚠️ lien vit tant que la fenêtre est
+  ouverte ; URL change à chaque relance (gratuit). Payant/permanent = runbook Azure déjà prêt.
+  **(2) Auth = porte d'entrée** : gate activé dans `.env` (`TPDL_AUTH_GATE=on`, `TPDL_TEAM_PASSWORD=TPDL`) ;
+  `app/main.py` resserré → **toute** page/API exige le login (Home, Marketing, APIs démo incluses), seule la
+  page login + auth + statics sont publiques ; login rendu **standalone** (flag `hide_chrome` sur base.html,
+  sans nav/footer). Tests auth-gate mis à jour. NB : une session valide (cookie) = accès direct sans re-login
+  (par navigateur) ; les autres voient bien le login.
+  **(3) Clarté du run cockpit** : les 4 tuiles de bandes de score somment désormais à 67 (act 7 / monitor 42 /
+  weak 15 / **no signal 3**) + ligne « 7+42+15+3 = 67 » ; **review-flagged (36) sorti comme indicateur
+  transversal** (pas une 5e bande — recoupe les autres). Corrige la lecture « somme = 100 ».
+  **(4) Δ vintage-aware** : une ligne NON re-scorée depuis mai affiche **« — »** (et non un faux « ±0 »).
+  Serializer `_serialize_company` ajoute `vintage` (refreshed | neotek_may) ; delta calculé seulement si
+  re-scorée après le run Neotek (`NEOTEK_REFERENCE_DATE`). Colonne renommée **« Δ since May »** + infobulle,
+  badge de fraîcheur **« refreshed Jul » / « May run »** (fini « stale »). Une re-scorée inchangée = **±0**
+  (toujours visible), seule une non-rafraîchie = « — ».
+  **(5) Filtre « Run »** (remplace « Fresh only ») : **All runs (490) / Refreshed — Fri 17 Jul (67) / May —
+  Neotek (423)** sur `filters.vintage` → un clic pour isoler la diff des 67 de vendredi. Décisions Betty :
+  défaut = 490 ; panneau Compare runs gardé visible. Vérifié live (67/423/490), 0 erreur console, 49 smoke verts.
+  Commits : b3d71e0, d6687fe, ce05b8c, 572953f, 53ae01a, 4a7858b, 86357e1 (+ ace85f4 partage initial).
 - 2026-07-21 — **Filtres Sales enrichis + comparaison de runs + prépa déploiement Azure (demande Betty).**
   UI Sales ([intel.html]/[intel.js]/[intel.py]) : (1) **filtre localisation** (CH/ES/USA/Middle East/
   Europe/APAC/Other) via `geo_region()` déterministe ajouté à `app/tools/radars.py` (bucketing free-text) ;
@@ -582,8 +605,16 @@
 - Base légale RGPD pour l'enrichissement + envoi (UE/CH) avant le 1er envoi.
 
 ## Dernière session
-- Date : 2026-07-21
-- Fait : **filtres Sales (localisation, comparaison de runs, Top-N + rang) + fiche société (delta + courbe
+- Date : 2026-07-22
+- Fait : **partage clé-en-main + login porte d'entrée + clarté du run** (voir log 2026-07-22 en haut).
+  `share.sh` + double-clic `Partager TPDL.command` (Cloudflare tunnel gratuit, lien copié auto ; robuste
+  bash 3.2) → lien public protégé par mot de passe équipe **TPDL**. Gate resserré : login = porte d'entrée
+  (toute page exige la connexion ; page login standalone). Cockpit : 4 bandes → 67 (+ review-flagged 36 sorti
+  comme transversal). Δ « vintage-aware » : non re-scorée = **« — »**, colonne **« Δ since May »**, badges
+  **refreshed Jul / May run**. Filtre **Run** (All 490 / Refreshed 67 / May 423) = isole les 67 de vendredi.
+  Décisions Betty : défaut 490 ; Compare runs gardé. 49 smoke verts, 0 erreur console. RESTE : (a) bouton
+  Déconnexion plus visible (demandé) ; (b) déploiement payant Azure/Render quand outil quotidien.
+- Fait (session du 2026-07-21) : **filtres Sales (localisation, comparaison de runs, Top-N + rang) + fiche société (delta + courbe
   toujours tracée) + utilisateurs réels + prépa déploiement Azure** (voir log 2026-07-21 en haut). Filtre
   localisation via `geo_region()` ; frise « compare runs » From→To (delta recalculé, s'étend seule dès un 3e
   run) ; Top-N + colonne `#`. Fiche société : delta toujours affiché, courbe tracée dès 1 point. Users →
