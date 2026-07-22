@@ -264,12 +264,19 @@ RESURFACED_OUT = Path("data/csv/discovery_resurfaced.csv")
 
 
 def _write_candidates(rows: list[Candidate], out: Path) -> None:
+    # Annotate each candidate with the ICP targeting verdict (Nathalie's rule:
+    # keep brand-owners, drop CDMO/CRO/manufacturing, tools suppliers,
+    # distributors/pharmacies and consultancies) so off-profile names are flagged
+    # BEFORE any paid scoring — no CDMO/consultancy slips into the target list.
+    from app.tools.icp import assess_icp
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["Company Name", "Theme", "Source URL"])
+        w.writerow(["Company Name", "Theme", "Source URL", "Out of ICP", "ICP Reason"])
         for c in rows:
-            w.writerow([c.name, c.theme, c.url or ""])
+            a = assess_icp(c.name)          # name-only at discovery (no sector/revenue yet)
+            w.writerow([c.name, c.theme, c.url or "",
+                        "YES" if a["out_of_scope"] else "no", a["reason"] or ""])
 
 
 def discover(cfg: EngineConfig, out: Path = DEFAULT_OUT) -> list[Candidate]:

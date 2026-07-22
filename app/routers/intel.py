@@ -508,6 +508,8 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
 
     universe = {norm(n) for (n,) in db.query(Company.name).all()}
 
+    from app.tools.icp import assess_icp
+
     rows: list[dict] = []
     with path.open(encoding="utf-8") as fh:
         for r in csv.DictReader(fh):
@@ -515,6 +517,7 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
             if not name:
                 continue
             theme = (r.get("Theme") or "").strip()
+            icp = assess_icp(name)   # name-only at discovery — flags CDMO/CRO/consultancy/etc.
             rows.append({
                 "company": name,
                 "theme": theme,
@@ -522,6 +525,8 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
                 "source_url": (r.get("Source URL") or "").strip(),
                 "already_in_universe": norm(name) in universe,
                 "scored": False,        # discovery output is never scored
+                "out_of_icp": icp["out_of_scope"],
+                "icp_reason": icp["reason"],
             })
 
     from collections import Counter
@@ -531,10 +536,13 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
         for t, n in counts.most_common()
     ]
     new_count = sum(1 for r in rows if not r["already_in_universe"])
+    out_of_icp = sum(1 for r in rows if r["out_of_icp"])
     return {
         "found": True,
         "count": len(rows),
         "new_to_universe": new_count,
+        "out_of_icp": out_of_icp,
+        "in_icp": len(rows) - out_of_icp,
         "candidates": rows,
         "by_theme": by_theme,
     }

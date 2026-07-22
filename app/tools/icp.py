@@ -31,10 +31,12 @@ CONFIRMED_TARGETS = {
 
 # Curated known out-of-ICP names (sector is often "Unknown" for these, so name
 # is the reliable signal). Lowercased, accent-stripped, substring match.
+# Distinctive tokens only — no ultra-short substrings ("ey" would match
+# "journey"/"Berkeley", "cgi" any word, etc.), which caused false positives.
 _CONSULTING_NAMES = {
-    "zuhlke", "accenture", "deloitte", "capgemini", "mckinsey", "bcg",
-    "boston consulting", "kpmg", "ey ", "pwc", "cognizant", "infosys",
-    "publicis", "cgi", "sopra steria", "atos", "wipro",
+    "zuhlke", "accenture", "deloitte", "capgemini", "mckinsey",
+    "boston consulting", "cognizant", "infosys", "sopra steria", "wipro",
+    "productlife",
 }
 _CDMO_NAMES = {
     "lonza", "catalent", "recipharm", "siegfried", "patheon", "samsung biologics",
@@ -50,6 +52,62 @@ _CDMO_HINTS = (
     "cdmo", "contract manufacturing", "contract manufacturer",
     "contract development", "fill-finish", "fill finish", "api manufacturing",
     "contract research organization", " cro ",
+)
+
+
+# Curated known NON-brand-owners (Nathalie's rule: TPDL targets brand owners
+# that make their own commercial decisions — not CDMO/CRO/manufacturing,
+# tools/instruments/reagents suppliers, distributors/pharmacies, or consultancies).
+# Normalised substring → reason. Reviewed against the July discovery batch; extend
+# as new off-profile names surface. Real targets (Recordati, Lundbeck, UCB,
+# Galapagos, Chiesi, Pierre Fabre, ALK-Abelló, Almirall, ADVANZ…) are NOT here.
+_KNOWN_OFF_ICP: tuple[tuple[str, str], ...] = (
+    # CDMO / CRO / contract R&D & manufacturing services
+    ("evotec", "CDMO/CRO — out of ICP"),
+    ("eurofins", "testing/lab services (CRO) — out of ICP"),
+    ("propharma", "pharma services/CRO — out of ICP"),
+    ("exmoor", "CDMO — out of ICP"),
+    ("veranova", "CDMO (API) — out of ICP"),
+    ("avid bioservices", "CDMO — out of ICP"),
+    ("kbi biopharma", "CDMO — out of ICP"),
+    ("syngene", "CRO/CDMO — out of ICP"),
+    ("solara active pharma", "API manufacturer (CDMO) — out of ICP"),
+    ("cenexi", "CDMO — out of ICP"),
+    ("sterling pharma", "CDMO (API) — out of ICP"),
+    ("curida", "CDMO — out of ICP"),
+    ("single use support", "manufacturing equipment/services — out of ICP"),
+    ("atec pharmatechnik", "pharma equipment/manufacturing — out of ICP"),
+    ("clinilabs", "CRO — out of ICP"),
+    ("signant health", "clinical-trial tech/CRO — out of ICP"),
+    ("tcg lifesciences", "CRO — out of ICP"),
+    ("immunoprecise", "antibody CRO — out of ICP"),
+    ("fairjourney", "antibody discovery CRO — out of ICP"),
+    ("frontier scientific", "chemicals supplier — out of ICP"),
+    ("capricorn scientific", "reagents supplier — out of ICP"),
+    ("axol bioscience", "cell-products supplier — out of ICP"),
+    # Tools / instruments / reagents suppliers (not brand owners)
+    ("milliporesigma", "life-science tools/reagents supplier — out of ICP"),
+    ("danaher", "tools/instruments conglomerate — out of ICP"),
+    ("waters", "analytical instruments (tools) — out of ICP"),
+    ("quanterix", "life-science tools/instruments — out of ICP"),
+    ("akoya", "life-science tools/instruments — out of ICP"),
+    ("berkeley lights", "life-science tools/instruments — out of ICP"),
+    ("tmrw life sciences", "life-science tools/instruments — out of ICP"),
+    ("epredia", "pathology instruments (tools) — out of ICP"),
+    ("microm microtech", "lab instruments — out of ICP"),
+    ("solmetex", "dental equipment/consumables — out of ICP"),
+    ("atcc", "biological-materials supplier — out of ICP"),
+    ("west pharmaceutical", "packaging/components supplier — out of ICP"),
+    # Distributors / pharmacies / retail / parallel-import (not brand owners)
+    ("docmorris", "online pharmacy/distribution — out of ICP"),
+    ("redcare pharmacy", "online pharmacy/distribution — out of ICP"),
+    ("walgreens", "pharmacy retail/distribution — out of ICP"),
+    ("lloydspharmacy", "pharmacy retail — out of ICP"),
+    ("orifarm", "parallel importer/distribution — out of ICP"),
+    ("sciensus", "pharma homecare/services — out of ICP"),
+    ("swixx biopharma", "market-access/distribution partner — out of ICP"),
+    # Consulting / staffing
+    ("pharmarelations", "pharma consulting/staffing — out of ICP"),
 )
 
 
@@ -92,6 +150,10 @@ def assess_icp(name: str | None,
     n = _norm(name)
     if any(t in n for t in CONFIRMED_TARGETS):
         return {"out_of_scope": False, "reason": None}
+
+    for token, reason in _KNOWN_OFF_ICP:
+        if token in n:
+            return {"out_of_scope": True, "reason": reason}
 
     haystack = " ".join([n, _norm(sector), _norm(sector_bucket)])
 

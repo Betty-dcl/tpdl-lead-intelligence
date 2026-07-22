@@ -176,6 +176,15 @@ def test_icp_targeting_classifier():
     assert revenue_below_floor("~$77.3M (regional listing)") is False
     assert revenue_below_floor("private") is False
     assert revenue_below_floor("~€45M") is True
+    # curated non-brand-owners (Nathalie's rule) are excluded by name
+    assert assess_icp("Evotec SE")["out_of_scope"] is True          # CDMO/CRO
+    assert assess_icp("DocMorris")["out_of_scope"] is True          # pharmacy/distribution
+    assert assess_icp("PharmaRelations")["out_of_scope"] is True    # consulting
+    # brand-owner targets in the discovery batch are KEPT
+    assert assess_icp("Recordati S.p.A.")["out_of_scope"] is False
+    assert assess_icp("Laboratoires Pierre Fabre")["out_of_scope"] is False
+    # no short-substring false positives ("ey"/"cgi" must not match journey/Berkeley words)
+    assert assess_icp("Journey Medical")["out_of_scope"] is False
 
 
 def test_intel_runs_list(client):
