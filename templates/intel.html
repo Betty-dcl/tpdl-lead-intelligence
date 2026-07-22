@@ -542,9 +542,9 @@
                 </div>
                 <div>
                   <span class="score-pill" style="min-width:auto;padding:3px 7px;font-size:11px"
-                        :style="deltaChipStyle(effDelta(c))"
-                        :title="effReappeared(c) ? ('Baseline: ' + effBaseline(c).toFixed(1)) : 'Not in the baseline run'"
-                        x-text="deltaLabel(effDelta(c))"></span>
+                        :style="deltaStyleFor(c)"
+                        :title="deltaTitleFor(c)"
+                        x-text="deltaText(c)"></span>
                 </div>
                 <div class="text-ink-2 text-xs" x-text="(c.coverage || '').split(' ').slice(0,3).join(' ')"></div>
                 <div>
@@ -842,5 +842,5 @@
 
 </div>
 
-<script src="/static/js/intel.js?v=8"></script>
+<script src="/static/js/intel.js?v=9"></script>
 {% endblock %}

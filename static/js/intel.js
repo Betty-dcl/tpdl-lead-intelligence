@@ -298,6 +298,28 @@ function intelPage() {
       if (d === 0)  return "background:#f3f3ef;color:#5c5c5c";
       return d > 0 ? "background:#dcf7e7;color:#0a3a26" : "background:#fee2e2;color:#7f1d1d";
     },
+    // Δ column display — vintage-aware. A row still on its Neotek-May score
+    // hasn't been re-scored, so it shows "—", not a fake "±0" or "new".
+    deltaText(c) {
+      if (this.compare.on) return this.deltaLabel(this.effDelta(c));
+      if (c.vintage === "neotek_may") return "—";
+      return this.deltaLabel(c.delta);
+    },
+    deltaStyleFor(c) {
+      if (this.compare.on) return this.deltaChipStyle(this.effDelta(c));
+      if (c.vintage === "neotek_may") return "background:transparent;color:#8a8a8a";
+      return this.deltaChipStyle(c.delta);
+    },
+    deltaTitleFor(c) {
+      if (this.compare.on) {
+        const e = this.cmp(c);
+        return (e && e.from_score != null) ? ("From " + e.from_score.toFixed(1)) : "New in this period";
+      }
+      if (c.vintage === "neotek_may") return "Neotek May score — not re-scored since, so there's no movement to show";
+      if (c.reappeared) return "Neotek May: " + c.neotek_score.toFixed(1);
+      return "Not in the Neotek run";
+    },
+
     // Left accent that marks a company already seen in the baseline run
     // (period-aware: reflects the selected comparison when compare mode is on).
     reappearedBorder(c) {

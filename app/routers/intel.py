@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api/intel", tags=["intel"])
 # May, TPDL's rebuilt engine in July), so a delta mixes a real change in signal
 # with an engine change — the UI is explicit about that caveat.
 NEOTEK_REFERENCE_RUN = "cb97cf5d50d2"
+NEOTEK_REFERENCE_DATE = "2026-05-25"   # the day the Neotek reference run is dated
 
 
 # ---------------------------------------------------------------------------
@@ -83,14 +84,22 @@ def _serialize_company(c: Company, baseline: Optional[dict[str, float]] = None) 
     not_evidenced = [
         s.strip() for s in (c.signals_not_evidenced or "").split(";") if s.strip()
     ]
-    # Movement since the Neotek May reference run.
+    # Movement since the Neotek May reference run. A "delta vs Neotek" only
+    # means something for a company RE-SCORED after May. Rows still dated on the
+    # Neotek run day ARE the Neotek data, so comparing them to themselves would
+    # print a meaningless "±0" — instead we mark them as un-refreshed (vintage
+    # "neotek_may") and report no delta. Only refreshed rows carry a real delta.
+    day = c.run_date.date().isoformat() if c.run_date else None
+    refreshed = day is not None and day != NEOTEK_REFERENCE_DATE
+    vintage = "refreshed" if refreshed else "neotek_may"
     neotek = None
     delta = None
     reappeared = False
     if baseline is not None and c.name in baseline:
         neotek = baseline[c.name]
-        delta = round((c.assessed_score or 0.0) - neotek, 1)
-        reappeared = True
+        if refreshed:
+            delta = round((c.assessed_score or 0.0) - neotek, 1)
+            reappeared = True
     return {
         "name":          c.name,
         "sector":        c.sector,
@@ -116,6 +125,7 @@ def _serialize_company(c: Company, baseline: Optional[dict[str, float]] = None) 
         "neotek_score":       neotek,
         "delta":              delta,
         "reappeared":         reappeared,
+        "vintage":            vintage,   # "refreshed" (re-scored) | "neotek_may"
     }
 
 
