@@ -120,10 +120,11 @@
           <div class="text-[11px] uppercase tracking-[0.2em] mb-1" style="color:var(--tpdl-accent)">Latest run</div>
           <h2 class="text-2xl font-semibold">
             <span x-text="formatDate(run?.run_date)"></span>
-            <span class="text-base font-normal opacity-70">· CH + ES “Lunch” set</span>
+            <span class="text-base font-normal opacity-70"
+                  x-text="run ? ('· ' + runComposition(run)) : ''"></span>
           </h2>
           <p class="text-sm opacity-80 mt-1">
-            <span x-text="run?.companies"></span> companies re-scored by TPDL’s rebuilt engine ·
+            <span x-text="run?.companies"></span> companies scored by TPDL’s rebuilt engine ·
             top scorer <strong x-text="run?.top?.name"></strong>
             at <span class="font-mono" x-text="run?.top?.score?.toFixed(1)"></span>
           </p>
@@ -185,14 +186,16 @@
         </span>
       </div>
 
-      <!-- Why everything looks 'Neotek' + where new companies live -->
+      <!-- What this run contained + where discovered-but-unscored names live -->
       <div class="mt-4 rounded-lg px-4 py-3 text-sm flex flex-wrap items-center gap-x-4 gap-y-1"
            style="background:rgba(255,255,255,0.08)"
-           x-show="run && (run.discovered_candidates || run.net_new_scored === 0)">
-        <span>
-          This run re-scored existing companies —
-          <strong x-text="run?.net_new_scored"></strong> are new to Neotek,
-          which is why every row shows a delta.
+           x-show="run && (run.discovered_candidates || run.net_new_scored)">
+        <span x-show="run?.net_new_scored">
+          This run scored <strong x-text="run?.net_new_scored"></strong>
+          companies new to Neotek — they now appear here with a real score.
+        </span>
+        <span x-show="!run?.net_new_scored">
+          This run re-scored existing companies (no net-new names).
         </span>
         <a href="/candidates" class="tpdl-btn text-xs"
            style="background:var(--tpdl-accent);color:#0a3a26;border:none"

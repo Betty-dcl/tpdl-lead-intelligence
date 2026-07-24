@@ -285,6 +285,17 @@ function intelPage() {
       return Object.values(by).sort((a, b) => b.day.localeCompare(a.day));
     },
 
+    // Accurate one-line descriptor of what the latest run contained, instead of
+    // a hardcoded "CH + ES Lunch set" that goes stale run to run.
+    runComposition(run) {
+      const total = run.companies || 0;
+      const fresh = run.net_new_scored || 0;
+      const back  = total - fresh;
+      if (fresh >= total) return `${total} new to Neotek`;
+      if (fresh === 0)    return "re-scored existing companies";
+      return `${fresh} new + ${back} re-scored`;
+    },
+
     distinctBuckets() {
       return [...new Set(this.companies.map(c => c.sector_bucket).filter(Boolean))].sort();
     },
