@@ -43,3 +43,4 @@ data/csv/discovery_friday.csv
 data/csv/discovery_comparison.csv
 data/review_flags_backup_*.json
 data/agent_results/
+data/duplicates_backup_*.json
