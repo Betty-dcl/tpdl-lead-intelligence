@@ -19,6 +19,61 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-23 — **Stratégie SERP inversée : DRAINER SerpAPI d'abord, Serper en BACKUP auto (demande
+  Betty).** Betty a un abonnement SerpAPI peu rechargé + une clé Serper (ajoutée dans `.env` le
+  23/07, 40 car., chargée OK) qui sera « remplie de tokens ». Consigne : utiliser SerpAPI jusqu'à
+  le VIDER, et quand il n'a plus de crédit → **ne pas planter**, arrêter SerpAPI et **basculer sur
+  Serper** pour le reste du run ; les deux clés vivent ensemble. ⚠️ Le code faisait l'INVERSE
+  (préférait Serper si la clé existait). Corrigé dans `pipeline/research.py` : `SerpApiExhausted`
+  + `_check_serpapi_quota` (détecte le body SerpAPI « run out of searches » = HTTP 200 + error) +
+  wrappers `serp_news`/`serp_jobs` (`_serp_with_fallback`) = SerpAPI d'abord ; sur épuisement
+  (SerpApiExhausted ou HTTP 401/429) → flag **run-scoped** `cfg._serpapi_exhausted` → SerpAPI n'est
+  plus rappelé du run, Serper prend le relais ; sur erreur transitoire → fallback Serper pour CETTE
+  société seulement (SerpAPI re-tenté à la suivante). Même ordre appliqué à `eu_registry` et à
+  `discovery._serp_theme`. `gather()` utilise les wrappers. Message `--estimate` mis à jour (quota
+  SerpAPI bas + Serper présent = « OK, fallback auto », plus « INSUFFISANT »). ⚠️ Garde-fou anti-quota
+  (`runner.py` ~L368, clé sur le mot « INSUFFICIENT ») préservé : le mot reste UNIQUEMENT dans le cas
+  sans-Serper, donc le run n'est bloqué que si SerpAPI est court ET aucun backup Serper. +1 test
+  (`test_serpapi_drains_then_serper_backup`). Fonctions validées via python3.14 (assertions PASS).
+- 2026-07-23 — **Crédit Anthropic/Perplexity CONFIRMÉ présent (Betty) + lanceur du gros run écrit.**
+  ⚠️ **Correction d'intention (Betty)** : PAS de fusion maintenant — **garder vendredi et le gros run
+  SÉPARÉS**, voir la **différence** (communes / nouvelles), **merger PLUS TARD**. Script
+  `scripts/run_big_launch.sh` (bash 3.2, exécutable) : (1) fige vendredi → `discovery_friday.csv` ;
+  (2) `--discover --live` → `discovery_candidates.csv` = le gros run (écrase, séparé de vendredi) ;
+  (3) **comparaison SANS fusion** via `scripts/compare_discoveries.py` → `discovery_comparison.csv`
+  (colonne Status : common / new / dropped) + résumé écran ; (4) score le **GROS RUN SEUL** (noms via
+  `scripts/_names_from_csv.py`, pas d'union) : `--names <gros run> --live --batch --submit
+  --enrich-location --enrich-revenue --rescan-tech --max-usd 60 --out engine_run_big.csv` → run/snapshot
+  DISTINCT ; (5) affiche `--fetch` (≤24h) + import. Les 2 helpers sont standalone (`_norm` copié de
+  discovery._norm, validé identique — tournent par chemin depuis n'importe quel cwd). ⚠️ À LANCER DEPUIS
+  LE TERMINAL (SDK bloque en session). Galop GRATUIT = `--top 150 --estimate` (⚠️ `--discover --live`
+  coûte ~0,50 $, PAS gratuit). Testé : comparaison 122 vs 5 → 3 common / 2 new / 119 dropped ; noms=122.
+  bash -n OK. Ancien helper d'union supprimé. **Vue de comparaison AJOUTÉE dans l'UI** (demande Betty
+  « montrer le résultat + la différence de run ») : `/api/intel/candidates` lit `discovery_comparison.csv`
+  (join par nom normalisé) → renvoie `comparison{common,new,dropped}` + `vs_friday` par candidat ; page
+  Candidates ([templates/candidates.html]) affiche une barre « Big run vs Friday » (X common / Y new /
+  Z only-Friday) + filtre All/New/Common + badge par ligne (« new this run » vert / « also on Friday »
+  bleu). Vérifié LIVE (.venv, serveur :8000) avec un fichier de comparaison DÉMO (91/31/2) : barre +
+  filtre + badges OK, 0 erreur console ; démo supprimée → la page retombe proprement sur les 122 sans
+  barre. RESTE (idée future) : le vrai « merge » (dédup du gros run vs vendredi une fois importés).
+- 2026-07-23 — **Capture de la VILLE du siège (HQ) demandée par Betty + confirmation filtre Lonza/
+  Zühlke.** (1) **Feedback Lonza/Zühlke vérifié** : déjà exclus par `app/tools/icp.py` (Lonza ∈
+  `_CDMO_NAMES`, Zühlke ∈ `_CONSULTING_NAMES`) ; les 6 cibles protégées. Les 122 candidats : **42
+  flaggés hors-ICP** (CDMO/CRO/tools/distributeurs/conseil), 77 in-scope ; Lonza/Zühlke absents des
+  122 (ils sont dans la base historique des 490, où aussi flaggés). Rien à recoder côté exclusion.
+  (2) **Ville du HQ = trou identifié, capacité construite** : `location` était du texte libre (souvent
+  juste le pays) + le CSV des 122 n'avait AUCUNE colonne localisation. Ajouté, sur le patron
+  `enrich_revenue` (déterministe, fail-open, opt-in) : `enrich.parse_hq_location`/`needs_city`/
+  `estimate_hq_location` (1 appel Perplexity/société, remplit la ville quand `location` n'a qu'un
+  pays ; n'écrase jamais une vraie ville) + flag CLI **`--enrich-location`** (config `enrich_location`)
+  câblé dans `runner._assemble`. Découverte : `Candidate.hq` + prompt Sonnet (copie la ville
+  **verbatim si le finding la donne**, sinon null) + **colonne « HQ / City »** dans
+  discovery_candidates.csv (routeur `/api/intel/candidates` renvoie `hq` ; page Candidates affiche 📍).
+  Fichier des 122 réécrit avec la colonne (vide pour l'instant). +1 test (`test_hq_location_enrichment`).
+  ⚠️ **Remplissage des villes = étape LIVE** (Perplexity via urllib — marche en session, mais spend
+  non lancé sans accord ; le naturel = au prochain run depuis le Terminal avec `--enrich-location`,
+  gaté sur la clé Serper de toute façon). ⚠️ pytest non lançable en session (aucun venv trouvé avec
+  les deps) — fonctions pures validées via python3.14 direct (toutes assertions PASS) + syntaxe OK.
 - 2026-07-22 — **File Review nettoyée (36 → 9) : suppression des faux flags hérités + BLOCAGE SDK
   identifié (demande Betty).** Betty a remarqué des signaux `confidence=high` toujours en review et
   a demandé s'il y avait erreur. Diagnostic : **non, pas une erreur de conception** — les 36 flags
@@ -607,7 +662,7 @@
       `/recurring` s'active au 2e import. Reste : un 2e CSV réel à importer.
 - [x] #7b Modèle `Contact` étendu (function / seniority / crm_segment) + `app/tools/segmentation.py`
       + migration additive SQLite dans `init_db` + tests (44 passent). Reste : Apollo pour peupler.
-- [ ] Serper configuré (vide ; SerpAPI présent en fallback, web_search bascule auto)
+- [x] Serper configuré (clé ajoutée dans `.env` le 2026-07-23, 40 car., chargée OK ; le moteur préfère Serper, quota SerpAPI n'est plus le blocage du gros run)
 - [x] Firecrawl configuré (clé présente dans .env)
 - [~] Bouncer : connecteur CODÉ + gated (`app/tools/bouncer.py`, fail-closed). Reste : `BOUNCER_API_KEY`.
 - [~] Lemlist : connecteur CODÉ + gated (`app/tools/lemlist.py`, sortant/humain). Reste : `LEMLIST_API_KEY`.
@@ -642,6 +697,41 @@
 - Prix réels des outils (Firecrawl, Kaspr, Bouncer, Lemlist) avant souscription (Step 1).
 - Cible de taux de réponse Lunch Campaign (à fixer avec Andrés).
 - Base légale RGPD pour l'enrichissement + envoi (UE/CH) avant le 1er envoi.
+
+## Run du 2026-07-23 — FAIT (2 batchs récupérés + importés)
+- **Gros run (64) + reste-vendredi (71) récupérés & importés** → base **625**, **44 outreach-eligible**,
+  ICP-flag 122, review 56, **4 runs** en historique (+ le re-score = 5e). Top nouveaux in-ICP : **CNX
+  Therapeutics 9.0**, BCAL Diagnostics 8.5, VIP Dental 8.0, VERAXA Biotech 8.0. Lonza/Zühlke bien
+  marqués HORS-ICP (gardent leur 8.0, sortis du ciblage). Comparaison vendredi↔gros run : 51 common /
+  13 new / 71 only-Friday.
+- **9 faux zéros re-scorés** (`--names … --live`, recherche en cache, run `1bb49f0acb8d`) → tous
+  récupérés (EMD Serono 0→7.0 via le retry d'interprétation, Mubadala 7.5, FotoFinder 7.0, WBA 6.7,
+  RadNet 6.3, Syngene 6.5, BD Biosciences 6.5, +Galapagos/TMRW). Plus aucun faux zéro des 9.
+- **Nouvelle page « Recurring »** (`/recurring`, demande Betty « en commun ») : `templates/recurring.html`
+  + endpoint `/api/intel/recurring` (regroupe run_snapshots par **date de run**, pas par batch id → les
+  2 batchs du 23 comptent comme un scan). Montre les sociétés vues dans ≥2 scans avec une frise
+  May 25 / Jul 17 / Jul 23 (score par scan, chip grisé si absente) + delta 1re→dernière + filtres
+  All/3×+/In-ICP. Lien nav ajouté. **67 récurrentes** (toutes 2× May+Jul 17 pour l'instant ; le 3×
+  se remplira au prochain re-score de sociétés connues). Vérifié live, 0 erreur.
+- **Clarté des libellés Sales (demande Betty)** : `_serialize_company` expose `run_label` (date exacte
+  du scan via `_date_label`). Page Sales : badge de ligne = **date précise** (« May 25 / Jul 17 / Jul 23 »,
+  fini « refreshed Jul » ambigu) ; en-tête Δ = **« Δ vs May 25 »** (ou « Δ vs <run> » en mode comparaison) ;
+  **filtre Run dynamique** (`runOptions`, options + compteurs générés depuis les données : All 625 / Jul 23 135 /
+  Jul 17 67 / May 25 423), match par `run_label`. 217 tests verts, 0 erreur console.
+- ⚠️ Cosmétique connu non corrigé : le cockpit du run affiche encore « CH + ES Lunch set » pour le run
+  du 23 (label codé en dur dans `/api/intel/run`) — c'est en fait découverte + reste-vendredi, pas le lunch.
+
+## Run du 2026-07-23 (soumission — historique)
+- **Gros run SOUMIS** (batch `msgbatch_011gXNW…`, 64 sociétés, `engine_run_big.csv.pending.json`).
+  Découverte 453 findings/8 thèmes → 64 candidats. **Comparaison vendredi(122) ↔ gros run(64)** :
+  **51 common · 13 new · 71 only-Friday** (visible page Candidates). Corrigé en cours de route : le CLI
+  charge bien .env (Serper vu par le moteur) mais `serp_quota_check`/`--estimate` lisaient os.environ
+  AVANT le chargement → faux « no Serper backup » ; fix = lire via `EngineConfig.load().serper_api_key`
+  (test_credits mis à jour : branche avec/sans Serper). Script forcé sur `.venv/bin/python`. 217 tests verts.
+- **Petit batch « reste de vendredi »** (`scripts/run_friday_rest.sh` + `scripts/_friday_only_names.py`) :
+  score les **71 « seulement vendredi »** (diff friday\big, pas de doublon avec les 51) → `engine_run_friday_rest.csv`,
+  run DISTINCT. Demandé par Betty pour valider TOUTE la liste de vendredi. Non encore lancé au moment de l'écriture.
+- ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
 - Date : 2026-07-22

@@ -78,3 +78,92 @@ def estimate_revenue(cfg: EngineConfig, company: str) -> str | None:
         return parse_revenue(text)
     except Exception:
         return None
+
+
+# ── HQ / office location enrichment (opt-in, --enrich-location) ───────────────
+# Betty's ask (2026-07-23): capture the EXACT CITY where each target company's
+# head office is based, not just the country. The engine's `location` field is
+# free text and often holds only a country ("Spain"); the discovery output had no
+# location at all. Same fail-open pattern as revenue: one Perplexity call fills
+# the city when we don't already have it; any failure leaves location untouched.
+
+# A `location` value made only of a country/region (no city) is what we enrich.
+# Anything with a comma ("Madrid, Spain") already carries a city → left alone.
+_COUNTRY_ONLY = {
+    "spain", "switzerland", "germany", "france", "italy", "uk",
+    "united kingdom", "ireland", "netherlands", "belgium", "austria",
+    "portugal", "sweden", "denmark", "norway", "finland", "poland",
+    "usa", "united states", "us", "europe", "apac", "middle east",
+    "uae", "saudi arabia", "egypt", "israel", "turkey", "qatar",
+}
+
+
+def needs_city(location: str | None) -> bool:
+    """True when `location` lacks a city and is worth enriching.
+
+    Empty / unknown / a bare country or region → enrich. A value that already
+    carries a city (has a comma, e.g. 'Barcelona, Spain', or is a free city
+    string that isn't a bare country) → keep it, never overwrite real data."""
+    low = _norm_loc(location)
+    if not low or low in {"na", "n/a", "none", "-", "unknown", "tbc", "tbd"}:
+        return True
+    if "," in low:                       # 'City, Country' → already has a city
+        return False
+    return low in _COUNTRY_ONLY          # bare country/region → needs a city
+
+
+def _norm_loc(s: str | None) -> str:
+    return (s or "").strip().lower()
+
+
+def parse_hq_location(text: str | None) -> str | None:
+    """Extract a clean 'City, Country' (or 'City') from a Perplexity answer.
+
+    Deterministic and conservative: takes the first line, strips trailing
+    punctuation, rejects 'unknown'/sentences, and caps length. Returns None
+    rather than risk a wrong or sprawling value (the location stays unknown)."""
+    if not text:
+        return None
+    line = text.strip().splitlines()[0].strip().strip(".").strip()
+    low = line.lower()
+    if not line or len(line) > 64:
+        return None
+    if any(bad in low for bad in ("unknown", "not publicly", "no informa",
+                                  "cannot", "unable", "n/a")):
+        return None
+    if not re.search(r"[A-Za-zÀ-ÿ]", line):
+        return None
+    # Guard against a whole sentence sneaking through: a real HQ label is short.
+    # Accept if it has a comma (City, Country) OR is at most 4 words.
+    if "," not in line and len(line.split()) > 4:
+        return None
+    return line
+
+
+def estimate_hq_location(cfg: EngineConfig, company: str) -> str | None:
+    """One Perplexity call for a company's head-office city. Fail-open → str|None."""
+    try:
+        from pipeline.config import require_live
+        require_live(cfg, cfg.perplexity_api_key, "HQ location enrichment")
+    except Exception:
+        return None
+    try:
+        from pipeline.research import _post_json
+        from pipeline.usage_log import log_search_calls
+        log_search_calls("perplexity", 1, company)
+        data = _post_json(
+            "https://api.perplexity.ai/chat/completions",
+            {"model": "sonar", "messages": [{
+                "role": "user",
+                "content": (
+                    f"In which CITY is the head office / headquarters of the company "
+                    f"\"{company}\" based? Reply with just the city and country "
+                    f"(e.g. 'Barcelona, Spain'). If genuinely unknown, reply 'unknown'."
+                ),
+            }]},
+            {"Authorization": f"Bearer {cfg.perplexity_api_key}"},
+        )
+        text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        return parse_hq_location(text)
+    except Exception:
+        return None

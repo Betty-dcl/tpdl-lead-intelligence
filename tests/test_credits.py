@@ -162,9 +162,19 @@ def test_estimator_math_and_quota_verdict(monkeypatch):
     monkeypatch.setattr("app.tools.usage.serpapi_panel", lambda: usage._panel(
         "serpapi", "SerpAPI", remaining=250, plan="Free Plan"))
     assert "OK" in est_mod.serp_quota_check(est)
+    # Quota short: verdict now depends on whether a Serper backup exists.
     monkeypatch.setattr("app.tools.usage.serpapi_panel", lambda: usage._panel(
         "serpapi", "SerpAPI", remaining=10, plan="Free Plan"))
+    from pipeline.config import EngineConfig
+    # No Serper backup → hard "INSUFFICIENT" (the run guardrail blocks on this word).
+    monkeypatch.setattr(EngineConfig, "load",
+                        classmethod(lambda cls, live=False: EngineConfig(serper_api_key="")))
     assert "INSUFFICIENT" in est_mod.serp_quota_check(est)
+    # With a Serper backup → not a blocker (drain SerpAPI, then fall back).
+    monkeypatch.setattr(EngineConfig, "load",
+                        classmethod(lambda cls, live=False: EngineConfig(serper_api_key="sk-serper")))
+    verdict = est_mod.serp_quota_check(est)
+    assert "INSUFFICIENT" not in verdict and "backup" in verdict.lower()
 
 
 def test_ttl_cache_avoids_double_fetch(monkeypatch):

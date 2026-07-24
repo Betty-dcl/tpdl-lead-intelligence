@@ -90,6 +90,9 @@ class EngineConfig:
     enrich_revenue: bool = False         # opt-in (--enrich-revenue): 1 Perplexity call/company
                                          # to fill an unknown revenue so the €100M ICP floor can
                                          # apply. Fail-open (any error → revenue stays unknown).
+    enrich_location: bool = False        # opt-in (--enrich-location): 1 Perplexity call/company
+                                         # to fill the head-office CITY when location has none.
+                                         # Fail-open (any error → location stays unchanged).
 
     # ── scoring weights (from scoring_config.yaml) ──────────────────────
     recency: dict = field(default_factory=lambda: {

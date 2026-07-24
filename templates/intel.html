@@ -105,9 +105,9 @@
     <p class="text-ink-2 max-w-2xl">
       Life-sciences companies (pharma, medtech, dental, diagnostics) tracked across
       6 commercial signal categories, every finding traceable to a source URL.
-      Each row is tagged by run — “refreshed Jul” (Friday’s re-score) or “May run”
-      (the original Neotek scores). Use the <strong>Run</strong> filter to see just
-      Friday’s set or the May set.
+      Each row is tagged with the <strong>exact scan it was scored in</strong> —
+      “May 25” (original Neotek), “Jul 17”, “Jul 23”… — so a score is never ambiguous
+      about which run it came from. The Δ column always states its reference run.
     </p>
 
     <!-- ================================================================ -->
@@ -361,18 +361,17 @@
 
       <label class="inline-flex items-center gap-2 text-xs text-ink-3">
         <span class="uppercase tracking-wider">Run</span>
-        <select x-model="filters.vintage" aria-label="Filter by run vintage"
+        <select x-model="filters.vintage" aria-label="Filter by run"
                 class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink">
-          <option value="">All runs (490)</option>
-          <option value="refreshed">Refreshed — Fri 17 Jul (67)</option>
-          <option value="neotek_may">May — Neotek (423)</option>
+          <option value="" x-text="`All runs (${companies.length})`"></option>
+          <template x-for="r in runOptions" :key="r.day">
+            <option :value="r.label" x-text="`${r.label} (${r.count})`"></option>
+          </template>
         </select>
       </label>
 
-      <span class="ml-auto text-xs text-ink-3" x-show="stats">
-        <span x-text="freshCount"></span> refreshed on
-        <span x-text="formatDate(stats?.pipeline.last_run)"></span> (Fri) —
-        the rest still carry their May (Neotek) score
+      <span class="ml-auto text-xs text-ink-3">
+        Pick a run to see only the companies scored that day. Each row's badge shows its scan date.
       </span>
     </div>
 
@@ -511,7 +510,7 @@
           </div>
           <div class="sortable" @click="setSort('delta')"
                :title="compare.on ? 'Change over the selected period' : 'Score change for companies RE-SCORED since May. “—” = still on its May score (not re-scored yet).'">
-            <span x-text="compare.on ? 'Δ period' : 'Δ since May'"></span>
+            <span x-text="compare.on ? ('Δ vs ' + (compare.meta?.from?.label || 'start run')) : 'Δ vs May 25'"></span>
             <span class="sort-arrow" x-show="sortKey==='delta'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
           <div>Coverage</div>

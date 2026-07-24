@@ -65,9 +65,12 @@ dermatology, dental or diagnostics. Rules:
 2. EXCLUDE: consultancies/agencies, investors/PE funds (unless the TARGET is
    named — then list the target), universities, hospitals-as-buyers, media.
 3. One entry per company, keep the url of the finding that mentions it.
+4. If — and ONLY if — the finding explicitly states the company's head-office
+   city, copy it as "hq" (e.g. "Barcelona, Spain"). Never guess it; if the
+   finding does not say, set "hq" to null.
 
 Output — strict JSON, nothing else:
-{"companies": [{"name": "<exact name>", "url": "<finding url or null>"}]}
+{"companies": [{"name": "<exact name>", "url": "<finding url or null>", "hq": "<city, country or null>"}]}
 Empty is valid: {"companies": []}."""
 
 
@@ -76,6 +79,7 @@ class Candidate:
     name: str
     theme: str
     url: str | None
+    hq: str | None = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -95,14 +99,25 @@ def _exa_theme(cfg: EngineConfig, query: str, num: int = 8) -> list[dict]:
 
 
 def _serp_theme(cfg: EngineConfig, query: str) -> list[dict]:
-    if cfg.serper_api_key:
+    # Same strategy as company research (Betty 2026-07-23): drain SerpAPI first,
+    # fall back to the Serper backup once SerpAPI is out. Never crash discovery.
+    from pipeline.research import (SerpApiExhausted, _check_serpapi_quota,
+                                   serpapi_exhausted)
+    items: list[dict] = []
+    if cfg.serpapi_key and not serpapi_exhausted(cfg):
+        try:
+            data = _check_serpapi_quota(_get_json(_serpapi_url("google_news", query, cfg.serpapi_key)))
+            items = data.get("news_results", [])
+        except SerpApiExhausted as exc:
+            setattr(cfg, "_serpapi_exhausted", True)
+            logger.warning("[discovery] SerpAPI out of searches (%s) — using Serper backup", exc)
+        except Exception as exc:
+            logger.info("[discovery] SerpAPI theme search failed (%s) — trying Serper", exc)
+    if not items and cfg.serper_api_key:
         data = _post_json("https://google.serper.dev/news",
                           {"q": query, "num": 8},
                           {"X-API-KEY": cfg.serper_api_key})
         items = data.get("news", [])
-    else:
-        data = _get_json(_serpapi_url("google_news", query, cfg.serpapi_key))
-        items = data.get("news_results", [])
     return [{"title": i.get("title") or "", "url": i.get("link"),
              "snippet": i.get("snippet") or ""} for i in items]
 
@@ -199,8 +214,10 @@ def extract_candidates(cfg: EngineConfig,
             name = (raw.get("name") or "").strip()
             if name:
                 url = raw.get("url") or None
+                hq = (raw.get("hq") or "").strip() or None
                 out.append(Candidate(name=name, url=url,
-                                     theme=theme_by_url.get(url, "unknown")))
+                                     theme=theme_by_url.get(url, "unknown"),
+                                     hq=hq))
     return out
 
 
@@ -272,10 +289,11 @@ def _write_candidates(rows: list[Candidate], out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["Company Name", "Theme", "Source URL", "Out of ICP", "ICP Reason"])
+        w.writerow(["Company Name", "HQ / City", "Theme", "Source URL",
+                    "Out of ICP", "ICP Reason"])
         for c in rows:
             a = assess_icp(c.name)          # name-only at discovery (no sector/revenue yet)
-            w.writerow([c.name, c.theme, c.url or "",
+            w.writerow([c.name, c.hq or "", c.theme, c.url or "",
                         "YES" if a["out_of_scope"] else "no", a["reason"] or ""])
 
 

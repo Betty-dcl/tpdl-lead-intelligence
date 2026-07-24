@@ -195,7 +195,8 @@ function intelPage() {
       const eligibleOK = (c) => !f.outreach_eligible || c.outreach_eligible;
       const reviewOK   = (c) => !f.review_flag       || c.review_flag;
       const icpOK      = (c) => this.showICP || !c.icp_flag;
-      const vintageOK  = (c) => !f.vintage || c.vintage === f.vintage;
+      // Run filter matches the EXACT scan (run_label: "May 25" / "Jul 17" / "Jul 23").
+      const vintageOK  = (c) => !f.vintage || c.run_label === f.vintage;
       // In compare mode, only show companies present in the "to" period, and
       // (optionally) only the ones that are new in that period.
       const compareOK  = (c) => {
@@ -266,10 +267,23 @@ function intelPage() {
     isFresh(c) { return !!c.run_date && this._day(c.run_date) === this.latestRunDay; },
     freshLabel(c) {
       if (!c.run_date) return "no date";
-      // Vintage, stated as the run month — no pejorative "stale".
-      return this.isFresh(c) ? "refreshed Jul" : "May run";
+      // Exact scan date the row was scored in — "May 25" / "Jul 17" / "Jul 23".
+      // Run-specific so "Jul" is never ambiguous once there are several July runs.
+      return c.run_label || (this.isFresh(c) ? "latest run" : "older run");
     },
     get freshCount() { return this.companies.filter(c => this.isFresh(c)).length; },
+
+    // Distinct scan dates present, newest first, with a count — drives the Run
+    // filter dropdown dynamically (grows on its own as new runs are imported).
+    get runOptions() {
+      const by = {};
+      for (const c of this.companies) {
+        const label = c.run_label, day = this._day(c.run_date);
+        if (!label || !day) continue;
+        (by[day] ||= { day, label, count: 0 }).count++;
+      }
+      return Object.values(by).sort((a, b) => b.day.localeCompare(a.day));
+    },
 
     distinctBuckets() {
       return [...new Set(this.companies.map(c => c.sector_bucket).filter(Boolean))].sort();

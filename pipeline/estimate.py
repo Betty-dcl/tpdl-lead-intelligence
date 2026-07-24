@@ -73,9 +73,26 @@ def serp_quota_check(est: RunEstimate) -> str | None:
     if est.serp_searches <= remaining:
         return (f"SerpAPI quota OK: run needs {est.serp_searches} searches, "
                 f"{remaining} remaining this month ({panel.get('plan')}).")
-    return (f"⚠ SerpAPI quota INSUFFICIENT: run needs {est.serp_searches} "
-            f"searches but only {remaining} remain this month — shrink the "
-            f"run (--top) or wait for the monthly reset.")
+    # Read the Serper key the SAME way the engine will at run time — via
+    # EngineConfig.load(), which loads .env into the environment first. Reading
+    # os.environ directly here gave a false "no backup" during --estimate (the
+    # estimate path runs before the engine loads .env).
+    try:
+        from pipeline.config import EngineConfig
+        has_serper = bool(EngineConfig.load().serper_api_key)
+    except Exception:
+        import os
+        has_serper = bool(os.environ.get("SERPER_API_KEY"))
+    if has_serper:
+        # Not a blocker: the SERP layer drains SerpAPI then falls back to Serper.
+        # (Deliberately no "INSUFFICIENT" — the run guardrail keys off that word.)
+        return (f"SerpAPI has {remaining} searches left; the run needs "
+                f"{est.serp_searches}. That's fine — SerpAPI is drained first, then "
+                f"the run falls back to the Serper backup automatically (no crash).")
+    return (f"⚠ SerpAPI quota INSUFFICIENT: run needs {est.serp_searches} searches "
+            f"but only {remaining} remain this month, and no Serper backup is "
+            f"configured — add SERPER_API_KEY, shrink the run (--top), or wait for "
+            f"the monthly reset.")
 
 
 def render(est: RunEstimate, quota_line: str | None = None) -> str:

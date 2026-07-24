@@ -48,6 +48,36 @@
     </div>
   </section>
 
+  <!-- vs Friday: the run difference, without merging (kept separate on purpose) -->
+  <section class="mb-6" x-show="data && data.comparison" x-cloak>
+    <div class="rounded-xl border p-4" style="background:#eef6ff;border-color:#bfdbfe">
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <span class="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full"
+              style="background:#93c5fd;color:#1e3a5f">Big run vs Friday</span>
+        <span class="text-sm text-ink-2">
+          <strong x-text="data?.comparison?.common"></strong> in common ·
+          <strong x-text="data?.comparison?.new"></strong> new this run ·
+          <strong x-text="data?.comparison?.dropped"></strong> only on Friday
+        </span>
+        <span class="text-xs text-ink-3 ml-auto">Two runs kept separate — merge later.</span>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <button @click="vs=''" class="theme-pill"
+                :style="vs==='' ? 'background:var(--tpdl-dark-ink);color:#fff' : 'background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted)'">
+          All this run
+        </button>
+        <button @click="vs = (vs==='new' ? '' : 'new')" class="theme-pill"
+                :style="vs==='new' ? 'background:#059669;color:#fff' : 'background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted)'">
+          New this run · <span x-text="data?.comparison?.new"></span>
+        </button>
+        <button @click="vs = (vs==='common' ? '' : 'common')" class="theme-pill"
+                :style="vs==='common' ? 'background:#2563eb;color:#fff' : 'background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted)'">
+          In common · <span x-text="data?.comparison?.common"></span>
+        </button>
+      </div>
+    </div>
+  </section>
+
   <template x-if="!loading && (!data || !data.found)">
     <div class="tpdl-card p-6 text-sm text-ink-3">
       No discovery file found (<code>data/csv/discovery_candidates.csv</code>). Run Hugo’s discovery step to populate it.
@@ -78,9 +108,14 @@
       <div class="cand-row p-4 flex items-start justify-between gap-3">
         <div class="min-w-0">
           <div class="font-semibold text-ink" x-text="c.company"></div>
+          <div class="text-xs text-ink-3 mt-0.5" x-show="c.hq" x-cloak>
+            <span aria-hidden="true">📍</span> <span x-text="c.hq"></span>
+          </div>
           <div class="mt-1.5 flex items-center gap-2 flex-wrap">
             <span class="theme-pill text-white" :style="`background:${themeColor(c.theme)}`" x-text="c.theme_label"></span>
             <span class="text-[11px] px-1.5 py-0.5 rounded-full" style="background:#fef3c7;color:#854d0e">not scored</span>
+            <span x-show="c.vs_friday==='new'" class="text-[11px] px-1.5 py-0.5 rounded-full" style="background:#d1fae5;color:#065f46">new this run</span>
+            <span x-show="c.vs_friday==='common'" class="text-[11px] px-1.5 py-0.5 rounded-full" style="background:#dbeafe;color:#1e40af">also on Friday</span>
           </div>
           <a x-show="c.source_url" :href="c.source_url" target="_blank" rel="noopener"
              class="mt-2 inline-block text-xs text-[color:var(--tpdl-info)] hover:underline break-all"
@@ -108,15 +143,17 @@ const THEME_COLORS = {
 };
 function candidatesPage() {
   return {
-    data: null, loading: true, theme: "",
+    data: null, loading: true, theme: "", vs: "",
     async init() {
       try { this.data = await fetch("/api/intel/candidates").then(r => r.json()); }
       catch (e) { this.data = { found:false, candidates:[], by_theme:[] }; }
       finally { this.loading = false; }
     },
     get filtered() {
-      const all = this.data?.candidates || [];
-      return this.theme ? all.filter(c => c.theme === this.theme) : all;
+      let all = this.data?.candidates || [];
+      if (this.theme) all = all.filter(c => c.theme === this.theme);
+      if (this.vs)    all = all.filter(c => c.vs_friday === this.vs);
+      return all;
     },
     themeColor(t){ return THEME_COLORS[t] || "#5c5c5c"; },
     hostOf(u){ try { return new URL(u).hostname.replace(/^www\./,""); } catch(_) { return u; } },

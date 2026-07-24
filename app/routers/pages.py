@@ -113,6 +113,16 @@ def candidates_page(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/recurring", response_class=HTMLResponse)
+def recurring_page(request: Request) -> HTMLResponse:
+    """Companies that keep coming back across scan dates (May / Jul 17 / Jul 23…)."""
+    return templates.TemplateResponse(
+        request,
+        "recurring.html",
+        {"active_page": "recurring"},
+    )
+
+
 @router.get("/agent/{agent_id}", response_class=HTMLResponse)
 def agent_profile(
     request: Request, agent_id: str, db: Session = Depends(get_db)

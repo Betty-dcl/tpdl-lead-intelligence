@@ -246,11 +246,36 @@ def _serpapi_url(engine: str, query: str, key: str,
     return "https://serpapi.com/search.json?" + urlencode(params)
 
 
+class SerpApiExhausted(Exception):
+    """SerpAPI has no searches left this billing cycle. Signals the SERP layer
+    to stop calling SerpAPI and switch to the Serper backup for the rest of the
+    run (Betty's strategy: drain the SerpAPI subscription, then fall back)."""
+
+
+# SerpAPI returns HTTP 200 with an {"error": ...} body when the account is out
+# of searches — so a naive parse would look like "no results". These markers let
+# us tell "quota gone" apart from a genuine empty result.
+_SERPAPI_QUOTA_MARKERS = (
+    "run out of searches", "ran out of searches", "out of searches",
+    "no more searches", "exceeded your", "account limit", "plan searches",
+    "monthly searches", "search limit",
+)
+
+
+def _check_serpapi_quota(data: dict) -> dict:
+    """Raise SerpApiExhausted if the SerpAPI body signals a depleted quota."""
+    err = str(data.get("error") or "").lower()
+    if err and any(m in err for m in _SERPAPI_QUOTA_MARKERS):
+        raise SerpApiExhausted(data.get("error"))
+    return data
+
+
 def serpapi_news(cfg: EngineConfig, company: str,
                  gl: str | None = None, hl: str | None = None) -> list[RawDoc]:
     """SerpAPI Google News — same role as serper_news."""
     require_live(cfg, cfg.serpapi_key, "SerpAPI News")
-    data = _get_json(_serpapi_url("google_news", f'"{company}"', cfg.serpapi_key, gl, hl))
+    data = _check_serpapi_quota(
+        _get_json(_serpapi_url("google_news", f'"{company}"', cfg.serpapi_key, gl, hl)))
     return [
         RawDoc(
             source="serpapi_news",
@@ -267,8 +292,8 @@ def serpapi_jobs(cfg: EngineConfig, company: str,
                  gl: str | None = None, hl: str | None = None) -> list[RawDoc]:
     """SerpAPI Google Jobs — direct hiring-signal proxy (same role as serper_jobs)."""
     require_live(cfg, cfg.serpapi_key, "SerpAPI Jobs")
-    data = _get_json(_serpapi_url(
-        "google_jobs", f"{company} commercial digital CRM data", cfg.serpapi_key, gl, hl))
+    data = _check_serpapi_quota(_get_json(_serpapi_url(
+        "google_jobs", f"{company} commercial digital CRM data", cfg.serpapi_key, gl, hl)))
     docs = []
     for item in data.get("jobs_results", []):
         # Only keep postings actually at the target company
@@ -281,6 +306,60 @@ def serpapi_jobs(cfg: EngineConfig, company: str,
             text=(item.get("description", "") or "")[:2000],
         ))
     return docs
+
+
+# ── SERP with SerpAPI→Serper fallback (drain SerpAPI, then use the backup) ────
+
+def serpapi_exhausted(cfg: EngineConfig) -> bool:
+    """Run-scoped flag: True once SerpAPI reported no searches left this run."""
+    return bool(getattr(cfg, "_serpapi_exhausted", False))
+
+
+def _serp_with_fallback(cfg: EngineConfig, kind: str, company: str,
+                        gl: str | None, hl: str | None) -> list[RawDoc]:
+    """Try SerpAPI first (drain the current subscription); on quota-exhaustion
+    switch permanently to Serper for the rest of the run; on a transient SerpAPI
+    error fall back to Serper for THIS company only (keep trying SerpAPI next).
+    Never raises for a SERP failure — worst case returns []."""
+    serpapi_fn = serpapi_news if kind == "news" else serpapi_jobs
+    serper_fn = serper_news if kind == "news" else serper_jobs
+
+    if cfg.serpapi_key and not serpapi_exhausted(cfg):
+        try:
+            return serpapi_fn(cfg, company, gl=gl, hl=hl)
+        except SerpApiExhausted as exc:
+            setattr(cfg, "_serpapi_exhausted", True)
+            logger.warning("[research] SerpAPI out of searches (%s) — switching to "
+                           "the Serper backup for the rest of the run", exc)
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 429):        # auth/quota walls → treat as exhausted
+                setattr(cfg, "_serpapi_exhausted", True)
+                logger.warning("[research] SerpAPI HTTP %s — treating as exhausted, "
+                               "switching to the Serper backup", exc.code)
+            else:
+                logger.info("[research] SerpAPI %s HTTP %s — trying Serper backup "
+                            "for %s", kind, exc.code, company)
+        except Exception as exc:              # transient: this company falls back only
+            logger.info("[research] SerpAPI %s failed (%s) — trying Serper backup "
+                        "for %s", kind, exc, company)
+
+    if cfg.serper_api_key:
+        try:
+            return serper_fn(cfg, company, gl=gl, hl=hl)
+        except Exception as exc:
+            logger.info("[research] Serper %s also failed (%s) for %s",
+                        kind, exc, company)
+    return []
+
+
+def serp_news(cfg: EngineConfig, company: str,
+              gl: str | None = None, hl: str | None = None) -> list[RawDoc]:
+    return _serp_with_fallback(cfg, "news", company, gl, hl)
+
+
+def serp_jobs(cfg: EngineConfig, company: str,
+              gl: str | None = None, hl: str | None = None) -> list[RawDoc]:
+    return _serp_with_fallback(cfg, "jobs", company, gl, hl)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -382,15 +461,27 @@ def eu_registry(cfg: EngineConfig, company: str) -> list[RawDoc]:
                  "EU registry (public web search)")
     q = (f'"{company}" (company register OR directors OR shareholders OR ownership '
          f'OR "registre du commerce" OR Handelsregister)')
-    if cfg.serper_api_key:
-        data = _post_json("https://google.serper.dev/search", {"q": q, "num": 8},
-                          {"X-API-KEY": cfg.serper_api_key})
-        items = [(i.get("title", ""), i.get("link"), i.get("snippet", ""))
-                 for i in data.get("organic", [])]
-    else:
-        data = _get_json(_serpapi_url("google", q, cfg.serpapi_key))
-        items = [(i.get("title", ""), i.get("link"), i.get("snippet", ""))
-                 for i in data.get("organic_results", [])]
+    items: list[tuple] = []
+    # Same fallback order as the news/jobs SERP: drain SerpAPI, then Serper.
+    if cfg.serpapi_key and not serpapi_exhausted(cfg):
+        try:
+            data = _check_serpapi_quota(_get_json(_serpapi_url("google", q, cfg.serpapi_key)))
+            items = [(i.get("title", ""), i.get("link"), i.get("snippet", ""))
+                     for i in data.get("organic_results", [])]
+        except SerpApiExhausted as exc:
+            setattr(cfg, "_serpapi_exhausted", True)
+            logger.warning("[research] SerpAPI out of searches (%s) — EU registry "
+                           "falling back to Serper", exc)
+        except Exception as exc:
+            logger.info("[research] SerpAPI EU-registry failed (%s) — trying Serper", exc)
+    if not items and cfg.serper_api_key:
+        try:
+            data = _post_json("https://google.serper.dev/search", {"q": q, "num": 8},
+                              {"X-API-KEY": cfg.serper_api_key})
+            items = [(i.get("title", ""), i.get("link"), i.get("snippet", ""))
+                     for i in data.get("organic", [])]
+        except Exception as exc:
+            logger.info("[research] Serper EU-registry also failed (%s)", exc)
     docs: list[RawDoc] = []
     for title, link, snippet in items:
         if link and any(d in link.lower() for d in _REGISTRY_DOMAINS) and snippet:
@@ -458,9 +549,12 @@ def gather(cfg: EngineConfig, company: str,
                         company, len(cached))
             return dedupe(cached)
 
-    # SERP engine: Serper (target) when its key exists, else SerpAPI (current sub)
-    serp_sources = ((serper_news, serper_jobs) if cfg.serper_api_key
-                    else (serpapi_news, serpapi_jobs))
+    # SERP engine strategy (Betty, 2026-07-23): DRAIN the existing SerpAPI
+    # subscription first, then fall back to the (token-filled) Serper backup once
+    # SerpAPI is out — both keys live at once, run never crashes on quota. The
+    # two wrappers below carry that fallback; the run-scoped exhaustion flag lives
+    # on cfg so once SerpAPI is dry it stops being called for the rest of the run.
+    serp_sources = (serp_news, serp_jobs)
     sources = [*serp_sources, exa_search, perplexity_sonar]
     if cfg.eu_registry_enabled:           # conditional free source, opt-in (saves SERP quota)
         sources.append(eu_registry)

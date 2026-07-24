@@ -85,6 +85,15 @@ def _assemble(cfg: EngineConfig, name: str, sector: str | None, identity: dict,
         est = enrich.estimate_revenue(cfg, name)
         if est:
             identity = {**identity, "revenue": est}
+    # Opt-in HQ-city enrichment (fail-open): fill the exact office city when
+    # location carries only a country (or nothing). Never overwrites a value
+    # that already names a city.
+    if cfg.enrich_location:
+        from pipeline import enrich
+        if enrich.needs_city(identity.get("location")):
+            city = enrich.estimate_hq_location(cfg, name)
+            if city:
+                identity = {**identity, "location": city}
 
     review, reason = score.review_flag(scored)
     extra = []
@@ -281,6 +290,9 @@ def main() -> None:
     parser.add_argument("--enrich-revenue", action="store_true",
                         help="fill unknown revenues via 1 Perplexity call/company "
                              "(fail-open) so the €100M ICP floor can triage them")
+    parser.add_argument("--enrich-location", action="store_true",
+                        help="fill the head-office CITY via 1 Perplexity call/company "
+                             "(fail-open) when location carries only a country")
     parser.add_argument("--no-eu-registry", action="store_true",
                         help="Disable the free public EU-registry source for this run "
                              "(default ON; saves 1 SERP search/company when quota is tight)")
@@ -344,6 +356,8 @@ def main() -> None:
         cfg.eu_registry_enabled = False
     if getattr(args, "enrich_revenue", False):
         cfg.enrich_revenue = True
+    if getattr(args, "enrich_location", False):
+        cfg.enrich_location = True
     mode = "LIVE (spending enabled)" if cfg.live else "DRY-RUN (zero cost)"
     logger.info("Engine mode: %s · extraction=%s · interpretation=%s",
                 mode, cfg.extraction_model, cfg.interpretation_model)

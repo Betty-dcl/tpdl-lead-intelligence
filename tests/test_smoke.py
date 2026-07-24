@@ -204,6 +204,69 @@ def test_revenue_parser_and_failopen():
     assert estimate_revenue(EngineConfig(live=False), "Whatever Co") is None
 
 
+def test_hq_location_enrichment():
+    from pipeline.enrich import (parse_hq_location, needs_city,
+                                 estimate_hq_location)
+    from pipeline.config import EngineConfig
+    # parser: clean 'City, Country' kept; junk/sentences/unknown rejected
+    assert parse_hq_location("Barcelona, Spain") == "Barcelona, Spain"
+    assert parse_hq_location("Madrid, Spain.\nFounded 1989") == "Madrid, Spain"
+    assert parse_hq_location("Basel") == "Basel"
+    assert parse_hq_location("unknown") is None
+    assert parse_hq_location("The company does not publicly disclose this") is None
+    assert parse_hq_location("") is None
+    assert parse_hq_location(None) is None
+    # a rambling sentence with no comma and >4 words is rejected
+    assert parse_hq_location("It has offices in several European countries today") is None
+    # needs_city: enrich when empty / unknown / a bare country; keep real cities
+    assert needs_city(None) is True
+    assert needs_city("Spain") is True
+    assert needs_city("unknown") is True
+    assert needs_city("Barcelona, Spain") is False
+    assert needs_city("Les Ulis") is False        # a free city string is kept
+    # estimate_hq_location is fail-open: dry-run → None, never raises
+    assert estimate_hq_location(EngineConfig(live=False), "Whatever Co") is None
+
+
+def test_serpapi_drains_then_serper_backup():
+    """Betty's SERP strategy: use up SerpAPI first, then fall back to Serper
+    once SerpAPI is out — both keys live, never crash the run."""
+    from pipeline import research as R
+    from pipeline.research import (RawDoc, SerpApiExhausted, _check_serpapi_quota,
+                                   serpapi_exhausted)
+    from pipeline.config import EngineConfig
+
+    # quota body raises; a normal body passes through untouched
+    import pytest
+    with pytest.raises(SerpApiExhausted):
+        _check_serpapi_quota({"error": "Your account has run out of searches."})
+    assert _check_serpapi_quota({"news_results": [1]}) == {"news_results": [1]}
+
+    cfg = EngineConfig(live=True)
+    cfg.serpapi_key, cfg.serper_api_key = "sa", "sr"
+    calls = {"serpapi": 0, "serper": 0}
+
+    def fake_serpapi_news(c, company, gl=None, hl=None):
+        calls["serpapi"] += 1
+        raise SerpApiExhausted("run out of searches")
+
+    def fake_serper_news(c, company, gl=None, hl=None):
+        calls["serper"] += 1
+        return [RawDoc(source="serper_news", url="u", title="t", text="x")]
+
+    orig = (R.serpapi_news, R.serper_news)
+    R.serpapi_news, R.serper_news = fake_serpapi_news, fake_serper_news
+    try:
+        out = R.serp_news(cfg, "Acme")
+        assert len(out) == 1 and out[0].source == "serper_news"
+        assert serpapi_exhausted(cfg) is True           # flag set for the run
+        R.serp_news(cfg, "Beta")                         # 2nd company
+        assert calls["serpapi"] == 1                     # SerpAPI not called again
+        assert calls["serper"] == 2                      # Serper served both
+    finally:
+        R.serpapi_news, R.serper_news = orig
+
+
 def test_market_tier():
     from app.tools.icp import market_tier
     # core market = CH / ES / Middle East / rest of Europe

@@ -123,6 +123,7 @@ def _serialize_company(c: Company, baseline: Optional[dict[str, float]] = None) 
         "review_flag":        c.review_flag,
         "review_flag_reason": c.review_flag_reason,
         "run_date":           c.run_date.isoformat() if c.run_date else None,
+        "run_label":          _date_label(day),   # exact scan date: "May 25" / "Jul 17" / "Jul 23"
         # Neotek → now movement
         "neotek_score":       neotek,
         "delta":              delta,
@@ -512,6 +513,19 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
 
     from app.tools.icp import assess_icp
 
+    # Optional comparison vs Friday's list (data/csv/discovery_comparison.csv,
+    # written by scripts/compare_discoveries.py). Kept SEPARATE from the runs
+    # (Betty 2026-07-23): shows which candidates are common / new, no merge.
+    comparison: dict[str, str] = {}
+    comp_path = Path("data/csv/discovery_comparison.csv")
+    if comp_path.exists():
+        with comp_path.open(encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                cname = (r.get("Company") or "").strip()
+                status = (r.get("Status") or "").strip()
+                if cname and status:
+                    comparison[norm(cname)] = status
+
     rows: list[dict] = []
     with path.open(encoding="utf-8") as fh:
         for r in csv.DictReader(fh):
@@ -522,6 +536,7 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
             icp = assess_icp(name)   # name-only at discovery — flags CDMO/CRO/consultancy/etc.
             rows.append({
                 "company": name,
+                "hq": (r.get("HQ / City") or "").strip(),
                 "theme": theme,
                 "theme_label": _THEME_LABELS.get(theme, theme or "—"),
                 "source_url": (r.get("Source URL") or "").strip(),
@@ -529,6 +544,8 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
                 "scored": False,        # discovery output is never scored
                 "out_of_icp": icp["out_of_scope"],
                 "icp_reason": icp["reason"],
+                # vs Friday: 'common' (both lists) | 'new' (only this run) | None
+                "vs_friday": comparison.get(norm(name)),
             })
 
     from collections import Counter
@@ -539,6 +556,15 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
     ]
     new_count = sum(1 for r in rows if not r["already_in_universe"])
     out_of_icp = sum(1 for r in rows if r["out_of_icp"])
+    comp_summary = None
+    if comparison:
+        # 'dropped' = only in Friday, so not among these rows — count from the map.
+        comp_summary = {
+            "found": True,
+            "common": sum(1 for s in comparison.values() if s == "common"),
+            "new": sum(1 for s in comparison.values() if s == "new"),
+            "dropped": sum(1 for s in comparison.values() if s == "dropped"),
+        }
     return {
         "found": True,
         "count": len(rows),
@@ -547,6 +573,71 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
         "in_icp": len(rows) - out_of_icp,
         "candidates": rows,
         "by_theme": by_theme,
+        "comparison": comp_summary,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Recurring — companies that keep coming back across our scan DATES (May 25,
+# Jul 17, Jul 23…). Grouped by run_date, not by batch id, so the two Jul 23
+# batches count as one scan (Betty's "3× : mai · Jul 17 · Jul 23" idea). A
+# company recurring across runs = sustained relevance worth watching.
+# ---------------------------------------------------------------------------
+
+def _date_label(iso_day: str) -> str:
+    """'2026-07-23' → 'Jul 23'. Falls back to the raw string if unparseable."""
+    try:
+        return datetime.strptime(iso_day, "%Y-%m-%d").strftime("%b %d").replace(" 0", " ")
+    except (ValueError, TypeError):
+        return iso_day or "—"
+
+
+@router.get("/recurring")
+def recurring(db: Session = Depends(get_db)) -> dict:
+    """Companies present in ≥2 distinct run DATES, with their per-date score.
+    Sorted by how many runs they appear in (desc), then latest score (desc)."""
+    # Collect, per company, the best score seen on each distinct run_date.
+    per_company: dict[str, dict[str, dict]] = {}
+    for r in db.query(RunSnapshot).all():
+        day = (r.run_date.date().isoformat() if r.run_date else "unknown")
+        slot = per_company.setdefault(r.company_name, {})
+        prev = slot.get(day)
+        # If a date has several batches, keep the one that actually scored it
+        # (highest score) — avoids a flaky 0 masking a real score same day.
+        if prev is None or (r.assessed_score or 0) > prev["score"]:
+            slot[day] = {"day": day, "label": _date_label(day),
+                         "score": round(r.assessed_score or 0.0, 1),
+                         "eligible": bool(r.outreach_eligible)}
+
+    # Current ICP flag / sector for context (companies table = latest state).
+    meta = {c.name: c for c in db.query(Company).all()}
+
+    all_days = sorted({d for slots in per_company.values() for d in slots})
+    rows = []
+    for name, slots in per_company.items():
+        if len(slots) < 2:                       # recurring = seen in ≥2 dates
+            continue
+        runs = sorted(slots.values(), key=lambda s: s["day"])
+        c = meta.get(name)
+        first, last = runs[0]["score"], runs[-1]["score"]
+        rows.append({
+            "company": name,
+            "count": len(runs),
+            "runs": runs,                         # chronological, each {day,label,score,eligible}
+            "days": [r["day"] for r in runs],     # for quick client-side matching
+            "latest_score": last,
+            "delta_first_last": round(last - first, 1),
+            "out_of_icp": bool(c.icp_flag) if c else False,
+            "sector_bucket": (c.sector_bucket if c else None),
+            "location": (c.location if c else None),
+        })
+    rows.sort(key=lambda r: (r["count"], r["latest_score"]), reverse=True)
+
+    return {
+        "count": len(rows),
+        "all_days": [{"day": d, "label": _date_label(d)} for d in all_days],
+        "max_runs": len(all_days),
+        "companies": rows,
     }
 
 

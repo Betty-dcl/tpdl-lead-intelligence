@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Recurring companies — TPDL{% endblock %}
+
+{% block head %}
+<style>
+  .rec-row { border:1px solid var(--tpdl-border); border-radius:12px; background:#fff; }
+  .rec-row:hover { border-color: var(--tpdl-dark-ink); }
+  .run-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.15rem .55rem; border-radius:9999px; font-size:.72rem; font-weight:600; }
+  .run-chip.absent { background:#f3f4f6; color:#9ca3af; }
+  [x-cloak]{ display:none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="recurringPage()" x-init="init()">
+
+  <div class="mb-6 flex items-center gap-2 text-sm">
+    <a href="/intel" class="text-ink-3 hover:text-ink">← Sales pipeline</a>
+    <span class="text-ink-3">/</span>
+    <span class="text-ink font-medium">Recurring</span>
+  </div>
+
+  <section class="mb-8">
+    <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Across every scan</p>
+    <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-3xl leading-tight">
+      Companies that <span style="color:var(--tpdl-accent-ink)">keep coming back</span>
+    </h1>
+    <p class="text-ink-2 max-w-3xl">
+      These companies surfaced in <strong>more than one scan</strong>. Each row shows exactly which
+      runs it appeared in — <strong>May</strong> (Neotek), <strong>Jul 17</strong> (Friday),
+      <strong>Jul 23</strong> (the big run) — and its score each time. A name that recurs is a
+      sustained signal worth watching, not a one-off.
+    </p>
+  </section>
+
+  <template x-if="loading">
+    <div class="py-16 text-center text-ink-3">Loading…</div>
+  </template>
+
+  <template x-if="!loading && (!data || !data.count)">
+    <div class="tpdl-card p-6 text-sm text-ink-3">
+      Nothing recurring yet — a company has to appear in at least two scans. Import a second run to populate this.
+    </div>
+  </template>
+
+  <div x-show="!loading && data && data.count" x-cloak>
+    <!-- Summary + filter by how many runs -->
+    <section class="mb-6 rounded-xl border p-4" style="background:#f5f3ff;border-color:#ddd6fe">
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <span class="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full" style="background:#c4b5fd;color:#4c1d95">Recurring</span>
+        <span class="text-sm text-ink-2"><strong x-text="data.count"></strong> companies seen in 2+ scans</span>
+        <span class="text-xs text-ink-3 ml-auto" x-text="`across ${data.max_runs} scan dates: ` + data.all_days.map(d=>d.label).join(' · ')"></span>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <button @click="minCount=2" class="run-chip"
+                :style="minCount===2 ? 'background:var(--tpdl-dark-ink);color:#fff' : 'background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted)'">
+          All recurring
+        </button>
+        <template x-for="n in countTiers" :key="n">
+          <button @click="minCount = n" class="run-chip"
+                  :style="minCount===n ? 'background:#7c3aed;color:#fff' : 'background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted)'">
+            <span x-text="`${n}× or more`"></span>
+          </button>
+        </template>
+        <label class="run-chip ml-2" style="background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted);cursor:pointer">
+          <input type="checkbox" x-model="inIcpOnly" class="mr-1"> In-ICP only
+        </label>
+      </div>
+    </section>
+
+    <!-- Recurring list -->
+    <section class="grid grid-cols-1 gap-3">
+      <template x-for="(c, i) in filtered" :key="i">
+        <div class="rec-row p-4">
+          <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div class="min-w-0">
+              <a :href="`/intel/company?c=${encodeURIComponent(c.company)}`" class="font-semibold text-ink hover:underline" x-text="c.company"></a>
+              <span x-show="c.out_of_icp" class="ml-2 text-[11px] px-1.5 py-0.5 rounded-full" style="background:#fee2e2;color:#991b1b">out of ICP</span>
+              <div class="text-xs text-ink-3 mt-0.5" x-show="c.location" x-text="c.location"></div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="text-[11px] uppercase tracking-wider text-ink-3" x-text="`${c.count}× · seen in ${c.count} scans`"></div>
+              <div class="text-sm mt-0.5">
+                <span x-text="`latest ${c.latest_score.toFixed(1)}`"></span>
+                <span x-show="c.delta_first_last !== 0"
+                      :style="c.delta_first_last>0 ? 'color:#059669' : 'color:#dc2626'"
+                      x-text="` (${c.delta_first_last>0?'+':''}${c.delta_first_last.toFixed(1)} since first seen)`"></span>
+              </div>
+            </div>
+          </div>
+          <!-- Timeline: one chip per scan date; greyed when the company was absent that run -->
+          <div class="flex flex-wrap gap-2 mt-3">
+            <template x-for="d in data.all_days" :key="d.day">
+              <span class="run-chip" :class="scoreOn(c, d.day)===null ? 'absent' : ''"
+                    :style="scoreOn(c, d.day)===null ? '' : `background:${scoreColor(scoreOn(c,d.day))};color:#fff`">
+                <span x-text="d.label"></span>
+                <span x-text="scoreOn(c, d.day)===null ? '—' : scoreOn(c, d.day).toFixed(1)"></span>
+              </span>
+            </template>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <p class="text-xs text-ink-3 mt-6">
+      <span x-text="filtered.length"></span> shown · click a name for its full detail.
+      A chip shows the score that scan; “—” means the company wasn’t in that run.
+    </p>
+  </div>
+</div>
+
+<script>
+function recurringPage() {
+  return {
+    data: null, loading: true, minCount: 2, inIcpOnly: false,
+    async init() {
+      try { this.data = await fetch("/api/intel/recurring").then(r => r.json()); }
+      catch (e) { this.data = { count:0, companies:[], all_days:[] }; }
+      finally { this.loading = false; }
+    },
+    get countTiers() {
+      const max = this.data?.max_runs || 2;
+      const tiers = [];
+      for (let n = 3; n <= max; n++) tiers.push(n);   // "All recurring" already covers 2×
+      return tiers;
+    },
+    get filtered() {
+      let all = this.data?.companies || [];
+      all = all.filter(c => c.count >= this.minCount);
+      if (this.inIcpOnly) all = all.filter(c => !c.out_of_icp);
+      return all;
+    },
+    scoreOn(c, day) {
+      const r = (c.runs || []).find(x => x.day === day);
+      return r ? r.score : null;
+    },
+    scoreColor(s) {
+      if (s >= 8) return "#059669";      // outreach-eligible
+      if (s >= 5) return "#0284c7";      // monitor band
+      return "#94a3b8";                  // low / weak
+    },
+  };
+}
+</script>
+{% endblock %}
