@@ -20,16 +20,12 @@
     <span class="text-ink font-medium">Recurring</span>
   </div>
 
-  <section class="mb-8">
-    <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Across every scan</p>
-    <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-3xl leading-tight">
+  <section class="mb-6">
+    <h1 class="text-3xl md:text-4xl font-semibold mb-2 leading-tight">
       Companies that <span style="color:var(--tpdl-accent-ink)">keep coming back</span>
     </h1>
-    <p class="text-ink-2 max-w-3xl">
-      These companies surfaced in <strong>more than one scan</strong>. Each row shows exactly which
-      runs it appeared in — <strong>May</strong> (Neotek), <strong>Jul 17</strong> (Friday),
-      <strong>Jul 23</strong> (the big run) — and its score each time. A name that recurs is a
-      sustained signal worth watching, not a one-off.
+    <p class="text-ink-2 max-w-3xl text-sm">
+      Seen in more than one scan. Filter by ×2 / ×3, read the score at each scan, click a name for its curve and detail.
     </p>
   </section>
 
@@ -52,15 +48,14 @@
         <span class="text-xs text-ink-3 ml-auto" x-text="`across ${data.max_runs} scan dates: ` + data.all_days.map(d=>d.label).join(' · ')"></span>
       </div>
       <div class="flex flex-wrap gap-2 mt-3">
-        <button @click="minCount=2" class="run-chip"
-                :style="minCount===2 ? 'background:var(--tpdl-dark-ink);color:#fff' : 'background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted)'">
-          All recurring
+        <button @click="pick=0" class="run-chip"
+                :style="pick===0 ? 'background:var(--tpdl-dark-ink);color:#fff' : 'background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted)'">
+          All · <span x-text="data.count"></span>
         </button>
         <template x-for="n in countTiers" :key="n">
-          <button @click="minCount = n" class="run-chip"
-                  :style="minCount===n ? 'background:#7c3aed;color:#fff' : 'background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted)'">
-            <span x-text="`${n}× or more`"></span>
-          </button>
+          <button @click="pick = n" class="run-chip"
+                  :style="pick===n ? 'background:#7c3aed;color:#fff' : 'background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted)'"
+                  x-text="`×${n} · ${countAt(n)}`"></button>
         </template>
         <label class="run-chip ml-2" style="background:#fff;border:1px solid var(--tpdl-border);color:var(--tpdl-text-muted);cursor:pointer">
           <input type="checkbox" x-model="inIcpOnly" class="mr-1"> In-ICP only
@@ -112,7 +107,7 @@
 <script>
 function recurringPage() {
   return {
-    data: null, loading: true, minCount: 2, inIcpOnly: false,
+    data: null, loading: true, pick: 0, inIcpOnly: false,   // pick 0 = all; 2 = seen ×2; 3 = seen ×3
     async init() {
       try { this.data = await fetch("/api/intel/recurring").then(r => r.json()); }
       catch (e) { this.data = { count:0, companies:[], all_days:[] }; }
@@ -121,12 +116,13 @@ function recurringPage() {
     get countTiers() {
       const max = this.data?.max_runs || 2;
       const tiers = [];
-      for (let n = 3; n <= max; n++) tiers.push(n);   // "All recurring" already covers 2×
+      for (let n = 2; n <= max; n++) tiers.push(n);   // one button per exact scan count (×2, ×3…)
       return tiers;
     },
+    countAt(n) { return (this.data?.companies || []).filter(c => c.count === n).length; },
     get filtered() {
       let all = this.data?.companies || [];
-      all = all.filter(c => c.count >= this.minCount);
+      if (this.pick) all = all.filter(c => c.count === this.pick);   // exact ×N
       if (this.inIcpOnly) all = all.filter(c => !c.out_of_icp);
       return all;
     },
