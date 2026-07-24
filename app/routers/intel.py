@@ -648,30 +648,40 @@ def recurring(db: Session = Depends(get_db)) -> dict:
 # pickers grow automatically — nothing here is hard-coded to two.
 # ---------------------------------------------------------------------------
 
-def _run_label(run_id: str, day: Optional[str]) -> str:
-    engine = "Neotek" if run_id == NEOTEK_REFERENCE_RUN else "TPDL"
+def _run_label(day: Optional[str]) -> str:
+    engine = "Neotek" if day == NEOTEK_REFERENCE_DATE else "TPDL"
     return f"{engine} · {day}" if day else engine
+
+
+def _runs_by_date(db: Session) -> dict[str, dict[str, float]]:
+    """{iso_date: {company: best_score that day}}. Groups by SCAN DATE, not by
+    import batch — so the three 23 Jul batches count as ONE '23 Jul' run (same
+    rule as the Recurring page). Best score per company covers same-day re-scores."""
+    by_date: dict[str, dict[str, float]] = {}
+    for r in db.query(RunSnapshot).all():
+        if not r.run_date:
+            continue
+        d = r.run_date.date().isoformat()
+        slot = by_date.setdefault(d, {})
+        s = r.assessed_score or 0.0
+        if r.company_name not in slot or s > slot[r.company_name]:
+            slot[r.company_name] = s
+    return by_date
 
 
 @router.get("/runs")
 def list_runs(db: Session = Depends(get_db)) -> dict:
-    """Every run in history, oldest → newest, for the comparison pickers.
-    INCLUDES the Neotek May reference (the user explicitly wants to diff
-    against it), unlike the /runs traceability page which tracks TPDL only."""
-    by_run: dict[str, list[RunSnapshot]] = {}
-    for r in db.query(RunSnapshot).all():
-        by_run.setdefault(r.import_run_id, []).append(r)
-    runs = []
-    for run_id, rows in by_run.items():
-        dates = [r.run_date for r in rows if r.run_date]
-        day = min(dates).date().isoformat() if dates else None
-        runs.append({
-            "run_id":    run_id,
-            "run_date":  day,
-            "label":     _run_label(run_id, day),
-            "companies": len(rows),
-            "is_neotek": run_id == NEOTEK_REFERENCE_RUN,
-        })
+    """Every scan DATE in history, oldest → newest, for the comparison pickers.
+    One entry per date (batches of the same day are merged), INCLUDING the Neotek
+    May reference. The date string is the run identifier used by /compare."""
+    by_date = _runs_by_date(db)
+    runs = [{
+        "run_id":    d,                       # the date IS the identifier now
+        "run_date":  d,
+        "label":     _run_label(d),
+        "companies": len(names),
+        "is_neotek": d == NEOTEK_REFERENCE_DATE,
+    } for d, names in by_date.items()]
     runs.sort(key=lambda r: r["run_date"] or "")
     return {"runs": runs, "count": len(runs)}
 
@@ -682,16 +692,13 @@ def compare_runs(
     to_run: str,
     db: Session = Depends(get_db),
 ) -> dict:
-    """Per-company movement between ANY two runs. `from_run` is the baseline,
-    `to_run` the later period. Returns each company with its from/to score,
-    the delta, and a status: new (only in `to`), dropped (only in `from`),
+    """Per-company movement between ANY two scan DATES. `from_run`/`to_run` are
+    date strings (see /runs). Returns each company with its from/to score, the
+    delta, and a status: new (only in `to`), dropped (only in `from`),
     rising / fading / stable (present in both)."""
-    def scores(run_id: str) -> dict[str, float]:
-        return {r.company_name: (r.assessed_score or 0.0) for r in
-                db.query(RunSnapshot).filter(RunSnapshot.import_run_id == run_id).all()}
-
-    a = scores(from_run)
-    b = scores(to_run)
+    by_date = _runs_by_date(db)
+    a = by_date.get(from_run, {})
+    b = by_date.get(to_run, {})
     if not b and not a:
         raise HTTPException(status_code=404, detail="Unknown run id(s)")
 
