@@ -698,6 +698,26 @@
 - Cible de taux de réponse Lunch Campaign (à fixer avec Andrés).
 - Base légale RGPD pour l'enrichissement + envoi (UE/CH) avant le 1er envoi.
 
+## 2026-07-24 — Bilan santé + polish dashboard + fusion doublons (demande Betty)
+- **Audit d'intégrité** (Vera) : 622 sociétés, 523 scorées, **0 faux zéro** (3 vrais zéros = 2 hôpitaux
+  + Z-Systems), 0 incohérence éligibilité, signals sync. Zéros = 99 de mai (ancien univers) + 3 juillet.
+- **Bug ville corrigé** : `--enrich-location`/`--enrich-revenue` étaient PERDUS entre `--submit` et
+  `--fetch` (fetch recrée une cfg vierge) → 126/135 du batch sans ville. Fix : flags persistés dans le
+  pending state + restaurés au fetch (`runner._run_submit`/`_run_fetch`). **Rattrapage fait** via
+  `scripts/backfill_hq_city.py` (Perplexity, fail-open, sans re-score) : **219/220 villes remplies**,
+  0 société sans localisation (582 avec « Ville, Pays »). 1 inconnue, qq approximations mineures.
+- **Cockpit Sales rendu juste** : libellé codé en dur « CH + ES Lunch set » + « re-scored » → dynamique
+  via `runComposition()` (« 135 new to Neotek » / « N new + M re-scored »). Bandeau explicatif corrigé.
+- **Fusion 3 doublons** (`scripts/merge_duplicates.py`, sauvegarde `data/duplicates_backup_2026-07-24.json`,
+  gitignored) : Glenmark Pharmaceuticals ← …Europe ; Julphar (Gulf…) ← Julphar ; Sesderma (Mediderma
+  Group) ← Sesderma. Le gardé couvre déjà les dates du doublon → Recurring reste juste (Sesderma 2×).
+  625 → 622. ⚠️ **RESTE une paire à trancher (Betty)** : « Mediderma (Sesderma Group) » vs « Sesderma
+  (Mediderma Group) » — peut-être 2 marques réelles du même groupe, pas fusionnées.
+- Commits : 4615474 (fallback/ville/comparaison/Recurring/libellés), 6c81c4c (fix flags batch + backfill),
+  a8d112f (cockpit), 8559367 (fusion). 217 tests verts tout du long.
+- ⚠️ RESTE (idées, non urgent) : page « How it works » (méthodo, pour démo) ; 16 résumés hors-format
+  (5-6 phrases) à re-scorer ; 273 secteurs « Unknown » (trou CSV source) ; décision Mediderma/Sesderma.
+
 ## Run du 2026-07-23 — FAIT (2 batchs récupérés + importés)
 - **Gros run (64) + reste-vendredi (71) récupérés & importés** → base **625**, **44 outreach-eligible**,
   ICP-flag 122, review 56, **4 runs** en historique (+ le re-score = 5e). Top nouveaux in-ICP : **CNX
