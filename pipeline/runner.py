@@ -510,6 +510,11 @@ def _run_submit(cfg, companies, args) -> None:
     state = {
         "batch_id": batch_id,
         "out": str(args.out),
+        # Enrichment happens in _assemble, which for a batch runs at --fetch time.
+        # Persist the flags so --fetch honours them (else the city/revenue fill is
+        # silently lost for batch runs — it only worked on synchronous ones).
+        "enrich_location": bool(cfg.enrich_location),
+        "enrich_revenue": bool(cfg.enrich_revenue),
         "companies": [
             {"name": c.name, "sector": c.sector, "identity": c.identity,
              "tech_stack": tech, "violations": viol, "flags": flags,
@@ -536,6 +541,10 @@ def _run_fetch(cfg, args) -> None:
         return
     state = json.loads(pending.read_text(encoding="utf-8"))
     batch_id = state["batch_id"]
+    # Restore the enrichment flags saved at submit time so --fetch fills the HQ
+    # city / revenue in _assemble (they don't come from the CLI at fetch time).
+    cfg.enrich_location = bool(state.get("enrich_location", False))
+    cfg.enrich_revenue = bool(state.get("enrich_revenue", False))
 
     status = batch_mod.batch_status(cfg, batch_id)
     if status != "ended":
