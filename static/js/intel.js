@@ -112,6 +112,9 @@ function intelPage() {
     // Run comparison ("bank-statement" period picker)
     runs: [],
     compare: { on: false, from_run: "", to_run: "", data: {}, summary: null, meta: null, loading: false },
+    // Δ column baseline — the run the delta is measured against (default: first run)
+    deltaBase: "",
+    baseScores: {},
     charts: { score: null, signals: null, sectors: null },
     loading: true,
     error: null,
@@ -137,6 +140,11 @@ function intelPage() {
         if (this.runs.length >= 2) {
           this.compare.from_run = this.runs[0].run_id;
           this.compare.to_run = this.runs[this.runs.length - 1].run_id;
+        }
+        // Δ baseline defaults to the FIRST run (oldest = May); user can rebase it.
+        if (this.runs.length) {
+          this.deltaBase = this.runs[0].run_id;
+          await this.loadBaseline();
         }
         this.$nextTick(() => this.renderCharts());
       } catch (e) {
@@ -211,7 +219,7 @@ function intelPage() {
         reviewOK(c) && icpOK(c) && vintageOK(c) && compareOK(c));
       const dir = this.sortDesc ? -1 : 1;
       const key = this.sortKey;
-      const val = (c) => (key === "delta" && this.compare.on) ? this.effDelta(c) : c[key];
+      const val = (c) => (key === "delta") ? this.deltaSort(c) : c[key];
       return [...rows].sort((a, b) => {
         const av = val(a), bv = val(b);
         if (av === bv) return 0;
@@ -313,46 +321,62 @@ function intelPage() {
       return { bg: "#fee2e2", color: "#7f1d1d" };
     },
 
-    /* ---- Movement vs the Neotek May reference run ---- */
-    deltaLabel(d) {
-      if (d == null) return "new";
-      if (d === 0) return "±0";
-      return (d > 0 ? "▲ +" : "▼ ") + Number(d).toFixed(1);
+    /* ---- Δ column — rebaseable against ANY run (default = first run) ---- */
+    // deltaBase = the chosen baseline run date (iso); baseScores = {name: score}
+    // for that run, fetched from /api/intel/baseline.
+    async loadBaseline() {
+      if (!this.deltaBase) return;
+      try {
+        const r = await fetch(`/api/intel/baseline?run=${encodeURIComponent(this.deltaBase)}`).then(x => x.json());
+        this.baseScores = r.scores || {};
+      } catch (e) { this.baseScores = {}; }
     },
-    deltaChipStyle(d) {
-      if (d == null) return "background:#e0e7ff;color:#3730a3";        // never in Neotek
-      if (d === 0)  return "background:#f3f3ef;color:#5c5c5c";
-      return d > 0 ? "background:#dcf7e7;color:#0a3a26" : "background:#fee2e2;color:#7f1d1d";
+    get baseLabel() {
+      const o = (this.runOptions || []).find(r => r.day === this.deltaBase);
+      return o ? o.label : this.deltaBase;
     },
-    // Δ column display — vintage-aware. A row still on its Neotek-May score
-    // hasn't been re-scored, so it shows "—", not a fake "±0" or "new".
+    // number | 'new' (not in baseline run) | 'flat' (not re-scored after baseline)
+    deltaVal(c) {
+      const base = this.baseScores || {};
+      if (!(c.name in base)) return "new";
+      const cd = this._day(c.run_date);
+      if (!cd || cd <= this.deltaBase) return "flat";
+      return Math.round((c.assessed_score - base[c.name]) * 10) / 10;
+    },
     deltaText(c) {
-      if (this.compare.on) return this.deltaLabel(this.effDelta(c));
-      if (c.vintage === "neotek_may") return "—";
-      return this.deltaLabel(c.delta);
+      const v = this.deltaVal(c);
+      if (v === "new")  return "new";
+      if (v === "flat") return "—";
+      if (v === 0)      return "±0";
+      return (v > 0 ? "▲ +" : "▼ ") + Math.abs(v).toFixed(1);
     },
     deltaStyleFor(c) {
-      if (this.compare.on) return this.deltaChipStyle(this.effDelta(c));
-      if (c.vintage === "neotek_may") return "background:transparent;color:#8a8a8a";
-      return this.deltaChipStyle(c.delta);
+      const v = this.deltaVal(c);
+      if (v === "new")  return "background:#e0e7ff;color:#3730a3";
+      if (v === "flat") return "background:transparent;color:#8a8a8a";
+      if (v === 0)      return "background:#f3f3ef;color:#5c5c5c";
+      return v > 0 ? "background:#dcf7e7;color:#0a3a26" : "background:#fee2e2;color:#7f1d1d";
     },
     deltaTitleFor(c) {
-      if (this.compare.on) {
-        const e = this.cmp(c);
-        return (e && e.from_score != null) ? ("From " + e.from_score.toFixed(1)) : "New in this period";
-      }
-      if (c.vintage === "neotek_may") return "Neotek May score — not re-scored since, so there's no movement to show";
-      if (c.reappeared) return "Neotek May: " + c.neotek_score.toFixed(1);
-      return "Not in the Neotek run";
+      const v = this.deltaVal(c);
+      if (v === "new")  return "Not in the " + this.baseLabel + " run";
+      if (v === "flat") return "Not re-scored since " + this.baseLabel + " — no movement to show";
+      return this.baseLabel + ": " + (this.baseScores[c.name]).toFixed(1);
+    },
+    // numeric proxy for sorting the Δ column ('new'/'flat' sink to the bottom)
+    deltaSort(c) {
+      const v = this.deltaVal(c);
+      return typeof v === "number" ? v : -999;
     },
 
-    // Left accent that marks a company already seen in the baseline run
-    // (period-aware: reflects the selected comparison when compare mode is on).
+    // Left accent — green up / red down / grey flat vs the chosen baseline run;
+    // transparent for companies not in that baseline (nothing to move from).
     reappearedBorder(c) {
-      if (!this.effReappeared(c)) return "3px solid transparent";
-      const d = this.effDelta(c);
-      if (d > 0) return "3px solid #34D591";
-      if (d < 0) return "3px solid #ef4444";
+      const v = this.deltaVal(c);
+      if (v === "new") return "3px solid transparent";
+      if (v === "flat") return "3px solid #94a3b8";
+      if (v > 0) return "3px solid #34D591";
+      if (v < 0) return "3px solid #ef4444";
       return "3px solid #94a3b8";
     },
     companyUrl(c) { return `/intel/company?c=${encodeURIComponent(c.name)}`; },

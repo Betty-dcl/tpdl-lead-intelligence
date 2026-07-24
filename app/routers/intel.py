@@ -741,6 +741,14 @@ def list_runs(db: Session = Depends(get_db)) -> dict:
     return {"runs": runs, "count": len(runs)}
 
 
+@router.get("/baseline")
+def baseline_scores(run: str, db: Session = Depends(get_db)) -> dict:
+    """Per-company scores for ONE scan date, so the Sales Δ column can be rebased
+    to any run the user picks in the header dropdown (default = the first run)."""
+    by_date = _runs_by_date(db)
+    return {"run": run, "scores": by_date.get(run, {})}
+
+
 @router.get("/compare")
 def compare_runs(
     from_run: str,

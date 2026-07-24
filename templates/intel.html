@@ -397,10 +397,17 @@
           <div class="sortable" @click="setSort('assessed_score')">Score
             <span class="sort-arrow" x-show="sortKey==='assessed_score'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
-          <div class="sortable" @click="setSort('delta')"
-               :title="compare.on ? 'Change over the selected period' : 'Score change for companies RE-SCORED since May. “—” = still on its May score (not re-scored yet).'">
-            <span x-text="compare.on ? ('Δ vs ' + (compare.meta?.from?.label || 'start run')) : 'Δ vs May 25'"></span>
-            <span class="sort-arrow" x-show="sortKey==='delta'" x-text="sortDesc ? '▼' : '▲'"></span>
+          <div title="Score change vs the chosen baseline run. “—” = not re-scored since then; “new” = wasn't in that run.">
+            <span class="sortable" @click="setSort('delta')">Δ vs
+              <span class="sort-arrow" x-show="sortKey==='delta'" x-text="sortDesc ? '▼' : '▲'"></span>
+            </span>
+            <select x-model="deltaBase" @change="loadBaseline()" @click.stop
+                    aria-label="Delta baseline run"
+                    class="ml-1 text-[11px] border border-line rounded px-1 py-0.5 bg-white text-ink">
+              <template x-for="r in runOptions" :key="r.day">
+                <option :value="r.day" x-text="r.label"></option>
+              </template>
+            </select>
           </div>
           <div>Coverage</div>
           <div>Signals</div>
@@ -737,5 +744,5 @@
 
 </div>
 
-<script src="/static/js/intel.js?v=12"></script>
+<script src="/static/js/intel.js?v=13"></script>
 {% endblock %}
