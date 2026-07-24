@@ -170,17 +170,28 @@
         </span>
       </div>
 
-      <!-- Movement vs Neotek -->
+      <!-- Movement vs Neotek — only meaningful when this run overlaps May -->
       <div class="mt-4 pt-4 border-t text-sm flex flex-wrap items-center gap-x-5 gap-y-1"
            style="border-color:rgba(255,255,255,0.15)">
         <span class="text-[11px] uppercase tracking-wider opacity-70">Since the Neotek May run</span>
-        <span>🟢 <strong x-text="run?.neotek.risers"></strong> rising</span>
-        <span>🔴 <strong x-text="run?.neotek.faders"></strong> fading</span>
-        <span>⚪ <strong x-text="run?.neotek.stable"></strong> stable</span>
-        <span class="opacity-80" x-show="run?.neotek.top_riser">
-          Top riser <strong x-text="run?.neotek.top_riser?.name"></strong>
-          (<span x-text="'+' + run?.neotek.top_riser?.delta.toFixed(1)"></span>)
-        </span>
+        <template x-if="run?.neotek.reappeared">
+          <span class="flex flex-wrap items-center gap-x-5 gap-y-1">
+            <span>🟢 <strong x-text="run?.neotek.risers"></strong> rising</span>
+            <span>🔴 <strong x-text="run?.neotek.faders"></strong> fading</span>
+            <span>⚪ <strong x-text="run?.neotek.stable"></strong> stable</span>
+            <span class="opacity-80" x-show="run?.neotek.top_riser">
+              Top riser <strong x-text="run?.neotek.top_riser?.name"></strong>
+              (<span x-text="'+' + run?.neotek.top_riser?.delta.toFixed(1)"></span>)
+            </span>
+          </span>
+        </template>
+        <template x-if="!run?.neotek.reappeared">
+          <span>
+            <strong>No overlap with May</strong> — every company in this run is new to Neotek,
+            so there's no movement to compare. Score movement vs May lives on the
+            <a href="/recurring" class="underline">Recurring</a> page (the accounts seen in both).
+          </span>
+        </template>
         <span class="opacity-70 text-xs w-full mt-1">
           ⚠ May = original Neotek engine, July = TPDL’s rebuilt engine — a delta mixes a real change in signal with the engine change. Rows already seen in May carry a coloured left edge.
         </span>
