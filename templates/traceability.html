@@ -49,6 +49,55 @@
     </p>
   </div>
 
+  <!-- Compare ANY two runs — pick a baseline and a later run -->
+  <div class="rounded-xl border border-line bg-white overflow-hidden mb-6" x-show="cmpRuns.length >= 2" x-cloak>
+    <div class="px-5 py-4 border-b border-line">
+      <p class="text-lg font-semibold">📊 Compare two runs</p>
+      <p class="text-xs text-ink-3 mb-3">Pick a baseline and a later run — like a bank statement between two dates.</p>
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="text-xs text-ink-3"><div class="mb-1">From (baseline)</div>
+          <select x-model="cmpFrom" @change="runCompare()"
+                  class="px-3 py-1.5 text-sm border border-line rounded-md text-ink bg-white min-w-[200px]">
+            <template x-for="r in cmpRuns" :key="r.run_id">
+              <option :value="r.run_id" x-text="`${r.label} · ${r.companies} co.`"></option>
+            </template>
+          </select></label>
+        <span class="text-ink-3 pb-2">→</span>
+        <label class="text-xs text-ink-3"><div class="mb-1">To (later run)</div>
+          <select x-model="cmpTo" @change="runCompare()"
+                  class="px-3 py-1.5 text-sm border border-line rounded-md text-ink bg-white min-w-[200px]">
+            <template x-for="r in cmpRuns" :key="r.run_id">
+              <option :value="r.run_id" x-text="`${r.label} · ${r.companies} co.`"></option>
+            </template>
+          </select></label>
+      </div>
+    </div>
+    <div class="px-5 py-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-center" x-show="cmpSummary" x-cloak>
+      <div><p class="text-2xl font-semibold" style="color:var(--tpdl-accent-ink)" x-text="cmpSummary?.new"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">new</p></div>
+      <div><p class="text-2xl font-semibold" style="color:#0a3a26" x-text="cmpSummary?.rising"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">rising</p></div>
+      <div><p class="text-2xl font-semibold" style="color:#7f1d1d" x-text="cmpSummary?.fading"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">fading</p></div>
+      <div><p class="text-2xl font-semibold text-ink-3" x-text="cmpSummary?.stable"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">stable</p></div>
+      <div><p class="text-2xl font-semibold text-ink" x-text="cmpSummary?.common"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">in both</p></div>
+    </div>
+    <div class="px-5 pb-4 text-sm text-ink-2 flex flex-wrap gap-x-6 gap-y-1" x-show="cmpSummary">
+      <span x-show="cmpSummary?.top_riser">Top riser
+        <strong x-text="cmpSummary?.top_riser?.company"></strong>
+        (<span x-text="'+' + cmpSummary?.top_riser?.delta.toFixed(1)"></span>)</span>
+      <span x-show="cmpSummary?.top_fader">Top fader
+        <strong x-text="cmpSummary?.top_fader?.company"></strong>
+        (<span x-text="cmpSummary?.top_fader?.delta.toFixed(1)"></span>)</span>
+      <span class="w-full text-[11px] text-ink-3" x-show="cmpMeta">
+        Comparing <strong x-text="cmpMeta?.from?.label"></strong> → <strong x-text="cmpMeta?.to?.label"></strong>.
+        A May↔July delta also spans an engine change (Neotek → TPDL).
+      </span>
+    </div>
+  </div>
+
   <a :href="sharepointUrl" target="_blank" rel="noopener"
      class="inline-flex items-center gap-2 mb-6 text-sm font-medium px-4 py-2 rounded-lg text-white"
      style="background: var(--tpdl-accent-ink)">
@@ -168,6 +217,7 @@
 function traceability() {
   return {
     runs: [], loading: true, neo: null,
+    cmpRuns: [], cmpFrom: '', cmpTo: '', cmpSummary: null, cmpMeta: null,
     sharepointUrl: {{ sharepoint_url | tojson }},
     async load() {
       try {
@@ -180,7 +230,28 @@ function traceability() {
         const run = await fetch('/api/intel/run').then(x => x.json());
         if (run && run.has_run && run.neotek) this.neo = run;
       } catch (e) {}
+      // Two-run comparison picker (grouped by scan date, incl. Neotek May).
+      try {
+        const cr = await fetch('/api/intel/runs').then(x => x.json());
+        this.cmpRuns = cr.runs || [];
+        if (this.cmpRuns.length >= 2) {
+          this.cmpFrom = this.cmpRuns[0].run_id;             // oldest (May)
+          this.cmpTo = this.cmpRuns[1].run_id;               // next run — meaningful default
+          await this.runCompare();
+        }
+      } catch (e) {}
       this.loading = false;
+    },
+    async runCompare() {
+      if (!this.cmpFrom || !this.cmpTo || this.cmpFrom === this.cmpTo) {
+        this.cmpSummary = null; this.cmpMeta = null; return;
+      }
+      try {
+        const d = await fetch(`/api/intel/compare?from_run=${encodeURIComponent(this.cmpFrom)}`
+                              + `&to_run=${encodeURIComponent(this.cmpTo)}`).then(x => x.json());
+        this.cmpSummary = d.summary || null;
+        this.cmpMeta = { from: d.from, to: d.to };
+      } catch (e) { this.cmpSummary = null; }
     },
     async exportRun(run) {
       run._exporting = true; run._exported = '';

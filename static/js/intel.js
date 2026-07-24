@@ -251,7 +251,7 @@ function intelPage() {
     regionLabel(r) {
       return { CH: "Switzerland", ES: "Spain", USA: "USA",
                "Middle East": "Middle East", Europe: "Europe (rest)",
-               APAC: "APAC", Other: "Other / unknown" }[r] || r;
+               APAC: "APAC", Other: "Unknown" }[r] || r;
     },
 
     resetFilters() {
