@@ -170,31 +170,29 @@
         </span>
       </div>
 
-      <!-- Movement vs Neotek — only meaningful when this run overlaps May -->
+      <!-- Movement vs our whole database (each company's previous score) -->
       <div class="mt-4 pt-4 border-t text-sm flex flex-wrap items-center gap-x-5 gap-y-1"
            style="border-color:rgba(255,255,255,0.15)">
-        <span class="text-[11px] uppercase tracking-wider opacity-70">Since the Neotek May run</span>
-        <template x-if="run?.neotek.reappeared">
+        <span class="text-[11px] uppercase tracking-wider opacity-70">Compared to our database</span>
+        <template x-if="run?.vs_db.reappeared">
           <span class="flex flex-wrap items-center gap-x-5 gap-y-1">
-            <span>🟢 <strong x-text="run?.neotek.risers"></strong> rising</span>
-            <span>🔴 <strong x-text="run?.neotek.faders"></strong> fading</span>
-            <span>⚪ <strong x-text="run?.neotek.stable"></strong> stable</span>
-            <span class="opacity-80" x-show="run?.neotek.top_riser">
-              Top riser <strong x-text="run?.neotek.top_riser?.name"></strong>
-              (<span x-text="'+' + run?.neotek.top_riser?.delta.toFixed(1)"></span>)
+            <span><strong x-text="run?.vs_db.reappeared"></strong> already in the database —</span>
+            <span>🟢 <strong x-text="run?.vs_db.risers"></strong> rose</span>
+            <span>🔴 <strong x-text="run?.vs_db.faders"></strong> fell</span>
+            <span>⚪ <strong x-text="run?.vs_db.stable"></strong> unchanged</span>
+            <span class="opacity-80" x-show="run?.vs_db.top_riser">
+              Top riser <strong x-text="run?.vs_db.top_riser?.name"></strong>
+              (<span x-text="'+' + run?.vs_db.top_riser?.delta.toFixed(1)"></span>)
             </span>
           </span>
         </template>
-        <template x-if="!run?.neotek.reappeared">
+        <template x-if="!run?.vs_db.reappeared">
           <span>
-            <strong>No overlap with May</strong> — every company in this run is new to Neotek,
-            so there's no movement to compare. Score movement vs May lives on the
-            <a href="/recurring" class="underline">Recurring</a> page (the accounts seen in both).
+            <strong>All new to our database</strong> — none of this run's companies had been
+            scored before, so there's no earlier score to move from. When a run re-scores
+            companies we already have, their rise / fall shows here.
           </span>
         </template>
-        <span class="opacity-70 text-xs w-full mt-1">
-          ⚠ May = original Neotek engine, July = TPDL’s rebuilt engine — a delta mixes a real change in signal with the engine change. Rows already seen in May carry a coloured left edge.
-        </span>
       </div>
 
       <!-- What this run contained + where discovered-but-unscored names live -->
@@ -203,10 +201,10 @@
            x-show="run && (run.discovered_candidates || run.net_new_scored)">
         <span x-show="run?.net_new_scored">
           This run scored <strong x-text="run?.net_new_scored"></strong>
-          companies new to Neotek — they now appear here with a real score.
+          companies new to our database — they now appear here with a real score.
         </span>
         <span x-show="!run?.net_new_scored">
-          This run re-scored existing companies (no net-new names).
+          This run re-scored companies we already had (no net-new names).
         </span>
         <a href="/candidates" class="tpdl-btn text-xs"
            style="background:var(--tpdl-accent);color:#0a3a26;border:none"
@@ -214,30 +212,6 @@
           See <span x-text="run?.discovered_candidates"></span> new candidates (found, not scored) →
         </a>
       </div>
-    </div>
-
-    <!-- Sales pipeline — 4 stages -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
-      <a href="/agent/hugo" class="tpdl-card p-4 hover:border-ink transition-colors">
-        <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 1</div>
-        <div class="font-semibold text-sm">Hugo</div>
-        <div class="text-xs text-ink-3">Research &amp; scoring</div>
-      </a>
-      <a href="/agent/maya" class="tpdl-card p-4 hover:border-ink transition-colors">
-        <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 2</div>
-        <div class="font-semibold text-sm">Maya</div>
-        <div class="text-xs text-ink-3">Shortlist &amp; trends</div>
-      </a>
-      <a href="/agent/ines" class="tpdl-card p-4 hover:border-ink transition-colors">
-        <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 3</div>
-        <div class="font-semibold text-sm">Inès</div>
-        <div class="text-xs text-ink-3">Contacts &amp; radars</div>
-      </a>
-      <a href="/agent/julie" class="tpdl-card p-4 hover:border-ink transition-colors">
-        <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--tpdl-accent-ink)">Stage 4</div>
-        <div class="font-semibold text-sm">Julie</div>
-        <div class="text-xs text-ink-3">Segmented outreach</div>
-      </a>
     </div>
 
     <!-- Team activity feed strip -->

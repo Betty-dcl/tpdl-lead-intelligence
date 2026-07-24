@@ -291,7 +291,7 @@ function intelPage() {
       const total = run.companies || 0;
       const fresh = run.net_new_scored || 0;
       const back  = total - fresh;
-      if (fresh >= total) return `${total} new to Neotek`;
+      if (fresh >= total) return `${total} new to our database`;
       if (fresh === 0)    return "re-scored existing companies";
       return `${fresh} new + ${back} re-scored`;
     },

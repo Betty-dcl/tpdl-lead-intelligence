@@ -326,6 +326,24 @@ def list_signals(limit: int = 50, db: Session = Depends(get_db)) -> list[dict]:
 # Latest-run summary (the "run cockpit" header) + Neotek movement
 # ---------------------------------------------------------------------------
 
+def _prior_scores(db: Session, before_day: str) -> dict[str, float]:
+    """Each company's most recent score from ANY run before `before_day` (iso).
+    This is the 'what we already had in the DB' baseline — broader than the Neotek
+    reference, so the Sales cockpit can frame a run against our whole history."""
+    best_day: dict[str, str] = {}
+    scores: dict[str, float] = {}
+    for r in db.query(RunSnapshot).all():
+        if not r.run_date:
+            continue
+        d = r.run_date.date().isoformat()
+        if d >= before_day:
+            continue
+        if r.company_name not in best_day or d > best_day[r.company_name]:
+            best_day[r.company_name] = d
+            scores[r.company_name] = r.assessed_score or 0.0
+    return scores
+
+
 @router.get("/run")
 def latest_run(db: Session = Depends(get_db)) -> dict:
     """Everything the Sales page needs to frame the LATEST run: its date, size,
@@ -341,7 +359,8 @@ def latest_run(db: Session = Depends(get_db)) -> dict:
         .order_by(Company.assessed_score.desc())
         .all()
     )
-    baseline = _neotek_baseline(db)
+    neotek = _neotek_baseline(db)                       # vs the original Neotek May run
+    prior = _prior_scores(db, day.isoformat())          # vs each company's previous score in OUR DB
 
     def band(s: float) -> str:
         s = s or 0
@@ -350,39 +369,52 @@ def latest_run(db: Session = Depends(get_db)) -> dict:
         if s >= 1: return "weak"
         return "none"
 
+    def movement(baseline: dict[str, float]) -> dict:
+        reappeared = risers = faders = stable = 0
+        top_riser = top_fader = None
+        for c in rows:
+            if c.name in baseline:
+                reappeared += 1
+                d = round((c.assessed_score or 0) - baseline[c.name], 1)
+                if d > 0:
+                    risers += 1
+                    if top_riser is None or d > top_riser[1]:
+                        top_riser = (c.name, d)
+                elif d < 0:
+                    faders += 1
+                    if top_fader is None or d < top_fader[1]:
+                        top_fader = (c.name, d)
+                else:
+                    stable += 1
+        return {
+            "reappeared": reappeared, "risers": risers, "faders": faders, "stable": stable,
+            "top_riser": {"name": top_riser[0], "delta": top_riser[1]} if top_riser else None,
+            "top_fader": {"name": top_fader[0], "delta": top_fader[1]} if top_fader else None,
+        }
+
     bands = {"act_now": 0, "monitor": 0, "weak": 0, "none": 0}
-    reappeared = risers = faders = stable = 0
-    top_riser = top_fader = None
     for c in rows:
         bands[band(c.assessed_score)] += 1
-        if c.name in baseline:
-            reappeared += 1
-            d = round((c.assessed_score or 0) - baseline[c.name], 1)
-            if d > 0:
-                risers += 1
-                if top_riser is None or d > top_riser[1]:
-                    top_riser = (c.name, d)
-            elif d < 0:
-                faders += 1
-                if top_fader is None or d < top_fader[1]:
-                    top_fader = (c.name, d)
-            else:
-                stable += 1
 
     top = rows[0] if rows else None
-    # net-new SCORED this run = companies in the run that Neotek never had
-    net_new_scored = sum(1 for c in rows if c.name not in baseline)
+    # net-new = companies this run scored that were NOT already anywhere in our DB
+    net_new_scored = sum(1 for c in rows if c.name not in prior)
 
-    # discovered-but-unscored candidates waiting in the discovery step's output
+    # discovered-but-unscored candidates: only those NOT yet in the scored universe.
+    # (After a run scores them, they drop off — the count must not stay stale.)
     discovered = 0
     try:
         import csv as _csv
+        import re as _re
         from pathlib import Path as _Path
+        _norm = lambda s: _re.sub(r"[^a-z0-9]", "", (s or "").lower())
+        universe = {_norm(n) for (n,) in db.query(Company.name).all()}
         _p = _Path("data/csv/discovery_candidates.csv")
         if _p.exists():
             with _p.open(encoding="utf-8") as _fh:
                 discovered = sum(1 for r in _csv.DictReader(_fh)
-                                 if (r.get("Company Name") or "").strip())
+                                 if (r.get("Company Name") or "").strip()
+                                 and _norm(r["Company Name"]) not in universe)
     except Exception:
         discovered = 0
 
@@ -397,15 +429,10 @@ def latest_run(db: Session = Depends(get_db)) -> dict:
         "net_new_scored": net_new_scored,
         "discovered_candidates": discovered,
         "engine": "TPDL engine (rebuilt)",
-        "neotek": {
-            "reference_date": "2026-05-25",
-            "reappeared": reappeared,
-            "risers": risers,
-            "faders": faders,
-            "stable": stable,
-            "top_riser": {"name": top_riser[0], "delta": top_riser[1]} if top_riser else None,
-            "top_fader": {"name": top_fader[0], "delta": top_fader[1]} if top_fader else None,
-        },
+        # vs the whole database (each company's previous score) — for the Sales cockpit
+        "vs_db": movement(prior),
+        # vs the original Neotek May run (cross-engine) — for the Runs page
+        "neotek": {"reference_date": "2026-05-25", **movement(neotek)},
     }
 
 
