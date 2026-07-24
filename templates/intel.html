@@ -388,97 +388,11 @@
       <span class="ml-auto">Click a company name to open its full detail page →</span>
     </div>
 
-    <!-- ============ RUN COMPARISON (period picker) ============ -->
-    <div class="tpdl-card p-5 mb-4" x-show="runs.length >= 2" x-cloak>
-      <div class="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h3 class="font-semibold text-sm flex items-center gap-2">
-            📊 Compare runs
-            <span class="text-xs font-normal text-ink-3">— pick a period, like a bank statement</span>
-          </h3>
-          <p class="text-xs text-ink-3 mt-1">
-            See what changed between any two runs: new companies, risers, faders — the delta
-            recomputes for whatever period you choose.
-          </p>
-        </div>
-        <button @click="toggleCompare()"
-                :class="compare.on ? 'filter-pill is-active' : 'filter-pill'">
-          <span x-text="compare.on ? '● Comparison on' : '○ Turn comparison on'"></span>
-        </button>
-      </div>
-
-      <div class="flex flex-wrap items-end gap-3 mt-4">
-        <label class="text-xs text-ink-3">
-          <div class="mb-1">From run (baseline)</div>
-          <select x-model="compare.from_run" @change="onCompareRunChange()"
-                  aria-label="Comparison baseline run"
-                  class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink min-w-[190px]">
-            <template x-for="r in runs" :key="r.run_id">
-              <option :value="r.run_id" x-text="`${r.label} · ${r.companies} co.`"></option>
-            </template>
-          </select>
-        </label>
-        <span class="text-ink-3 pb-2">→</span>
-        <label class="text-xs text-ink-3">
-          <div class="mb-1">To run (later period)</div>
-          <select x-model="compare.to_run" @change="onCompareRunChange()"
-                  aria-label="Comparison later run"
-                  class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink min-w-[190px]">
-            <template x-for="r in runs" :key="r.run_id">
-              <option :value="r.run_id" x-text="`${r.label} · ${r.companies} co.`"></option>
-            </template>
-          </select>
-        </label>
-
-        <button x-show="compare.on"
-                @click="filters.new_only = !filters.new_only"
-                :class="filters.new_only ? 'filter-pill is-active' : 'filter-pill'">
-          ✦ New in period only
-        </button>
-        <span x-show="runs.length < 3" class="text-[11px] text-ink-3 pb-2">
-          Only two runs so far — more periods unlock as new runs land.
-        </span>
-      </div>
-
-      <!-- Comparison summary tiles -->
-      <div x-show="compare.on && compare.summary" x-cloak
-           class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 pt-4 border-t border-line">
-        <div class="rounded-lg p-3" style="background:var(--tpdl-accent-soft)">
-          <div class="text-xl font-semibold" style="color:var(--tpdl-accent-ink)" x-text="compare.summary?.new"></div>
-          <div class="text-[11px] uppercase tracking-wider" style="color:var(--tpdl-accent-ink)">New companies</div>
-        </div>
-        <div class="rounded-lg p-3 bg-bg-2">
-          <div class="text-xl font-semibold text-ink" x-text="compare.summary?.rising"></div>
-          <div class="text-[11px] uppercase tracking-wider text-ink-3">Rising 🟢</div>
-        </div>
-        <div class="rounded-lg p-3 bg-bg-2">
-          <div class="text-xl font-semibold text-ink" x-text="compare.summary?.fading"></div>
-          <div class="text-[11px] uppercase tracking-wider text-ink-3">Fading 🔴</div>
-        </div>
-        <div class="rounded-lg p-3 bg-bg-2">
-          <div class="text-xl font-semibold text-ink" x-text="compare.summary?.stable"></div>
-          <div class="text-[11px] uppercase tracking-wider text-ink-3">Stable ⚪</div>
-        </div>
-        <div class="rounded-lg p-3 bg-bg-2">
-          <div class="text-xl font-semibold text-ink" x-text="compare.summary?.common"></div>
-          <div class="text-[11px] uppercase tracking-wider text-ink-3">In both runs</div>
-        </div>
-      </div>
-      <div x-show="compare.on && compare.summary && (compare.summary?.top_riser || compare.summary?.top_fader)" x-cloak
-           class="text-xs text-ink-3 mt-3 flex flex-wrap gap-x-5 gap-y-1">
-        <span x-show="compare.summary?.top_riser">
-          Top riser <strong class="text-ink" x-text="compare.summary?.top_riser?.company"></strong>
-          (<span x-text="'+' + compare.summary?.top_riser?.delta.toFixed(1)"></span>)
-        </span>
-        <span x-show="compare.summary?.top_fader">
-          Top fader <strong class="text-ink" x-text="compare.summary?.top_fader?.company"></strong>
-          (<span x-text="compare.summary?.top_fader?.delta.toFixed(1)"></span>)
-        </span>
-        <span class="w-full opacity-80" x-show="compare.meta">
-          ⚠ Comparing <strong x-text="compare.meta?.from?.label"></strong> →
-          <strong x-text="compare.meta?.to?.label"></strong>. A May→July delta also spans an engine change (Neotek → TPDL).
-        </span>
-      </div>
+    <!-- Run comparison lives on the Runs page now (one job per page). -->
+    <div class="mb-4 rounded-lg px-4 py-2.5 text-xs text-ink-3 flex flex-wrap items-center gap-x-3"
+         style="background:var(--tpdl-bg-2)" x-show="runs.length >= 2" x-cloak>
+      <span>Want to compare two scans (risers / faders / new)?</span>
+      <a href="/runs" class="font-medium text-[color:var(--tpdl-info)] hover:underline">Open the Runs page →</a>
     </div>
 
     <!-- ============ TOP-N picker ============ -->
