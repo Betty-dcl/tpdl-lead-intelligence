@@ -170,29 +170,16 @@
         </span>
       </div>
 
-      <!-- Movement vs our whole database (each company's previous score) -->
+      <!-- Whole-database movement: every company scored more than once -->
       <div class="mt-4 pt-4 border-t text-sm flex flex-wrap items-center gap-x-5 gap-y-1"
            style="border-color:rgba(255,255,255,0.15)">
-        <span class="text-[11px] uppercase tracking-wider opacity-70">Compared to our database</span>
-        <template x-if="run?.vs_db.reappeared">
-          <span class="flex flex-wrap items-center gap-x-5 gap-y-1">
-            <span><strong x-text="run?.vs_db.reappeared"></strong> already in the database —</span>
-            <span>🟢 <strong x-text="run?.vs_db.risers"></strong> rose</span>
-            <span>🔴 <strong x-text="run?.vs_db.faders"></strong> fell</span>
-            <span>⚪ <strong x-text="run?.vs_db.stable"></strong> unchanged</span>
-            <span class="opacity-80" x-show="run?.vs_db.top_riser">
-              Top riser <strong x-text="run?.vs_db.top_riser?.name"></strong>
-              (<span x-text="'+' + run?.vs_db.top_riser?.delta.toFixed(1)"></span>)
-            </span>
-          </span>
-        </template>
-        <template x-if="!run?.vs_db.reappeared">
-          <span>
-            <strong>All new to our database</strong> — none of this run's companies had been
-            scored before, so there's no earlier score to move from. When a run re-scores
-            companies we already have, their rise / fall shows here.
-          </span>
-        </template>
+        <span class="text-[11px] uppercase tracking-wider opacity-70">Across our whole database</span>
+        <span><strong x-text="run?.db_movement.tracked"></strong> companies scored more than once —</span>
+        <span>🟢 <strong x-text="run?.db_movement.rose"></strong> rose</span>
+        <span>🔴 <strong x-text="run?.db_movement.fell"></strong> fell</span>
+        <span>⚪ <strong x-text="run?.db_movement.stable"></strong> unchanged</span>
+        <span class="opacity-70 text-xs">(first → latest score)</span>
+        <a href="/recurring" class="text-xs underline opacity-80 ml-auto">See each one on Recurring →</a>
       </div>
 
       <!-- What this run contained + where discovered-but-unscored names live -->

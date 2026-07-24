@@ -400,6 +400,31 @@ def latest_run(db: Session = Depends(get_db)) -> dict:
     # net-new = companies this run scored that were NOT already anywhere in our DB
     net_new_scored = sum(1 for c in rows if c.name not in prior)
 
+    # Whole-database movement: EVERY company scored in ≥2 runs, first → latest
+    # score. This is the "across our whole database, how many rose/fell/stable"
+    # number — independent of which run is latest (Betty 2026-07-24).
+    hist: dict[str, dict[str, float]] = {}
+    for r in db.query(RunSnapshot).all():
+        if not r.run_date:
+            continue
+        d = r.run_date.date().isoformat()
+        slot = hist.setdefault(r.company_name, {})
+        if d not in slot or (r.assessed_score or 0) > slot[d]:
+            slot[d] = r.assessed_score or 0.0
+    db_rose = db_fell = db_stable = db_tracked = 0
+    for slots in hist.values():
+        if len(slots) < 2:
+            continue
+        days = sorted(slots)
+        delta = round(slots[days[-1]] - slots[days[0]], 1)
+        db_tracked += 1
+        if delta > 0:
+            db_rose += 1
+        elif delta < 0:
+            db_fell += 1
+        else:
+            db_stable += 1
+
     # discovered-but-unscored candidates: only those NOT yet in the scored universe.
     # (After a run scores them, they drop off — the count must not stay stale.)
     discovered = 0
@@ -431,6 +456,9 @@ def latest_run(db: Session = Depends(get_db)) -> dict:
         "engine": "TPDL engine (rebuilt)",
         # vs the whole database (each company's previous score) — for the Sales cockpit
         "vs_db": movement(prior),
+        # whole-DB movement: all companies scored more than once, first → latest
+        "db_movement": {"tracked": db_tracked, "rose": db_rose,
+                        "fell": db_fell, "stable": db_stable},
         # vs the original Neotek May run (cross-engine) — for the Runs page
         "neotek": {"reference_date": "2026-05-25", **movement(neotek)},
     }
