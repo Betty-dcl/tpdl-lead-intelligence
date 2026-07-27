@@ -19,6 +19,38 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-27 — **Refonte Sales (frise + double delta), Recurring (matrice), Candidats (honnête) +
+  CSV run complet + garde-fou anti-fuite découverte (demandes Betty).** Commits 9311331 + 0812e78
+  sur `feat/neotek-engine`, 218 tests verts, 0 erreur console.
+  **(1) Sales — « frise » de comparaison de runs** ([templates/intel.html], [static/js/intel.js]) :
+  sélecteur From→To façon relevé bancaire (au-dessus du tableau) → le tableau se restreint au run
+  « To », résumé live (new/rose/fell/unchanged) + toggle « only new ». **Deux colonnes Δ** : **Δ period**
+  (les 2 runs choisis) et **Δ vs May** (base Neotek, TOUJOURS affichée). Pas de frise → Δ period = « — »
+  et l'histoire repose sur la colonne May. Réutilise `/api/intel/compare` + `neotek_score/delta` déjà
+  sérialisés. Retiré l'ancienne colonne Δ rebaseable + `deltaBase/loadBaseline/compare/renderCharts`.
+  **(2) Sales allégé** : import Chart.js inutilisé, 5 cartes KPI redondantes et la timeline de signaux
+  du bas supprimées (on arrive direct aux résultats). Phrase « en commun avec la base » clarifiée.
+  **(3) Recurring refait en MATRICE** ([templates/recurring.html]) : 1 ligne/société, badge ×N, 1 cellule
+  score par date de scan (colorée par bande, « — » si absente) + trajectoire « since first » ; tri
+  scans/latest/riser/faller, filtres ×N / in-ICP / recherche. (Endpoint `/api/intel/recurring` inchangé.)
+  **(4) Candidats HONNÊTE** ([templates/candidates.html] + `/api/intel/candidates`) : la page ne prétend
+  plus que des noms déjà scorés sont « not scored ». Lit l'état réel par nom (**64 découverts · 64 scorés ·
+  0 en attente**), badge « ✓ scored → Sales », filtre Waiting/Scored/All, bandeau vert quand 0 en attente.
+  Texte périmé « annulé le 18/07 » retiré. Constat clé re-vérifié : **les 135 du 23/07 sont 100 % nouvelles**
+  (0 historique) → d'où « new » partout dans les Δ ; les chiffres (+1.5…) n'existent que pour les sociétés
+  à historique (les 67 CH+ES). RIEN n'a été perdu : les 122 de vendredi + 13 = 135, toutes scorées.
+  **(5) Export CSV run enrichi** (`/api/intel/export.csv`, 53 colonnes) : identité + geo/market_tier, score
+  & flags, **évolution inter-runs complète** (times scored, net-new, previous score, Δ vs previous run,
+  Δ vs May, trajectoire « May 25 7.0 → Jul 17 8.5 »), summary, chaque signal détaillé + **corroboration
+  (0-2)**, tech stack, historique. `?run=AAAA-MM-JJ` cible un run (défaut = dernier). Bouton cockpit renommé
+  « Full run detail (CSV) ». Test smoke mis à jour.
+  **(6) Garde-fou anti-fuite découverte** (`pipeline/discovery.py`) : `archive_candidates()` écrit un
+  journal **append-only** `data/csv/discovery_archive.csv` (dédup par nom normalisé, garde la 1re date vue) —
+  appelé dans `discover()` AVANT tout scoring, donc un nom ne peut plus disparaître quand
+  discovery_candidates.csv est écrasé. **Backfill fait** : 135 noms (122 vendredi 18/07 + 13 gros run 23/07).
+  L'API/UI Candidats exposent « ever discovered 135 / never scored 0 » comme preuve. +1 test (idempotence).
+  Fichier gitignoré (comme les autres artefacts discovery). ⚠️ L'archivage AUTO ne s'active qu'au prochain
+  `--discover` réel (Terminal).
 - 2026-07-23 — **Stratégie SERP inversée : DRAINER SerpAPI d'abord, Serper en BACKUP auto (demande
   Betty).** Betty a un abonnement SerpAPI peu rechargé + une clé Serper (ajoutée dans `.env` le
   23/07, 40 car., chargée OK) qui sera « remplie de tokens ». Consigne : utiliser SerpAPI jusqu'à
@@ -754,6 +786,14 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-07-27
+- Fait : **refonte Sales (frise de comparaison de runs + double colonne Δ), Recurring en matrice,
+  Candidats rendus honnêtes, export CSV run complet (53 col.), garde-fou anti-fuite découverte**
+  (voir log 2026-07-27 en haut). Commits 9311331 + 0812e78 sur `feat/neotek-engine`, 218 tests verts,
+  0 erreur console (vérifié live sur :8000). Points clarifiés à Betty : les 135 du 23/07 sont 100 %
+  nouvelles (d'où « new » dans les Δ, pas un bug) ; rien perdu (122 vendredi + 13 = 135, toutes scorées).
+  RESTE (idées, non urgent) : (a) pousser sur le remote GitHub ; (b) l'archivage auto de découverte
+  s'activera au prochain `--discover` Terminal ; (c) éventuel « merge » vendredi↔gros run une fois voulu.
 - Date : 2026-07-22
 - Fait (fin de session) : **ICP « Market Intel July 2026 » formalisé + répercuté** (voir log 2026-07-22
   en haut). 5 docs analysés → `app/tools/icp.py` (découverte large + ICP filtre de ciblage ; exclut
