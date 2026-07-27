@@ -2,7 +2,6 @@
 {% block title %}Sales — TPDL{% endblock %}
 
 {% block head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
 <style>
   .filter-pill {
     display: inline-flex; align-items: center; gap: 0.4rem;
@@ -43,10 +42,11 @@
     vertical-align: middle;
   }
 
-  /* Grid row — leading rank column, then the real-CSV columns */
+  /* Grid row — leading rank column, then the real-CSV columns.
+     Two delta columns: Δ period (the frise) then Δ vs May (the base). */
   .grid-row {
     display: grid;
-    grid-template-columns: 38px minmax(180px, 1.5fr) 118px 150px 78px 64px 96px 104px 92px 150px 28px;
+    grid-template-columns: 34px minmax(170px, 1.4fr) 108px 128px 70px 56px 86px 86px 86px 80px 132px 26px;
     gap: 0.5rem;
     align-items: center;
     padding: 0.85rem 1rem 0.85rem 0.75rem;
@@ -69,7 +69,7 @@
 
   .grid-head {
     display: grid;
-    grid-template-columns: 38px minmax(180px, 1.5fr) 118px 150px 78px 64px 96px 104px 92px 150px 28px;
+    grid-template-columns: 34px minmax(170px, 1.4fr) 108px 128px 70px 56px 86px 86px 86px 80px 132px 26px;
     gap: 0.5rem;
     padding: 0.6rem 1rem 0.6rem 0.75rem;
     background: var(--tpdl-bg-2);
@@ -131,7 +131,8 @@
         </div>
         <div class="flex gap-2 flex-wrap">
           <a href="/api/intel/export.csv?scope=run"
-             class="tpdl-btn text-xs" style="background:var(--tpdl-accent);color:#0a3a26;border:none">⬇ Run CSV (Excel)</a>
+             class="tpdl-btn text-xs" style="background:var(--tpdl-accent);color:#0a3a26;border:none"
+             title="Full detail for this run: score, evolution/delta, all signals, sources, tech stack">⬇ Full run detail (CSV)</a>
           <a href="/runs" class="tpdl-btn text-xs" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.35)">All runs →</a>
         </div>
       </div>
@@ -170,16 +171,18 @@
         </span>
       </div>
 
-      <!-- Whole-database movement: every company scored more than once -->
-      <div class="mt-4 pt-4 border-t text-sm flex flex-wrap items-center gap-x-5 gap-y-1"
+      <!-- Whole-database movement — one plain sentence: how many companies we've
+           scored more than once, and how they've moved since we first scored them. -->
+      <div class="mt-4 pt-4 border-t text-sm flex flex-wrap items-center gap-x-2 gap-y-1"
            style="border-color:rgba(255,255,255,0.15)">
-        <span class="text-[11px] uppercase tracking-wider opacity-70">Across our whole database</span>
-        <span><strong x-text="run?.db_movement.tracked"></strong> companies scored more than once —</span>
-        <span>🟢 <strong x-text="run?.db_movement.rose"></strong> rose</span>
-        <span>🔴 <strong x-text="run?.db_movement.fell"></strong> fell</span>
-        <span>⚪ <strong x-text="run?.db_movement.stable"></strong> unchanged</span>
-        <span class="opacity-70 text-xs">(first → latest score)</span>
-        <a href="/recurring" class="text-xs underline opacity-80 ml-auto">See each one on Recurring →</a>
+        <span>
+          <strong x-text="run?.db_movement.tracked"></strong> companies are in common with our
+          database (scored in more than one run). Since we first scored them,
+          <span style="color:var(--tpdl-accent)">🟢 <strong x-text="run?.db_movement.rose"></strong> rose</span>,
+          <span style="color:#fca5a5">🔴 <strong x-text="run?.db_movement.fell"></strong> fell</span>,
+          and <span class="opacity-80">⚪ <strong x-text="run?.db_movement.stable"></strong> held steady</span>.
+        </span>
+        <a href="/recurring" class="text-xs underline opacity-80 ml-auto whitespace-nowrap">See each one on Recurring →</a>
       </div>
 
       <!-- What this run contained + where discovered-but-unscored names live -->
@@ -221,34 +224,6 @@
       </div>
     </div>
 
-    <!-- Pipeline KPIs -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-8" x-show="stats" x-cloak>
-      <div class="tpdl-card p-5">
-        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Companies</div>
-        <div class="text-3xl font-semibold" x-text="stats?.pipeline.total_companies"></div>
-        <div class="text-xs text-ink-3 mt-1">Across both lists</div>
-      </div>
-      <div class="tpdl-card p-5">
-        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">In scope</div>
-        <div class="text-3xl font-semibold" x-text="stats?.pipeline.in_scope"></div>
-        <div class="text-xs text-ink-3 mt-1">After ICP filter</div>
-      </div>
-      <div class="tpdl-card p-5">
-        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">ICP-flagged</div>
-        <div class="text-3xl font-semibold" x-text="stats?.pipeline.icp_flagged"></div>
-        <div class="text-xs text-ink-3 mt-1">USA HQ / Middle East / sub-€100M</div>
-      </div>
-      <div class="tpdl-card p-5" style="background: var(--tpdl-accent-soft); border-color: #c8efd9;">
-        <div class="text-xs uppercase tracking-wider mb-1" style="color: var(--tpdl-accent-ink)">Outreach eligible</div>
-        <div class="text-3xl font-semibold" style="color: var(--tpdl-accent-ink)" x-text="stats?.pipeline.outreach_eligible"></div>
-        <div class="text-xs mt-1" style="color: var(--tpdl-accent-ink)">Assessed score ≥ 8</div>
-      </div>
-      <div class="tpdl-card p-5">
-        <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Review flagged</div>
-        <div class="text-3xl font-semibold" x-text="stats?.pipeline.review_flagged"></div>
-        <div class="text-xs text-ink-3 mt-1">60s manual check</div>
-      </div>
-    </div>
   </section>
 
   <!-- ================================================================ -->
@@ -268,6 +243,61 @@
       </div>
       <button @click="resetFilters()"
               class="tpdl-btn tpdl-btn--ghost text-xs">Reset filters</button>
+    </div>
+
+    <!-- ============ Frise: bank-statement style run period picker ============ -->
+    <div class="rounded-xl border mb-4 p-4"
+         style="background:var(--tpdl-bg-2);border-color:var(--tpdl-border)"
+         x-show="runs.length >= 2" x-cloak>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs uppercase tracking-wider font-medium text-ink-2">📊 Compare runs</span>
+          <span class="text-[11px] text-ink-3">— like picking a date range on a bank statement</span>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap ml-auto">
+          <span class="text-[11px] uppercase tracking-wider text-ink-3">From</span>
+          <select x-model="period.from" @change="loadPeriod()" aria-label="Compare from run"
+                  class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink bg-white">
+            <option value="">— pick a run —</option>
+            <template x-for="r in runs" :key="'f'+r.run_id">
+              <option :value="r.run_id"
+                      x-text="`${shortRunDate(r.run_date)}${r.is_neotek?' · Neotek base':''} (${r.companies})`"></option>
+            </template>
+          </select>
+          <span class="text-ink-3 text-lg leading-none">→</span>
+          <span class="text-[11px] uppercase tracking-wider text-ink-3">To</span>
+          <select x-model="period.to" @change="loadPeriod()" aria-label="Compare to run"
+                  class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink bg-white">
+            <option value="">— pick a run —</option>
+            <template x-for="r in runs" :key="'t'+r.run_id">
+              <option :value="r.run_id"
+                      x-text="`${shortRunDate(r.run_date)}${r.is_neotek?' · Neotek base':''} (${r.companies})`"></option>
+            </template>
+          </select>
+          <button x-show="period.from || period.to" @click="clearPeriod()" class="filter-pill">Clear</button>
+        </div>
+      </div>
+
+      <!-- Live summary of the chosen period -->
+      <div class="mt-3 pt-3 border-t flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
+           style="border-color:var(--tpdl-border)" x-show="periodOn && periodSummary" x-cloak>
+        <span class="text-ink-2">
+          <strong x-text="runLabelFor(period.to)"></strong>
+          vs <strong x-text="runLabelFor(period.from)"></strong> —
+        </span>
+        <span>🆕 <strong x-text="periodSummary?.new || 0"></strong> new</span>
+        <span style="color:#059669">▲ <strong x-text="periodSummary?.rising || 0"></strong> rose</span>
+        <span style="color:#dc2626">▼ <strong x-text="periodSummary?.fading || 0"></strong> fell</span>
+        <span class="text-ink-3">■ <strong x-text="periodSummary?.stable || 0"></strong> unchanged</span>
+        <label class="inline-flex items-center gap-1.5 ml-auto text-ink-2 cursor-pointer">
+          <input type="checkbox" x-model="period.newOnly">
+          only new in <span x-text="runLabelFor(period.to)"></span>
+        </label>
+      </div>
+      <div class="mt-2 text-[11px] text-ink-3" x-show="!periodOn">
+        Pick two runs and the table narrows to the later one, with the <strong>Δ period</strong> column
+        filled in against the earlier one. Leave it empty and every row is measured against the May base only.
+      </div>
     </div>
 
     <div class="flex flex-wrap items-center gap-3 mb-4">
@@ -329,21 +359,14 @@
       </span>
     </div>
 
-    <!-- Legend — how to read the table -->
+    <!-- Legend — how to read the two Δ columns -->
     <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mb-3 text-xs text-ink-3">
-      <span class="flex items-center gap-1.5"><span style="display:inline-block;width:3px;height:14px;background:#34D591;border-radius:2px"></span> reappeared, score up vs Neotek</span>
-      <span class="flex items-center gap-1.5"><span style="display:inline-block;width:3px;height:14px;background:#ef4444;border-radius:2px"></span> reappeared, score down</span>
-      <span class="flex items-center gap-1.5"><span style="display:inline-block;width:3px;height:14px;background:#94a3b8;border-radius:2px"></span> reappeared, no change</span>
-      <span class="flex items-center gap-1.5"><span class="score-pill" style="min-width:auto;padding:2px 6px;font-size:10px;background:#dcf7e7;color:#0a3a26">▲ +1.5</span> re-scored since May — change shown</span>
-      <span class="flex items-center gap-1.5"><span class="score-pill" style="min-width:auto;padding:2px 6px;font-size:10px;background:transparent;color:#8a8a8a">—</span> still on its May score (not re-scored yet)</span>
-      <span class="ml-auto">Click a company name to open its full detail page →</span>
-    </div>
-
-    <!-- Run comparison lives on the Runs page now (one job per page). -->
-    <div class="mb-4 rounded-lg px-4 py-2.5 text-xs text-ink-3 flex flex-wrap items-center gap-x-3"
-         style="background:var(--tpdl-bg-2)" x-show="runs.length >= 2" x-cloak>
-      <span>Want to compare two scans (risers / faders / new)?</span>
-      <a href="/runs" class="font-medium text-[color:var(--tpdl-info)] hover:underline">Open the Runs page →</a>
+      <span class="flex items-center gap-1.5"><span class="score-pill" style="min-width:auto;padding:2px 6px;font-size:10px;background:#dcf7e7;color:#0a3a26">▲ +1.5</span> score rose</span>
+      <span class="flex items-center gap-1.5"><span class="score-pill" style="min-width:auto;padding:2px 6px;font-size:10px;background:#fee2e2;color:#7f1d1d">▼ 1.0</span> score fell</span>
+      <span class="flex items-center gap-1.5"><span class="score-pill" style="min-width:auto;padding:2px 6px;font-size:10px;background:#e0e7ff;color:#3730a3">new</span> wasn't in the compared run</span>
+      <span class="flex items-center gap-1.5"><span class="score-pill" style="min-width:auto;padding:2px 6px;font-size:10px;background:transparent;color:#8a8a8a">—</span> nothing to compare yet</span>
+      <span><strong>Δ period</strong> = the runs you picked above · <strong>Δ vs May</strong> = the Neotek base</span>
+      <span class="ml-auto">Click a company name to open its full detail →</span>
     </div>
 
     <!-- ============ TOP-N picker ============ -->
@@ -357,7 +380,7 @@
       <button @click="topN = 0"
               :class="topN === 0 ? 'filter-pill is-active' : 'filter-pill'">All</button>
       <span class="text-xs text-ink-3 ml-2">
-        by <span x-text="sortKey === 'delta' ? 'Δ' : 'score'"></span>,
+        by <span x-text="sortKey==='period_delta' ? 'Δ period' : sortKey==='may_delta' ? 'Δ vs May' : 'score'"></span>,
         <span x-text="sortDesc ? 'high → low' : 'low → high'"></span>
       </span>
     </div>
@@ -365,7 +388,7 @@
     <!-- Grid-based "table" -->
     <div class="tpdl-card overflow-hidden">
       <div class="overflow-x-auto">
-        <div class="grid-head" style="min-width: 1250px;">
+        <div class="grid-head" style="min-width: 1290px;">
           <div class="rank-num">#</div>
           <div class="sortable" @click="setSort('name')">Company
             <span class="sort-arrow" x-show="sortKey==='name'" x-text="sortDesc ? '▼' : '▲'"></span>
@@ -376,17 +399,15 @@
           <div class="sortable" @click="setSort('assessed_score')">Score
             <span class="sort-arrow" x-show="sortKey==='assessed_score'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
-          <div title="Score change vs the chosen baseline run. “—” = not re-scored since then; “new” = wasn't in that run.">
-            <span class="sortable" @click="setSort('delta')">Δ vs
-              <span class="sort-arrow" x-show="sortKey==='delta'" x-text="sortDesc ? '▼' : '▲'"></span>
-            </span>
-            <select x-model="deltaBase" @change="loadBaseline()" @click.stop
-                    aria-label="Delta baseline run"
-                    class="ml-1 text-[11px] border border-line rounded px-1 py-0.5 bg-white text-ink">
-              <template x-for="r in runOptions" :key="r.day">
-                <option :value="r.day" x-text="r.label"></option>
-              </template>
-            </select>
+          <div class="sortable" @click="setSort('period_delta')"
+               title="Movement between the two runs you picked in “Compare runs”. “—” until you pick a period.">
+            Δ period
+            <span class="sort-arrow" x-show="sortKey==='period_delta'" x-text="sortDesc ? '▼' : '▲'"></span>
+          </div>
+          <div class="sortable" @click="setSort('may_delta')"
+               title="Movement since the Neotek May run — the base of the base. Always shown.">
+            Δ vs May
+            <span class="sort-arrow" x-show="sortKey==='may_delta'" x-text="sortDesc ? '▼' : '▲'"></span>
           </div>
           <div>Coverage</div>
           <div>Signals</div>
@@ -394,7 +415,7 @@
           <div></div>
         </div>
 
-        <div style="min-width: 1250px;">
+        <div style="min-width: 1290px;">
           <template x-if="displayedCompanies.length === 0">
             <div class="text-center text-ink-3 py-12">No company matches the current filters.</div>
           </template>
@@ -423,9 +444,15 @@
                 </div>
                 <div>
                   <span class="score-pill" style="min-width:auto;padding:3px 7px;font-size:11px"
-                        :style="deltaStyleFor(c)"
-                        :title="deltaTitleFor(c)"
-                        x-text="deltaText(c)"></span>
+                        :style="periodStyle(c)"
+                        :title="periodTitle(c)"
+                        x-text="periodText(c)"></span>
+                </div>
+                <div>
+                  <span class="score-pill" style="min-width:auto;padding:3px 7px;font-size:11px"
+                        :style="mayStyle(c)"
+                        :title="mayTitle(c)"
+                        x-text="mayText(c)"></span>
                 </div>
                 <div class="text-ink-2 text-xs" x-text="(c.coverage || '').split(' ').slice(0,3).join(' ')"></div>
                 <div>
@@ -682,38 +709,6 @@
     </div>
   </section>
 
-  <!-- ================================================================ -->
-  <!-- TOP SIGNALS TIMELINE                                             -->
-  <!-- ================================================================ -->
-  <section class="mt-12">
-    <div class="mb-4">
-      <h2 class="text-xl font-semibold">Strongest signals across the tracked universe</h2>
-      <p class="text-xs text-ink-3 mt-1">The highest-scoring evidence on record — all runs combined, not only the latest. Vintage varies per company.</p>
-    </div>
-    <div class="tpdl-card p-6">
-      <ol class="relative border-l border-line ml-3">
-        <template x-for="(s, i) in signals.slice(0, 15)" :key="i">
-          <li class="mb-5 ml-6">
-            <span class="absolute -left-[6px] w-3 h-3 rounded-full ring-4 ring-white"
-                  :style="`background: ${signalColor(s.category)}`"></span>
-            <div class="flex items-baseline gap-2 flex-wrap">
-              <span class="tpdl-badge text-white" :style="`background: ${signalColor(s.category)}`"
-                    x-text="signalLabel(s.category)"></span>
-              <span class="text-sm font-semibold" x-text="s.company"></span>
-              <span class="ml-auto text-xs text-ink-2 font-mono">company score <span x-text="s.score"></span></span>
-            </div>
-            <p class="text-sm text-ink-2 mt-1" x-text="s.what_happened"></p>
-            <p class="text-xs text-ink-3 mt-0.5">
-              <span x-text="s.sector_bucket"></span>
-              <span x-show="s.location"> · <span x-text="s.location"></span></span>
-              <span x-show="s.tpdl_relevance"> · TPDL: <span x-text="s.tpdl_relevance"></span></span>
-            </p>
-          </li>
-        </template>
-      </ol>
-    </div>
-  </section>
-
   <template x-if="error">
     <div class="mt-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm" x-text="error"></div>
   </template>
@@ -723,5 +718,5 @@
 
 </div>
 
-<script src="/static/js/intel.js?v=14"></script>
+<script src="/static/js/intel.js?v=15"></script>
 {% endblock %}

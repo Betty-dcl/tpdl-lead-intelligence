@@ -101,21 +101,22 @@ function intelPage() {
       geo_region: "",
       outreach_eligible: false,
       review_flag: false,
-      vintage: "",          // "" all · "refreshed" (Jul run) · "neotek_may"
-      new_only: false,
+      vintage: "",          // "" all · exact scan label ("May 25" / "Jul 23"…)
     },
     showICP: false,
     topN: 0,                 // 0 = show all; otherwise 10/20/35/50/200
     sortKey: "assessed_score",
     sortDesc: true,
     expandedRow: null,
-    // Run comparison ("bank-statement" period picker)
-    runs: [],
-    compare: { on: false, from_run: "", to_run: "", data: {}, summary: null, meta: null, loading: false },
-    // Δ column baseline — the run the delta is measured against (default: first run)
-    deltaBase: "",
-    baseScores: {},
-    charts: { score: null, signals: null, sectors: null },
+    runs: [],                // every scan date, oldest → newest (from /api/intel/runs)
+    // "Frise" — bank-statement style period picker. Pick a From run and a To run;
+    // the table narrows to the To run and the period-Δ column shows To − From.
+    // Empty by default → period-Δ shows "—" and the story rests on the May column.
+    period: { from: "", to: "", newOnly: false },
+    periodData: {},          // company → { from_score, to_score, delta, status }
+    periodSummary: null,
+    periodMeta: null,
+    periodLoading: false,
     loading: true,
     error: null,
 
@@ -136,17 +137,6 @@ function intelPage() {
         this.run = run;
         this.activity = activity;
         this.runs = runs.runs || [];
-        // Default the comparison to oldest → newest run.
-        if (this.runs.length >= 2) {
-          this.compare.from_run = this.runs[0].run_id;
-          this.compare.to_run = this.runs[this.runs.length - 1].run_id;
-        }
-        // Δ baseline defaults to the FIRST run (oldest = May); user can rebase it.
-        if (this.runs.length) {
-          this.deltaBase = this.runs[0].run_id;
-          await this.loadBaseline();
-        }
-        this.$nextTick(() => this.renderCharts());
       } catch (e) {
         this.error = `Couldn't load market intel: ${e.message}`;
       } finally {
@@ -154,44 +144,50 @@ function intelPage() {
       }
     },
 
-    /* ---- Run comparison (period picker) ---- */
+    /* ---- Frise: bank-statement style run period picker ---- */
 
-    runLabel(id) {
-      const r = this.runs.find(x => x.run_id === id);
-      return r ? r.label : id;
+    // Short, friendly label for a run date: "May 25" / "Jul 23".
+    shortRunDate(iso) {
+      if (!iso) return "—";
+      const d = new Date(iso + "T00:00:00");
+      return d.toLocaleDateString("en-GB", { month: "short", day: "numeric" });
     },
-    async loadCompare() {
-      if (!this.compare.from_run || !this.compare.to_run) return;
-      this.compare.loading = true;
+    // Label for a run date, matching the row badges. Neotek May is the base.
+    runLabelFor(day) {
+      const r = this.runs.find(x => x.run_id === day);
+      if (!r) return this.shortRunDate(day);
+      return this.shortRunDate(r.run_date) + (r.is_neotek ? " · base" : "");
+    },
+    // Both ends chosen and different → a real period is selected.
+    get periodOn() {
+      return !!(this.period.from && this.period.to && this.period.from !== this.period.to);
+    },
+    async loadPeriod() {
+      if (!this.periodOn) {
+        this.periodData = {}; this.periodSummary = null; this.periodMeta = null;
+        return;
+      }
+      this.periodLoading = true;
       try {
-        const url = `/api/intel/compare?from_run=${encodeURIComponent(this.compare.from_run)}&to_run=${encodeURIComponent(this.compare.to_run)}`;
+        const url = `/api/intel/compare?from_run=${encodeURIComponent(this.period.from)}&to_run=${encodeURIComponent(this.period.to)}`;
         const d = await fetch(url).then(r => r.json());
         const map = {};
         (d.companies || []).forEach(c => { map[c.company] = c; });
-        this.compare.data = map;
-        this.compare.summary = d.summary;
-        this.compare.meta = { from: d.from, to: d.to };
+        this.periodData = map;
+        this.periodSummary = d.summary;
+        this.periodMeta = { from: d.from, to: d.to };
       } catch (e) {
-        console.error("compare load failed:", e);
+        console.error("period load failed:", e);
+        this.periodData = {}; this.periodSummary = null;
       } finally {
-        this.compare.loading = false;
+        this.periodLoading = false;
       }
     },
-    toggleCompare() {
-      this.compare.on = !this.compare.on;
-      if (this.compare.on && !this.compare.summary) this.loadCompare();
+    clearPeriod() {
+      this.period = { from: "", to: "", newOnly: false };
+      this.periodData = {}; this.periodSummary = null; this.periodMeta = null;
+      if (this.sortKey === "period_delta") this.sortKey = "assessed_score";
     },
-    onCompareRunChange() {
-      // Re-pull whenever a picker changes (only matters while compare is on).
-      this.loadCompare();
-    },
-    // Entry for a company in the currently-selected period (or null).
-    cmp(c) { return this.compare.on ? (this.compare.data[c.name] || null) : null; },
-    // Effective delta / baseline / status — period-aware.
-    effDelta(c)     { const e = this.cmp(c); return this.compare.on ? (e ? e.delta : null) : c.delta; },
-    effBaseline(c)  { const e = this.cmp(c); return this.compare.on ? (e ? e.from_score : null) : c.neotek_score; },
-    effReappeared(c){ const e = this.cmp(c); return this.compare.on ? !!(e && e.from_score != null) : c.reappeared; },
-    effStatus(c)    { const e = this.cmp(c); return e ? e.status : null; },
 
     /* ---- Filtering / sorting ---- */
 
@@ -205,21 +201,25 @@ function intelPage() {
       const icpOK      = (c) => this.showICP || !c.icp_flag;
       // Run filter matches the EXACT scan (run_label: "May 25" / "Jul 17" / "Jul 23").
       const vintageOK  = (c) => !f.vintage || c.run_label === f.vintage;
-      // In compare mode, only show companies present in the "to" period, and
-      // (optionally) only the ones that are new in that period.
-      const compareOK  = (c) => {
-        if (!this.compare.on) return true;
-        const e = this.compare.data[c.name];
-        if (!e || e.to_score == null) return false;     // not in the later run
-        if (f.new_only && e.status !== "new") return false;
+      // With a frise selected, narrow to the "To" run, and (optionally) only the
+      // companies that are new in that run vs the "From" run.
+      const periodOK   = (c) => {
+        if (!this.periodOn) return true;
+        const e = this.periodData[c.name];
+        if (!e || e.to_score == null) return false;     // not in the To run
+        if (this.period.newOnly && e.status !== "new") return false;
         return true;
       };
       const rows = this.companies.filter(c =>
         sectorOK(c) && signalOK(c) && geoOK(c) && eligibleOK(c) &&
-        reviewOK(c) && icpOK(c) && vintageOK(c) && compareOK(c));
+        reviewOK(c) && icpOK(c) && vintageOK(c) && periodOK(c));
       const dir = this.sortDesc ? -1 : 1;
       const key = this.sortKey;
-      const val = (c) => (key === "delta") ? this.deltaSort(c) : c[key];
+      const val = (c) => {
+        if (key === "period_delta") { const v = this.periodDelta(c); return typeof v === "number" ? v : -999; }
+        if (key === "may_delta")    { const v = this.mayDelta(c);    return typeof v === "number" ? v : -999; }
+        return c[key];
+      };
       return [...rows].sort((a, b) => {
         const av = val(a), bv = val(b);
         if (av === bv) return 0;
@@ -257,9 +257,10 @@ function intelPage() {
     resetFilters() {
       this.filters = { sector_bucket: "", signal_type: "", geo_region: "",
                        outreach_eligible: false, review_flag: false,
-                       vintage: "", new_only: false };
+                       vintage: "" };
       this.showICP = false;
       this.topN = 0;
+      this.clearPeriod();
     },
 
     /* ---- Freshness (the universe mixes vintages: latest run vs older stock) ---- */
@@ -321,63 +322,78 @@ function intelPage() {
       return { bg: "#fee2e2", color: "#7f1d1d" };
     },
 
-    /* ---- Δ column — rebaseable against ANY run (default = first run) ---- */
-    // deltaBase = the chosen baseline run date (iso); baseScores = {name: score}
-    // for that run, fetched from /api/intel/baseline.
-    async loadBaseline() {
-      if (!this.deltaBase) return;
-      try {
-        const r = await fetch(`/api/intel/baseline?run=${encodeURIComponent(this.deltaBase)}`).then(x => x.json());
-        this.baseScores = r.scores || {};
-      } catch (e) { this.baseScores = {}; }
+    /* ---- Δ period column (the frise) ---- */
+    // "off" (no frise) | "absent" (not in To run) | "new" (only in To) | number
+    periodDelta(c) {
+      if (!this.periodOn) return "off";
+      const e = this.periodData[c.name];
+      if (!e || e.to_score == null) return "absent";
+      if (e.from_score == null)     return "new";
+      return e.delta;
     },
-    get baseLabel() {
-      const o = (this.runOptions || []).find(r => r.day === this.deltaBase);
-      return o ? o.label : this.deltaBase;
+    periodText(c) {
+      const v = this.periodDelta(c);
+      if (v === "off" || v === "absent") return "—";
+      if (v === "new") return "new";
+      if (v === 0)     return "±0";
+      return (v > 0 ? "▲ +" : "▼ ") + Math.abs(v).toFixed(1);
     },
-    // number | 'new' (not in baseline run) | 'flat' (not re-scored after baseline)
-    deltaVal(c) {
-      const base = this.baseScores || {};
-      if (!(c.name in base)) return "new";
-      const cd = this._day(c.run_date);
-      if (!cd || cd <= this.deltaBase) return "flat";
-      return Math.round((c.assessed_score - base[c.name]) * 10) / 10;
+    periodStyle(c) {
+      const v = this.periodDelta(c);
+      if (v === "new") return "background:#e0e7ff;color:#3730a3";
+      if (v === "off" || v === "absent") return "background:transparent;color:#8a8a8a";
+      if (v === 0)     return "background:#f3f3ef;color:#5c5c5c";
+      return v > 0 ? "background:#dcf7e7;color:#0a3a26" : "background:#fee2e2;color:#7f1d1d";
     },
-    deltaText(c) {
-      const v = this.deltaVal(c);
+    periodTitle(c) {
+      if (!this.periodOn) return "Pick two runs above to compare them (like a bank statement)";
+      const v = this.periodDelta(c);
+      if (v === "absent") return "Not scored in the " + this.runLabelFor(this.period.to) + " run";
+      if (v === "new")    return "New in " + this.runLabelFor(this.period.to) + " — wasn't in " + this.runLabelFor(this.period.from);
+      const e = this.periodData[c.name];
+      return `${this.runLabelFor(this.period.from)}: ${e.from_score.toFixed(1)}  →  ${this.runLabelFor(this.period.to)}: ${e.to_score.toFixed(1)}`;
+    },
+
+    /* ---- Δ vs May column (the base of the base — Neotek) — always shown ---- */
+    // "new" (never in May) | "base" (this IS its May row) | number
+    mayDelta(c) {
+      if (c.neotek_score == null) return "new";
+      if (c.delta == null)        return "base";
+      return c.delta;
+    },
+    mayText(c) {
+      const v = this.mayDelta(c);
       if (v === "new")  return "new";
-      if (v === "flat") return "—";
+      if (v === "base") return "—";
       if (v === 0)      return "±0";
       return (v > 0 ? "▲ +" : "▼ ") + Math.abs(v).toFixed(1);
     },
-    deltaStyleFor(c) {
-      const v = this.deltaVal(c);
+    mayStyle(c) {
+      const v = this.mayDelta(c);
       if (v === "new")  return "background:#e0e7ff;color:#3730a3";
-      if (v === "flat") return "background:transparent;color:#8a8a8a";
+      if (v === "base") return "background:transparent;color:#8a8a8a";
       if (v === 0)      return "background:#f3f3ef;color:#5c5c5c";
       return v > 0 ? "background:#dcf7e7;color:#0a3a26" : "background:#fee2e2;color:#7f1d1d";
     },
-    deltaTitleFor(c) {
-      const v = this.deltaVal(c);
-      if (v === "new")  return "Not in the " + this.baseLabel + " run";
-      if (v === "flat") return "Not re-scored since " + this.baseLabel + " — no movement to show";
-      return this.baseLabel + ": " + (this.baseScores[c.name]).toFixed(1);
-    },
-    // numeric proxy for sorting the Δ column ('new'/'flat' sink to the bottom)
-    deltaSort(c) {
-      const v = this.deltaVal(c);
-      return typeof v === "number" ? v : -999;
+    mayTitle(c) {
+      const v = this.mayDelta(c);
+      if (v === "new")  return "Net-new — not in the Neotek May base";
+      if (v === "base") return "This is its Neotek May score (the base) — not re-scored since";
+      return `Neotek May: ${c.neotek_score.toFixed(1)}  →  now: ${c.assessed_score.toFixed(1)}`;
     },
 
-    // Left accent — green up / red down / grey flat vs the chosen baseline run;
-    // transparent for companies not in that baseline (nothing to move from).
+    // Left accent — reflects the chosen frise if one is set, otherwise movement
+    // since the May base. Green up / red down / grey flat / indigo new.
     reappearedBorder(c) {
-      const v = this.deltaVal(c);
-      if (v === "new") return "3px solid transparent";
-      if (v === "flat") return "3px solid #94a3b8";
-      if (v > 0) return "3px solid #34D591";
-      if (v < 0) return "3px solid #ef4444";
-      return "3px solid #94a3b8";
+      const v = this.periodOn ? this.periodDelta(c) : this.mayDelta(c);
+      if (v === "new") return "3px solid #6366f1";
+      if (v === "off" || v === "absent" || v === "base") return "3px solid transparent";
+      if (typeof v === "number") {
+        if (v > 0) return "3px solid #34D591";
+        if (v < 0) return "3px solid #ef4444";
+        return "3px solid #94a3b8";
+      }
+      return "3px solid transparent";
     },
     companyUrl(c) { return `/intel/company?c=${encodeURIComponent(c.name)}`; },
 
@@ -577,88 +593,5 @@ function intelPage() {
     },
 
     formatDate,
-
-    /* ---- Charts ---- */
-
-    renderCharts() {
-      this.renderScoreChart();
-      this.renderSignalsChart();
-      this.renderSectorsChart();
-    },
-
-    renderScoreChart() {
-      const canvas = document.getElementById("score-chart");
-      if (!canvas || typeof Chart === "undefined") return;
-      if (this.charts.score) this.charts.score.destroy();
-      this.charts.score = new Chart(canvas, {
-        type: "bar",
-        data: {
-          labels: this.stats.score_distribution.map(b => b.label),
-          datasets: [{
-            data: this.stats.score_distribution.map(b => b.count),
-            backgroundColor: ["#34D591", "#fef3c7", "#fee2e2", "#f3f3ef"],
-            borderRadius: 4,
-          }],
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: true, grid: { color: "rgba(0,0,0,0.05)" } },
-            x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-          },
-        },
-      });
-    },
-
-    renderSignalsChart() {
-      const canvas = document.getElementById("signals-chart");
-      if (!canvas || typeof Chart === "undefined") return;
-      if (this.charts.signals) this.charts.signals.destroy();
-      this.charts.signals = new Chart(canvas, {
-        type: "bar",
-        data: {
-          labels: this.stats.signal_coverage.map(s => SIGNAL_LABELS[s.signal_type]),
-          datasets: [{
-            data: this.stats.signal_coverage.map(s => s.count),
-            backgroundColor: this.stats.signal_coverage.map(s => SIGNAL_COLORS[s.signal_type]),
-            borderRadius: 4,
-          }],
-        },
-        options: {
-          indexAxis: "y", responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { beginAtZero: true, grid: { color: "rgba(0,0,0,0.05)" } },
-            y: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          },
-        },
-      });
-    },
-
-    renderSectorsChart() {
-      const canvas = document.getElementById("sectors-chart");
-      if (!canvas || typeof Chart === "undefined") return;
-      if (this.charts.sectors) this.charts.sectors.destroy();
-      const palette = ["#094752", "#34D591", "#F59E0B", "#8B5CF6", "#0EA5E9", "#EC4899", "#6366f1", "#94a3b8"];
-      this.charts.sectors = new Chart(canvas, {
-        type: "doughnut",
-        data: {
-          labels: this.stats.sector_distribution.map(s => s.sector),
-          datasets: [{
-            data: this.stats.sector_distribution.map(s => s.count),
-            backgroundColor: this.stats.sector_distribution.map((_, i) => palette[i % palette.length]),
-            borderWidth: 2,
-            borderColor: "#fafaf8",
-          }],
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { position: "right", labels: { font: { size: 10 }, boxWidth: 10 } },
-          },
-        },
-      });
-    },
   };
 }
