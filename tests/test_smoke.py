@@ -327,9 +327,22 @@ def test_intel_export_csv(client):
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/csv")
     header = r.text.splitlines()[0]
-    # Full-detail export: identity, score, cross-run evolution and per-signal columns.
-    for col in ("Assessed Score", "Delta vs May", "Delta vs Previous Run",
-                "Score Trajectory (all runs)", "Signal 1 Corroboration (0-2)"):
+    # Identity + status + score + full context (summary, signals, tech stack).
+    for col in ("Company Name", "Sector", "Website", "Revenue", "Status",
+                "Assessed Score", "Intelligence Summary",
+                "Signal 1 Corroboration (0-2)", "Tech Stack Summary"):
+        assert col in header
+    # ONE sector column only (no redundant "Sector Bucket").
+    assert "Sector Bucket" not in header
+    # Market Tier removed.
+    assert "Market Tier" not in header
+
+
+def test_intel_export_all_scope_has_evolution(client):
+    """scope=all spans several runs, so the evolution columns must appear;
+    an all-new single run prunes them (they'd be empty)."""
+    header = client.get("/api/intel/export.csv?scope=all").text.splitlines()[0]
+    for col in ("Delta vs May", "Score Trajectory", "Status"):
         assert col in header
 
 

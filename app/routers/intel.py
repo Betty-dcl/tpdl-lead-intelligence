@@ -468,34 +468,6 @@ def latest_run(db: Session = Depends(get_db)) -> dict:
 # Full-detail CSV export — HTML/CSV parity (open everything in Excel)
 # ---------------------------------------------------------------------------
 
-_EXPORT_HEADER = [
-    # ── Identity ────────────────────────────────────────────────────────
-    "Company Name", "Sector", "Sector Bucket", "Website", "Location",
-    "Geo Region", "Market Tier", "Revenue",
-    # ── This run ────────────────────────────────────────────────────────
-    "Run Date", "Run Label", "Assessed Score", "Coverage",
-    "Outreach Eligible", "ICP Flag", "Review Flag", "Review Flag Reason",
-    # ── Evolution across every run this company has been scored in ───────
-    "Times Scored", "Net-new (first score this run)",
-    "Previous Run Date", "Previous Score", "Delta vs Previous Run",
-    "Neotek May Score", "Delta vs May", "Score Trajectory (all runs)",
-    # ── Narrative ───────────────────────────────────────────────────────
-    "Intelligence Summary", "Signals Found", "Signals Not Evidenced",
-    # ── Signal detail (each signal fully expanded, incl. corroboration) ──
-    "Signal 1 Category", "Signal 1 What Happened", "Signal 1 Why It Matters",
-    "Signal 1 TPDL Relevance", "Signal 1 Confidence", "Signal 1 Corroboration (0-2)",
-    "Signal 1 Sources", "Signal 1 URLs",
-    "Signal 2 Category", "Signal 2 What Happened", "Signal 2 Why It Matters",
-    "Signal 2 TPDL Relevance", "Signal 2 Confidence", "Signal 2 Corroboration (0-2)",
-    "Signal 2 Sources", "Signal 2 URLs",
-    "Signal 3 Category", "Signal 3 What Happened", "Signal 3 Why It Matters",
-    "Signal 3 TPDL Relevance", "Signal 3 Confidence", "Signal 3 Corroboration (0-2)",
-    "Signal 3 Sources", "Signal 3 URLs",
-    # ── Context ─────────────────────────────────────────────────────────
-    "Tech Stack Summary", "Historical Context",
-]
-
-
 def _history_by_company(db: Session) -> dict[str, list[dict]]:
     """Per company, its best score at each distinct run DATE, oldest → newest.
     Powers the evolution columns (previous score, delta, trajectory) in the
@@ -513,12 +485,23 @@ def _history_by_company(db: Session) -> dict[str, list[dict]]:
             for name, days in per.items()}
 
 
+# Evolution/comparison columns. They only make sense once a company has been
+# scored more than once. For an all-new run (every row's first score) they'd be
+# blank, so we DROP any of these that are empty across the whole export — the
+# CSV then just carries the "Status = New company" marker instead of a wall of
+# empty cells (Betty 2026-07-27).
+_EVOLUTION_COLS = ["Previous Run Date", "Previous Score", "Delta vs Previous Run",
+                   "Neotek May Score", "Delta vs May", "Score Trajectory"]
+
+
 @router.get("/export.csv")
 def export_csv(scope: str = "run", run: Optional[str] = None, db: Session = Depends(get_db)):
-    """Excel-grade export — everything the platform shows per company, plus the
-    full cross-run evolution (previous score, delta vs previous, delta vs May,
-    trajectory) and per-signal corroboration.
-    scope=run → one run (default: the latest; pass ?run=YYYY-MM-DD to pick one);
+    """Excel-grade export — everything the platform shows per company: identity,
+    score & flags, the company context (intelligence summary, signals w/ sources
+    & corroboration, tech stack, historical context), and — when the company has
+    a history — its cross-run evolution. Columns that would be empty for every
+    row (e.g. the comparison columns on an all-new run) are omitted.
+    scope=run → one run (default: latest; ?run=YYYY-MM-DD to pick one);
     scope=all → the whole universe."""
     import csv
     import io
@@ -545,45 +528,83 @@ def export_csv(scope: str = "run", run: Optional[str] = None, db: Session = Depe
         n = len([u for u in (urls_str or "").split(";") if u.strip()])
         return 2 if n >= 2 else (1 if n == 1 else 0)
 
-    buf = io.StringIO()
-    w = csv.writer(buf)
-    w.writerow(_EXPORT_HEADER)
+    # Column groups. Identity + context are ALWAYS kept (stable schema, even when
+    # a field like Revenue is blank for a run). Evolution columns are pruned below.
+    identity = ["Company Name", "Sector", "Website", "Location", "Geo Region", "Revenue"]
+    runcols  = ["Run Date", "Run Label", "Status", "Assessed Score", "Coverage",
+                "Outreach Eligible", "ICP Flag", "Review Flag", "Review Flag Reason"]
+    narrative = ["Intelligence Summary", "Signals Found", "Signals Not Evidenced"]
+    sigcols = []
+    for i in (1, 2, 3):
+        sigcols += [f"Signal {i} Category", f"Signal {i} What Happened",
+                    f"Signal {i} Why It Matters", f"Signal {i} TPDL Relevance",
+                    f"Signal {i} Confidence", f"Signal {i} Corroboration (0-2)",
+                    f"Signal {i} Sources", f"Signal {i} URLs"]
+    context = ["Tech Stack Summary", "Historical Context"]
+
+    records: list[dict] = []
     for c in rows:
         day = c.run_date.date().isoformat() if c.run_date else None
         hist = history.get(c.name, [])
-        # Previous run = the most recent scored date strictly before this run.
-        prev = None
+        prev = None                               # most recent scored date before this run
         for h in hist:
             if day and h["day"] < day:
                 prev = h
-        net_new = prev is None                    # first time this company was scored
+        net_new = prev is None
+        times = len(hist)
         neo = baseline.get(c.name)
-        d_prev = round((c.assessed_score or 0) - prev["score"], 1) if prev else ""
-        d_may = round((c.assessed_score or 0) - neo, 1) if neo is not None else ""
-        trajectory = " → ".join(
-            f"{_date_label(h['day'])} {h['score']:.1f}" for h in hist
-        )
-        row = [
-            c.name, c.sector, c.sector_bucket, c.website, c.location,
-            geo_region(c.location), market_tier(c.location), c.revenue,
-            day or "", _date_label(day), c.assessed_score, c.coverage,
-            "YES" if c.outreach_eligible else "no",
-            "YES" if c.icp_flag else "no",
-            "YES" if c.review_flag else "no", c.review_flag_reason,
-            len(hist), "YES" if net_new else "no",
-            (prev["day"] if prev else ""), (prev["score"] if prev else ""), d_prev,
-            neo if neo is not None else "", d_may, trajectory,
-            c.intelligence_summary, c.signals_found, c.signals_not_evidenced,
-        ]
+        rec = {
+            "Company Name": c.name,
+            "Sector": c.sector_bucket or "",      # ONE sector column (the bucket)
+            "Website": c.website or "",
+            "Location": c.location or "",
+            "Geo Region": geo_region(c.location),
+            "Revenue": c.revenue or "",
+            "Run Date": day or "",
+            "Run Label": _date_label(day),
+            "Status": "New company" if net_new else f"Re-scored ({times} scans)",
+            "Assessed Score": c.assessed_score,
+            "Coverage": c.coverage,
+            "Outreach Eligible": "YES" if c.outreach_eligible else "no",
+            "ICP Flag": "YES" if c.icp_flag else "no",
+            "Review Flag": "YES" if c.review_flag else "no",
+            "Review Flag Reason": c.review_flag_reason or "",
+            "Previous Run Date": prev["day"] if prev else "",
+            "Previous Score": prev["score"] if prev else "",
+            "Delta vs Previous Run": round((c.assessed_score or 0) - prev["score"], 1) if prev else "",
+            "Neotek May Score": neo if neo is not None else "",
+            "Delta vs May": round((c.assessed_score or 0) - neo, 1) if neo is not None else "",
+            # Trajectory only when there's more than one point (else it's degenerate).
+            "Score Trajectory": " → ".join(f"{_date_label(h['day'])} {h['score']:.1f}"
+                                           for h in hist) if times >= 2 else "",
+            "Intelligence Summary": c.intelligence_summary or "",
+            "Signals Found": c.signals_found,
+            "Signals Not Evidenced": c.signals_not_evidenced or "",
+            "Tech Stack Summary": c.tech_stack_summary or "",
+            "Historical Context": c.historical_context or "",
+        }
         for i in (1, 2, 3):
             cat = getattr(c, f"s{i}_category")
-            row += [cat, getattr(c, f"s{i}_what_happened"),
-                    getattr(c, f"s{i}_why_it_matters"), getattr(c, f"s{i}_tpdl_relevance"),
-                    getattr(c, f"s{i}_confidence"),
-                    corroboration(getattr(c, f"s{i}_urls")) if cat else "",
-                    getattr(c, f"s{i}_sources"), getattr(c, f"s{i}_urls")]
-        row += [c.tech_stack_summary, c.historical_context]
-        w.writerow(row)
+            rec[f"Signal {i} Category"] = cat
+            rec[f"Signal {i} What Happened"] = getattr(c, f"s{i}_what_happened")
+            rec[f"Signal {i} Why It Matters"] = getattr(c, f"s{i}_why_it_matters")
+            rec[f"Signal {i} TPDL Relevance"] = getattr(c, f"s{i}_tpdl_relevance")
+            rec[f"Signal {i} Confidence"] = getattr(c, f"s{i}_confidence")
+            rec[f"Signal {i} Corroboration (0-2)"] = corroboration(getattr(c, f"s{i}_urls")) if cat else ""
+            rec[f"Signal {i} Sources"] = getattr(c, f"s{i}_sources")
+            rec[f"Signal {i} URLs"] = getattr(c, f"s{i}_urls")
+        records.append(rec)
+
+    # Drop evolution columns that are empty for EVERY exported row.
+    kept_evo = [col for col in _EVOLUTION_COLS
+                if any(str(r.get(col, "")).strip() for r in records)]
+    header = identity + runcols + kept_evo + narrative + sigcols + context
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(header)
+    for r in records:
+        w.writerow([r.get(col, "") for col in header])
 
     return Response(content=buf.getvalue(), media_type="text/csv",
                     headers={"Content-Disposition": f'attachment; filename="{fname}"'})
