@@ -185,22 +185,14 @@
         <a href="/recurring" class="text-xs underline opacity-80 ml-auto whitespace-nowrap">See each one on Recurring →</a>
       </div>
 
-      <!-- What this run contained + where discovered-but-unscored names live -->
+      <!-- What this run contained -->
       <div class="mt-4 rounded-lg px-4 py-3 text-sm flex flex-wrap items-center gap-x-4 gap-y-1"
            style="background:rgba(255,255,255,0.08)"
-           x-show="run && (run.discovered_candidates || run.net_new_scored)">
-        <span x-show="run?.net_new_scored">
+           x-show="run && run.net_new_scored">
+        <span>
           This run scored <strong x-text="run?.net_new_scored"></strong>
           companies new to our database — they now appear here with a real score.
         </span>
-        <span x-show="!run?.net_new_scored">
-          This run re-scored companies we already had (no net-new names).
-        </span>
-        <a href="/candidates" class="tpdl-btn text-xs"
-           style="background:var(--tpdl-accent);color:#0a3a26;border:none"
-           x-show="run?.discovered_candidates">
-          See <span x-text="run?.discovered_candidates"></span> new candidates (found, not scored) →
-        </a>
       </div>
     </div>
 
@@ -343,7 +335,8 @@
         Include ICP-flagged
       </button>
 
-      <label class="inline-flex items-center gap-2 text-xs text-ink-3">
+      <!-- Standalone Run picker — only when NO frise is active (else they'd conflict) -->
+      <label class="inline-flex items-center gap-2 text-xs text-ink-3" x-show="!periodOn">
         <span class="uppercase tracking-wider">Run</span>
         <select x-model="filters.vintage" aria-label="Filter by run"
                 class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink">
@@ -354,8 +347,19 @@
         </select>
       </label>
 
-      <span class="ml-auto text-xs text-ink-3">
+      <!-- When a frise is active it drives the run — show it locked so the two never disagree -->
+      <span class="inline-flex items-center gap-2 text-xs" x-show="periodOn" x-cloak>
+        <span class="uppercase tracking-wider text-ink-3">Run</span>
+        <span class="filter-pill is-active" style="cursor:default">
+          <span x-text="runLabelFor(period.to)"></span> · from the comparison above
+        </span>
+      </span>
+
+      <span class="ml-auto text-xs text-ink-3" x-show="!periodOn">
         Pick a run to see only the companies scored that day. Each row's badge shows its scan date.
+      </span>
+      <span class="ml-auto text-xs text-ink-3" x-show="periodOn" x-cloak>
+        The comparison above is driving the view (showing the <span x-text="runLabelFor(period.to)"></span> run).
       </span>
     </div>
 

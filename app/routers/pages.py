@@ -103,16 +103,6 @@ def company_detail(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/candidates", response_class=HTMLResponse)
-def candidates_page(request: Request) -> HTMLResponse:
-    """Discovered-but-not-yet-scored companies (the 'new pipeline')."""
-    return templates.TemplateResponse(
-        request,
-        "candidates.html",
-        {"active_page": "candidates"},
-    )
-
-
 @router.get("/recurring", response_class=HTMLResponse)
 def recurring_page(request: Request) -> HTMLResponse:
     """Companies that keep coming back across scan dates (May / Jul 17 / Jul 23…)."""

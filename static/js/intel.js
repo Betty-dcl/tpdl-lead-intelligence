@@ -200,7 +200,10 @@ function intelPage() {
       const reviewOK   = (c) => !f.review_flag       || c.review_flag;
       const icpOK      = (c) => this.showICP || !c.icp_flag;
       // Run filter matches the EXACT scan (run_label: "May 25" / "Jul 17" / "Jul 23").
-      const vintageOK  = (c) => !f.vintage || c.run_label === f.vintage;
+      // While a frise period is active the frise IS the run selector, so the
+      // standalone Run filter is ignored (and hidden in the UI) to avoid two
+      // conflicting run controls.
+      const vintageOK  = (c) => this.periodOn || !f.vintage || c.run_label === f.vintage;
       // With a frise selected, narrow to the "To" run, and (optionally) only the
       // companies that are new in that run vs the "From" run.
       const periodOK   = (c) => {
