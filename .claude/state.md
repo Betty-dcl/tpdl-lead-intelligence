@@ -19,6 +19,22 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-27 (2) — **CSV run nettoyé + enrichissement secteur/CA/site des 135 du 23/07 (accord Betty).**
+  Suite retours Betty sur l'export : (a) **1 seule colonne secteur** (fusion Sector/Sector Bucket),
+  (b) **« Market Tier » retirée**, (c) **colonnes de comparaison vides supprimées** quand tout le run est
+  neuf → remplacées par **« Status » = New company / Re-scored (N scans)** ; elles réapparaissent en
+  scope=all. Le **contexte de la boîte** (intelligence summary, signaux + sources + corroboration, tech
+  stack, historique) était déjà dans le CSV — confirmé. Commit 148d5b5. Aussi : **page Today supprimée**
+  (nav/route/template/js/router `/api/today`, commit c9325e5) ; frise Sales **pilote le run** (dropdown
+  « Run » caché quand une comparaison est active, commit 2ee3aaf) ; **page Candidats supprimée** (le « 64 »
+  = juste le dernier lot de découverte, source de confusion ; tout est scoré ⇒ page inutile ; garde-fou
+  archive reste dans le moteur). **Enrichissement live** (Betty : « oui, sans trop dépenser » → option A) :
+  `scripts/enrich_run.py` — **1 appel Perplexity `sonar`/société** (secteur+CA+site en un coup, urllib donc
+  tourne en session, fail-open, bucket via `import_csv.bucket_for`, `parse_revenue`, domaine extrait).
+  Passé sur les **135 du 23/07** (~0,70 $) → **secteur 133, site 131, CA 69** (les CA vides = mid-cap
+  privées, jamais inventé) ; 0 erreur. La table `companies` reflète les vrais secteurs (Pharma 57,
+  Diagnostics 26, Medtech 12, Dental 11…). ⚠️ Écrit dans `data/app.db` (gitignoré) ; un futur re-score
+  réécrira ces champs. Le script est réutilisable : `python scripts/enrich_run.py [--run …] [--sample N]`.
 - 2026-07-27 — **Refonte Sales (frise + double delta), Recurring (matrice), Candidats (honnête) +
   CSV run complet + garde-fou anti-fuite découverte (demandes Betty).** Commits 9311331 + 0812e78
   sur `feat/neotek-engine`, 218 tests verts, 0 erreur console.
