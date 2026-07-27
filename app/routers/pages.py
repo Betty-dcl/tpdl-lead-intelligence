@@ -56,15 +56,6 @@ def performance(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/today", response_class=HTMLResponse)
-def today_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(
-        request,
-        "today.html",
-        {"active_page": "today"},
-    )
-
-
 @router.get("/credits", response_class=HTMLResponse)
 def credits_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
