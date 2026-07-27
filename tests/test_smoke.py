@@ -327,7 +327,10 @@ def test_intel_export_csv(client):
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/csv")
     header = r.text.splitlines()[0]
-    assert "Delta vs Neotek" in header and "Assessed Score" in header
+    # Full-detail export: identity, score, cross-run evolution and per-signal columns.
+    for col in ("Assessed Score", "Delta vs May", "Delta vs Previous Run",
+                "Score Trajectory (all runs)", "Signal 1 Corroboration (0-2)"):
+        assert col in header
 
 
 def test_contacts_radars(client):

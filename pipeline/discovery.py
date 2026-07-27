@@ -279,6 +279,49 @@ def known_universe() -> list[str]:
 
 RESURFACED_OUT = Path("data/csv/discovery_resurfaced.csv")
 
+# Append-only history of every candidate ever discovered. `discovery_candidates.csv`
+# is overwritten each run; this log is NOT — so a name surfaced by one run can never
+# be silently lost if a later run overwrites the working file before it was scored.
+ARCHIVE_LOG = Path("data/csv/discovery_archive.csv")
+_ARCHIVE_HEADER = ["Company Name", "HQ / City", "Theme", "Source URL",
+                   "Out of ICP", "ICP Reason", "First Discovered"]
+
+
+def archive_candidates(rows: list[Candidate], today: str,
+                       log_path: Path = ARCHIVE_LOG) -> int:
+    """Record each candidate in an append-only log, keyed by normalised name.
+    A name already logged is never re-added (it keeps its original First
+    Discovered date), so the log accumulates every name ever surfaced without
+    duplicates. Returns how many NEW names were appended. Idempotent per name."""
+    from app.tools.icp import assess_icp
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    seen: set[str] = set()
+    if log_path.exists():
+        with open(log_path, newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                seen.add(_norm(r.get("Company Name") or ""))
+
+    new_rows = []
+    for c in rows:
+        key = _norm(c.name)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        a = assess_icp(c.name)
+        new_rows.append([c.name, c.hq or "", c.theme, c.url or "",
+                         "YES" if a["out_of_scope"] else "no",
+                         a["reason"] or "", today])
+
+    if new_rows:
+        write_header = not log_path.exists()
+        with open(log_path, "a", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            if write_header:
+                w.writerow(_ARCHIVE_HEADER)
+            w.writerows(new_rows)
+    return len(new_rows)
+
 
 def _write_candidates(rows: list[Candidate], out: Path) -> None:
     # Annotate each candidate with the ICP targeting verdict (Nathalie's rule:
@@ -306,6 +349,11 @@ def discover(cfg: EngineConfig, out: Path = DEFAULT_OUT) -> list[Candidate]:
     fresh, resurfaced = partition_candidates(candidates, known_universe())
     _write_candidates(fresh, out)
     _write_candidates(resurfaced, RESURFACED_OUT)
+    # Append every fresh name to the permanent log BEFORE it can be scored/overwritten.
+    from datetime import datetime, timezone
+    added = archive_candidates(fresh, datetime.now(timezone.utc).date().isoformat())
+    logger.info("[discovery] archived %d new name(s) to %s (append-only history)",
+                added, ARCHIVE_LOG)
     logger.info("[discovery] %d findings → %d names → %d NEW candidates (%s) + "
                 "%d resurfaced/already-tracked (%s)",
                 len(findings), len(candidates), len(fresh), out,

@@ -469,62 +469,120 @@ def latest_run(db: Session = Depends(get_db)) -> dict:
 # ---------------------------------------------------------------------------
 
 _EXPORT_HEADER = [
-    "Company Name", "Sector", "Sector Bucket", "Website", "Location", "Revenue",
-    "Assessed Score", "Neotek May Score", "Delta vs Neotek", "Reappeared",
-    "Coverage", "Outreach Eligible", "Intelligence Summary",
-    "Signals Found", "Signals Not Evidenced",
+    # ── Identity ────────────────────────────────────────────────────────
+    "Company Name", "Sector", "Sector Bucket", "Website", "Location",
+    "Geo Region", "Market Tier", "Revenue",
+    # ── This run ────────────────────────────────────────────────────────
+    "Run Date", "Run Label", "Assessed Score", "Coverage",
+    "Outreach Eligible", "ICP Flag", "Review Flag", "Review Flag Reason",
+    # ── Evolution across every run this company has been scored in ───────
+    "Times Scored", "Net-new (first score this run)",
+    "Previous Run Date", "Previous Score", "Delta vs Previous Run",
+    "Neotek May Score", "Delta vs May", "Score Trajectory (all runs)",
+    # ── Narrative ───────────────────────────────────────────────────────
+    "Intelligence Summary", "Signals Found", "Signals Not Evidenced",
+    # ── Signal detail (each signal fully expanded, incl. corroboration) ──
     "Signal 1 Category", "Signal 1 What Happened", "Signal 1 Why It Matters",
-    "Signal 1 TPDL Relevance", "Signal 1 Confidence", "Signal 1 Sources", "Signal 1 URLs",
+    "Signal 1 TPDL Relevance", "Signal 1 Confidence", "Signal 1 Corroboration (0-2)",
+    "Signal 1 Sources", "Signal 1 URLs",
     "Signal 2 Category", "Signal 2 What Happened", "Signal 2 Why It Matters",
-    "Signal 2 TPDL Relevance", "Signal 2 Confidence", "Signal 2 Sources", "Signal 2 URLs",
+    "Signal 2 TPDL Relevance", "Signal 2 Confidence", "Signal 2 Corroboration (0-2)",
+    "Signal 2 Sources", "Signal 2 URLs",
     "Signal 3 Category", "Signal 3 What Happened", "Signal 3 Why It Matters",
-    "Signal 3 TPDL Relevance", "Signal 3 Confidence", "Signal 3 Sources", "Signal 3 URLs",
-    "Tech Stack Summary", "Historical Context", "ICP Flag",
-    "Review Flag", "Review Flag Reason", "Run Date",
+    "Signal 3 TPDL Relevance", "Signal 3 Confidence", "Signal 3 Corroboration (0-2)",
+    "Signal 3 Sources", "Signal 3 URLs",
+    # ── Context ─────────────────────────────────────────────────────────
+    "Tech Stack Summary", "Historical Context",
 ]
 
 
+def _history_by_company(db: Session) -> dict[str, list[dict]]:
+    """Per company, its best score at each distinct run DATE, oldest → newest.
+    Powers the evolution columns (previous score, delta, trajectory) in the
+    export so the CSV carries the same movement story the platform shows."""
+    per: dict[str, dict[str, float]] = {}
+    for r in db.query(RunSnapshot).all():
+        if not r.run_date:
+            continue
+        d = r.run_date.date().isoformat()
+        s = r.assessed_score or 0.0
+        slot = per.setdefault(r.company_name, {})
+        if d not in slot or s > slot[d]:
+            slot[d] = s
+    return {name: [{"day": d, "score": days[d]} for d in sorted(days)]
+            for name, days in per.items()}
+
+
 @router.get("/export.csv")
-def export_csv(scope: str = "run", db: Session = Depends(get_db)):
-    """Excel-grade export — same fields the HTML shows, plus the Neotek delta.
-    scope=run → latest run only (default); scope=all → the whole universe."""
+def export_csv(scope: str = "run", run: Optional[str] = None, db: Session = Depends(get_db)):
+    """Excel-grade export — everything the platform shows per company, plus the
+    full cross-run evolution (previous score, delta vs previous, delta vs May,
+    trajectory) and per-signal corroboration.
+    scope=run → one run (default: the latest; pass ?run=YYYY-MM-DD to pick one);
+    scope=all → the whole universe."""
     import csv
     import io
     from fastapi.responses import Response
 
     baseline = _neotek_baseline(db)
+    history = _history_by_company(db)
+
     q = db.query(Company)
-    fname = "tpdl_universe.csv"
+    fname = "tpdl_universe_full.csv"
+    target_day: Optional[str] = None
     if scope == "run":
-        last_run = db.query(func.max(Company.run_date)).scalar()
-        if isinstance(last_run, datetime):
-            day = last_run.date().isoformat()
-            q = q.filter(func.date(Company.run_date) == day)
-            fname = f"tpdl_run_{day}.csv"
+        target_day = run
+        if not target_day:
+            last_run = db.query(func.max(Company.run_date)).scalar()
+            if isinstance(last_run, datetime):
+                target_day = last_run.date().isoformat()
+        if target_day:
+            q = q.filter(func.date(Company.run_date) == target_day)
+            fname = f"tpdl_run_{target_day}_full.csv"
     rows = q.order_by(Company.assessed_score.desc()).all()
+
+    def corroboration(urls_str: Optional[str]) -> int:
+        n = len([u for u in (urls_str or "").split(";") if u.strip()])
+        return 2 if n >= 2 else (1 if n == 1 else 0)
 
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(_EXPORT_HEADER)
     for c in rows:
+        day = c.run_date.date().isoformat() if c.run_date else None
+        hist = history.get(c.name, [])
+        # Previous run = the most recent scored date strictly before this run.
+        prev = None
+        for h in hist:
+            if day and h["day"] < day:
+                prev = h
+        net_new = prev is None                    # first time this company was scored
         neo = baseline.get(c.name)
-        delta = round((c.assessed_score or 0) - neo, 1) if neo is not None else ""
+        d_prev = round((c.assessed_score or 0) - prev["score"], 1) if prev else ""
+        d_may = round((c.assessed_score or 0) - neo, 1) if neo is not None else ""
+        trajectory = " → ".join(
+            f"{_date_label(h['day'])} {h['score']:.1f}" for h in hist
+        )
         row = [
-            c.name, c.sector, c.sector_bucket, c.website, c.location, c.revenue,
-            c.assessed_score, neo if neo is not None else "", delta,
-            "YES" if c.name in baseline else "no",
-            c.coverage, "YES" if c.outreach_eligible else "no", c.intelligence_summary,
-            c.signals_found, c.signals_not_evidenced,
+            c.name, c.sector, c.sector_bucket, c.website, c.location,
+            geo_region(c.location), market_tier(c.location), c.revenue,
+            day or "", _date_label(day), c.assessed_score, c.coverage,
+            "YES" if c.outreach_eligible else "no",
+            "YES" if c.icp_flag else "no",
+            "YES" if c.review_flag else "no", c.review_flag_reason,
+            len(hist), "YES" if net_new else "no",
+            (prev["day"] if prev else ""), (prev["score"] if prev else ""), d_prev,
+            neo if neo is not None else "", d_may, trajectory,
+            c.intelligence_summary, c.signals_found, c.signals_not_evidenced,
         ]
         for i in (1, 2, 3):
-            row += [getattr(c, f"s{i}_category"), getattr(c, f"s{i}_what_happened"),
+            cat = getattr(c, f"s{i}_category")
+            row += [cat, getattr(c, f"s{i}_what_happened"),
                     getattr(c, f"s{i}_why_it_matters"), getattr(c, f"s{i}_tpdl_relevance"),
-                    getattr(c, f"s{i}_confidence"), getattr(c, f"s{i}_sources"),
-                    getattr(c, f"s{i}_urls")]
-        row += [c.tech_stack_summary, c.historical_context,
-                "YES" if c.icp_flag else "no",
-                "YES" if c.review_flag else "no", c.review_flag_reason,
-                c.run_date.date().isoformat() if c.run_date else ""]
+                    getattr(c, f"s{i}_confidence"),
+                    corroboration(getattr(c, f"s{i}_urls")) if cat else "",
+                    getattr(c, f"s{i}_sources"), getattr(c, f"s{i}_urls")]
+        row += [c.tech_stack_summary, c.historical_context]
         w.writerow(row)
 
     return Response(content=buf.getvalue(), media_type="text/csv",
@@ -610,7 +668,30 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
         for t, n in counts.most_common()
     ]
     new_count = sum(1 for r in rows if not r["already_in_universe"])
+    scored_count = sum(1 for r in rows if r["already_in_universe"])
     out_of_icp = sum(1 for r in rows if r["out_of_icp"])
+
+    # Append-only discovery archive (pipeline/discovery.py) — the anti-leak net.
+    # Every name ever surfaced is logged here even after discovery_candidates.csv
+    # is overwritten, so we can always prove nothing fell through: any archived
+    # name NOT in the scored universe is still waiting.
+    archive = {"ever_discovered": 0, "never_scored": 0, "never_scored_names": []}
+    arch_path = Path("data/csv/discovery_archive.csv")
+    if arch_path.exists():
+        with arch_path.open(encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                nm = (r.get("Company Name") or "").strip()
+                if not nm:
+                    continue
+                archive["ever_discovered"] += 1
+                if norm(nm) not in universe:
+                    archive["never_scored"] += 1
+                    if len(archive["never_scored_names"]) < 100:
+                        archive["never_scored_names"].append({
+                            "company": nm,
+                            "first_discovered": (r.get("First Discovered") or "").strip(),
+                            "theme": (r.get("Theme") or "").strip(),
+                        })
     comp_summary = None
     if comparison:
         # 'dropped' = only in Friday, so not among these rows — count from the map.
@@ -624,11 +705,13 @@ def discovery_candidates(db: Session = Depends(get_db)) -> dict:
         "found": True,
         "count": len(rows),
         "new_to_universe": new_count,
+        "scored": scored_count,          # discovered names that have since been scored
         "out_of_icp": out_of_icp,
         "in_icp": len(rows) - out_of_icp,
         "candidates": rows,
         "by_theme": by_theme,
         "comparison": comp_summary,
+        "archive": archive,
     }
 
 

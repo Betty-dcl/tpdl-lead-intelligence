@@ -1310,3 +1310,30 @@ def test_discovery_partition_new_vs_resurfaced():
     assert [c.name for c in resurfaced] == ["Roche"]            # known reappearance, deduped
     # filter_new stays backward-compatible (fresh only)
     assert [c.name for c in discovery.filter_new(cands, ["Roche"])] == ["Novabiotic GmbH"]
+
+
+def test_discovery_archive_is_append_only_and_idempotent(tmp_path):
+    """The anti-leak net: every discovered name is logged permanently, a name
+    is never duplicated, and it keeps its ORIGINAL first-discovered date even if
+    a later batch re-surfaces it — so no candidate can be silently overwritten."""
+    from pipeline import discovery
+    log = tmp_path / "archive.csv"
+
+    batch1 = [discovery.Candidate("Acme Bio", "hiring", "https://a"),
+              discovery.Candidate("Beta Labs", "pe_event", "https://b")]
+    assert discovery.archive_candidates(batch1, "2026-07-18", log_path=log) == 2
+
+    # A later batch: one repeat (different casing) + one genuinely new name.
+    batch2 = [discovery.Candidate("ACME  BIO", "ma_expansion", "https://a2"),
+              discovery.Candidate("Gamma Pharma", "leadership_change", "https://c")]
+    assert discovery.archive_candidates(batch2, "2026-07-23", log_path=log) == 1  # only Gamma
+
+    import csv as _csv
+    with log.open(encoding="utf-8") as f:
+        rows = {r["Company Name"]: r for r in _csv.DictReader(f)}
+    assert set(rows) == {"Acme Bio", "Beta Labs", "Gamma Pharma"}          # no duplicate row
+    assert rows["Acme Bio"]["First Discovered"] == "2026-07-18"            # original date kept
+    assert rows["Gamma Pharma"]["First Discovered"] == "2026-07-23"
+
+    # Fully idempotent: replaying either batch adds nothing.
+    assert discovery.archive_candidates(batch1 + batch2, "2026-08-01", log_path=log) == 0
