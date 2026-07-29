@@ -322,11 +322,21 @@ def test_intel_compare_unknown_runs_404(client):
     assert r.status_code == 404
 
 
+def _csv_header(text: str) -> str:
+    """Header line, skipping the Excel `sep=;` sentinel and the UTF-8 BOM."""
+    lines = text.lstrip("﻿").splitlines()
+    return lines[1] if lines and lines[0].startswith("sep=") else lines[0]
+
+
 def test_intel_export_csv(client):
     r = client.get("/api/intel/export.csv?scope=run")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/csv")
-    header = r.text.splitlines()[0]
+    # Excel-friendly: UTF-8 BOM + `sep=;` sentinel + semicolon delimiter so the
+    # file opens as clean columns with correct accents in any Excel locale.
+    assert r.text.startswith("﻿sep=;")
+    header = _csv_header(r.text)
+    assert ";" in header
     # Identity + status + score + full context (summary, signals, tech stack).
     for col in ("Company Name", "Sector", "Website", "Revenue", "Status",
                 "Assessed Score", "Intelligence Summary",
@@ -341,7 +351,7 @@ def test_intel_export_csv(client):
 def test_intel_export_all_scope_has_evolution(client):
     """scope=all spans several runs, so the evolution columns must appear;
     an all-new single run prunes them (they'd be empty)."""
-    header = client.get("/api/intel/export.csv?scope=all").text.splitlines()[0]
+    header = _csv_header(client.get("/api/intel/export.csv?scope=all").text)
     for col in ("Delta vs May", "Score Trajectory", "Status"):
         assert col in header
 

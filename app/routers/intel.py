@@ -600,13 +600,30 @@ def export_csv(scope: str = "run", run: Optional[str] = None, db: Session = Depe
                 if any(str(r.get(col, "")).strip() for r in records)]
     header = identity + runcols + kept_evo + narrative + sigcols + context
 
+    # Excel-friendly CSV: a leading `sep=;` line makes Excel split into columns in
+    # ANY locale, and the ";" delimiter matches European Excel's default. Combined
+    # with the UTF-8 BOM below, accents (é/à) and arrows (→) render correctly instead
+    # of mojibake. Long text cells (summaries, signals) wrap inside their column.
     buf = io.StringIO()
-    w = csv.writer(buf)
+    buf.write("sep=;\r\n")
+    w = csv.writer(buf, delimiter=";", lineterminator="\r\n", quoting=csv.QUOTE_MINIMAL)
     w.writerow(header)
-    for r in records:
-        w.writerow([r.get(col, "") for col in header])
 
-    return Response(content=buf.getvalue(), media_type="text/csv",
+    def cell(col: str, r: dict):
+        v = r.get(col, "")
+        if v is None:
+            return ""
+        # one-decimal scores; collapse hard newlines so a cell stays on one Excel line
+        if isinstance(v, float):
+            return f"{v:.1f}"
+        return str(v).replace("\r\n", " ").replace("\n", " ").replace("\r", " ").strip()
+
+    for r in records:
+        w.writerow([cell(col, r) for col in header])
+
+    # UTF-8 BOM so Excel auto-detects the encoding (accents/→ render correctly).
+    content = "﻿" + buf.getvalue()
+    return Response(content=content, media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 

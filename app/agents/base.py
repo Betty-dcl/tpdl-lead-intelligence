@@ -14,6 +14,28 @@ logger = logging.getLogger(__name__)
 
 ROUTE_RE = re.compile(r"\[ROUTE_TO:\s*([a-zA-Z0-9_-]+)\s*\]", re.IGNORECASE)
 MAX_HISTORY_MESSAGES = 30
+
+# The chat panel renders replies as PLAIN TEXT, so Markdown symbols show up as
+# literal characters (e.g. "**Important**"). Betty asked that agents never emit
+# them. We handle it two ways: a global format rule appended to every agent's
+# system prompt (below), and a deterministic strip of any that slip through.
+PLAIN_TEXT_RULE = (
+    "\n\n---\nOUTPUT FORMAT (strict): reply in plain text only. Do NOT use any "
+    "Markdown syntax — no bold or italic asterisks (*, **, ***), no # headings, "
+    "no backtick code fences or tables. For lists use a simple hyphen '- '. "
+    "The chat shows raw text, so any Markdown symbol appears literally to the reader."
+)
+
+_MD_BOLD_ITALIC = re.compile(r"\*{1,3}(?=\S)(.+?)(?<=\S)\*{1,3}", re.S)
+
+
+def strip_markdown_emphasis(text: str) -> str:
+    """Remove **/***/* emphasis markers, keeping the wrapped words. Leaves
+    hyphen bullets, math like '2 * 3' (spaces after the star) and lone stars
+    untouched — only paired markers around non-space content are unwrapped."""
+    if not text or "*" not in text:
+        return text
+    return _MD_BOLD_ITALIC.sub(r"\1", text)
 # Agents produce full briefs, ranked lists, outreach drafts and long-form content
 # (Oliver's A4 article, Marc's content pieces). 1024 truncated these mid-output.
 # 8192 covers every agent's deliverable and stays well under the non-streaming
@@ -233,13 +255,16 @@ class BaseAgent:
         client = get_anthropic_client()
         response = client.messages.create(
             model=settings.anthropic_model,
-            system=self.record.system_prompt,
+            system=(self.record.system_prompt or "") + PLAIN_TEXT_RULE,
             messages=messages,
             max_tokens=DEFAULT_MAX_TOKENS,
         )
         text = "".join(
             block.text for block in response.content if getattr(block, "type", "") == "text"
         )
+        # Safety net: strip any Markdown emphasis the model still emitted, so the
+        # plain-text chat never shows literal *, ** or *** (Betty's request).
+        text = strip_markdown_emphasis(text)
         usage = {
             "input_tokens": response.usage.input_tokens,
             "output_tokens": response.usage.output_tokens,

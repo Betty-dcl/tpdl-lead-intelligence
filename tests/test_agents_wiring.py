@@ -367,3 +367,23 @@ def test_maya_shortlist_is_threshold_banded_not_fixed_count(client):
     assert isinstance(m["monitor"], int)
     # honesty: never claims a fixed count
     assert "top 50" not in meta["augmented_message"].lower()
+
+
+def test_strip_markdown_emphasis_removes_stars_keeps_bullets_and_math():
+    """Betty's request: the plain-text chat must never show literal * / ** / ***.
+    We strip emphasis markers while leaving hyphen bullets and 'a * b' math alone."""
+    from app.agents.base import strip_markdown_emphasis as s
+    assert s("**Important caveats**") == "Important caveats"
+    assert s("***where next***") == "where next"
+    assert s("run *italic* here") == "run italic here"
+    # hyphen bullets and spaced multiplication stars are preserved
+    assert s("- **Discovery** matters") == "- Discovery matters"
+    assert s("2 * 3 = 6 and a * b") == "2 * 3 = 6 and a * b"
+    assert s("no stars here") == "no stars here"
+
+
+def test_plain_text_rule_appended_to_every_agent_system_prompt():
+    """The no-Markdown rule is injected globally (one place) for all agents."""
+    from app.agents.base import PLAIN_TEXT_RULE
+    assert "plain text only" in PLAIN_TEXT_RULE
+    assert "**" in PLAIN_TEXT_RULE  # names the exact markers to avoid

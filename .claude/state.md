@@ -19,6 +19,31 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-29 — **CSV téléchargé actualisé + Excel-friendly, enrichissement CA/secteurs, section Home
+  retirée, `**` markdown supprimés pour tous les agents (demandes Betty).** Session de polish plateforme.
+  **(1) Revenus du run 23/07** : Betty téléchargeait le CSV sans revenus. Ajout `enrich_run.py
+  --missing-revenue` (ne re-paie pas les CA déjà remplis) → relance ciblée sur les 66 CA vides ⇒
+  **CA 69 → 78/135** (+9 : Sciensus, Berkeley Lights, Industria Chimica Emiliana…). Les 57 restants =
+  mid-cap privées / filiales sans CA public (Galapagos, MilliporeSigma…) → jamais inventé.
+  **(2) Secteurs Unknown de tout l'univers** (option 2-1 Betty) : ajout `--missing-sector` + `--all-runs`
+  → enrichissement des **138 Unknown → 6** (132 remplis, ~0,70 $, fail-open). Répartition propre :
+  Pharma 202, Medtech 96, Diagnostics 86, Dental 75, Healthcare/Services 68, Other 47, Dermato 42.
+  ⚠️ 1 des 6 restants = **donnée poubelle** « Global Director Digital Strategy and Innovation | NA »
+  (titre de poste entré comme société par une passe de découverte) — à supprimer (accord Betty en attente).
+  **(3) Export CSV Excel-friendly** ([intel.py] `export_csv`) : le CSV brut s'ouvrait en 1 colonne + accents/
+  flèches cassés dans Excel européen. Corrigé : **BOM UTF-8 + ligne `sep=;` + délimiteur point-virgule**
+  (colonnes propres quelle que soit la locale) + scores en 1 décimale + texte long nettoyé. Contenu inchangé
+  (44 colonnes = tous les critères : identité, ville, geo, secteur, CA, score/flags, résumé, 3 signaux +
+  sources + corroboration, tech stack, historique). Tests smoke adaptés (skip ligne `sep=`).
+  **(4) `**` markdown retirés pour TOUS les agents** ([base.py]) : le chat affiche le texte brut → les `**`/
+  `***` apparaissaient littéralement. Fix à un seul endroit (socle commun) : (a) `PLAIN_TEXT_RULE` ajoutée
+  au prompt système de chaque agent (pas de Markdown), (b) `strip_markdown_emphasis()` déterministe en sortie
+  de `_call_claude` (retire */**/***, préserve tirets de liste et « 2 * 3 »). Vérifié live : Hugo répond sans
+  étoiles même invité à en mettre. +2 tests. ⚠️ Anciens messages déjà stockés gardent leurs étoiles ; seuls
+  les nouveaux sont propres.
+  **(5) Home** : section « How the team works » (frises Sales+Marketing pipeline) supprimée ([office.html]).
+  Suite : **220 tests verts**, 0 erreur console. ⚠️ Enrichissements écrits dans `data/app.db` (gitignoré) —
+  un futur re-score réécrirait ces champs. Serveur relancé (auth active). Pas de push GitHub demandé.
 - 2026-07-27 (2) — **CSV run nettoyé + enrichissement secteur/CA/site des 135 du 23/07 (accord Betty).**
   Suite retours Betty sur l'export : (a) **1 seule colonne secteur** (fusion Sector/Sector Bucket),
   (b) **« Market Tier » retirée**, (c) **colonnes de comparaison vides supprimées** quand tout le run est

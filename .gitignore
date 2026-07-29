@@ -45,3 +45,7 @@ data/csv/discovery_archive.csv
 data/review_flags_backup_*.json
 data/agent_results/
 data/duplicates_backup_*.json
+
+# Exported run CSVs (generated artifacts)
+data/csv/tpdl_run_*.csv
+data/csv/tpdl_universe_*.csv

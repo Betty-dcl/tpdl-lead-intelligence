@@ -90,6 +90,12 @@ def main() -> None:
     ap.add_argument("--run", default=None, help="run date YYYY-MM-DD (default: latest)")
     ap.add_argument("--limit", type=int, default=0, help="cap number of companies")
     ap.add_argument("--sample", type=int, default=0, help="probe N and print raw answers, no DB write")
+    ap.add_argument("--missing-revenue", action="store_true",
+                    help="only process companies whose revenue is still blank (cheap re-pass)")
+    ap.add_argument("--missing-sector", action="store_true",
+                    help="only process companies whose sector is Unknown/blank")
+    ap.add_argument("--all-runs", action="store_true",
+                    help="ignore --run and process the whole universe")
     args = ap.parse_args()
 
     cfg = EngineConfig.load(live=True)
@@ -101,11 +107,21 @@ def main() -> None:
     cur = con.cursor()
 
     run = args.run
-    if not run:
+    if not run and not args.all_runs:
         run = cur.execute("select max(date(run_date)) from companies").fetchone()[0]
+
+    clauses, params = [], []
+    if not args.all_runs:
+        clauses.append("date(run_date)=?"); params.append(run)
+    if args.missing_revenue:
+        clauses.append("(revenue is null or trim(revenue)='')")
+    if args.missing_sector:
+        clauses.append("(sector_bucket is null or trim(sector_bucket)='' or sector_bucket='Unknown')")
+    where = " and ".join(clauses) if clauses else "1=1"
+    run = run or "ALL RUNS"
     rows = cur.execute(
         "select name, sector, sector_bucket, website, revenue, location "
-        "from companies where date(run_date)=? order by assessed_score desc", (run,)
+        f"from companies where {where} order by assessed_score desc", params
     ).fetchall()
     if args.limit:
         rows = rows[: args.limit]
