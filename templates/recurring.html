@@ -124,6 +124,16 @@
             <option value="fader">Biggest faller</option>
           </select>
         </label>
+
+        <!-- download the current view (filters + sort applied) -->
+        <div class="inline-flex items-center gap-1.5">
+          <button @click="exportCsv()" class="rec-chip" style="cursor:pointer"
+                  title="Full-depth CSV of the shown companies — summary, each signal + source links, score trajectory (for Excel)">⬇ CSV</button>
+          <button @click="exportPdfList()" class="rec-chip" style="cursor:pointer"
+                  title="PDF — LIST: a one-page table of the shown companies">⬇ PDF list</button>
+          <button @click="exportPdfDetail()" class="rec-chip" style="cursor:pointer"
+                  title="PDF — DETAIL: one full brief per shown company (score, curve, summary, clickable sources)">⬇ PDF detail</button>
+        </div>
       </div>
     </section>
 
@@ -193,6 +203,7 @@
   </div>
 </div>
 
+<script src="/static/js/view_export.js"></script>
 <script>
 function recurringPage() {
   return {
@@ -235,6 +246,62 @@ function recurringPage() {
       if (s >= 8) return "#059669";      // outreach-eligible
       if (s >= 5) return "#0284c7";      // monitor band
       return "#94a3b8";                  // low / weak
+    },
+    // ── download the CURRENT view (filters + sort applied) ────────────────────
+    _sortLabel() {
+      return ({count:"Most scans", latest:"Highest latest score",
+               riser:"Biggest riser", fader:"Biggest faller"})[this.sort] || this.sort;
+    },
+    _viewColumns() {
+      const days = (this.data?.all_days || []).map(d => d.label);
+      return ["Company", "Location", "Seen", ...days, "Since first", "ICP"];
+    },
+    _viewRows() {
+      const days = (this.data?.all_days || []).map(d => d.day);
+      return this.filtered.map(c => {
+        const scores = days.map(day => {
+          const s = this.scoreOn(c, day);
+          return (s === null || s === undefined) ? "—" : s.toFixed(1);
+        });
+        const d = c.delta_first_last;
+        const delta = d > 0 ? `+${d.toFixed(1)}` : d < 0 ? d.toFixed(1) : "0";
+        return [c.company, c.location || "", `×${c.count}`, ...scores, delta,
+                c.out_of_icp ? "out" : "in"];
+      });
+    },
+    _viewSubtitle() {
+      const parts = [`sort: ${this._sortLabel()}`, `${this.filtered.length} shown`];
+      if (this.pick) parts.push(`seen ×${this.pick}`);
+      if (this.inIcpOnly) parts.push("in-ICP only");
+      if (this.q.trim()) parts.push(`search: "${this.q.trim()}"`);
+      return "Recurring · " + parts.join(" · ");
+    },
+    // Rich exports: post the shown companies (in order) → full-depth CSV
+    // (summary, signals + source links, trajectory) and a detailed PDF (one brief
+    // per company: score + curve, summary, clickable sources).
+    _shownNames() { return this.filtered.map(c => c.company); },
+    exportCsv() {
+      tpdlPostDownload("/api/intel/export_rich.csv", {
+        names: this._shownNames(), filename: "tpdl_recurring.csv",
+        title: "Companies that keep coming back", subtitle: this._viewSubtitle(),
+      });
+    },
+    // PDF — LIST: a one-page table of the shown companies (the matrix snapshot).
+    exportPdfList() {
+      const days = (this.data?.all_days || []).length;
+      const widths = [30, 28, 10, ...Array(days).fill(11), 13, 9];
+      tpdlDownloadViewPdf({
+        title: "Companies that keep coming back", subtitle: this._viewSubtitle(),
+        columns: this._viewColumns(), rows: this._viewRows(), widths,
+        filename: "tpdl_recurring_list.pdf",
+      });
+    },
+    // PDF — DETAIL: one full brief per shown company (score, curve, summary, links).
+    exportPdfDetail() {
+      tpdlPostDownload("/api/intel/view_briefs.pdf", {
+        names: this._shownNames(), filename: "tpdl_recurring_briefs.pdf",
+        title: this._viewSubtitle(), subtitle: this._viewSubtitle(),
+      });
     },
   };
 }

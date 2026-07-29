@@ -387,6 +387,16 @@
         by <span x-text="sortKey==='period_delta' ? 'Δ period' : sortKey==='may_delta' ? 'Δ vs May' : 'score'"></span>,
         <span x-text="sortDesc ? 'high → low' : 'low → high'"></span>
       </span>
+      <!-- download the current view (filters + sort + top-N applied) -->
+      <div class="inline-flex items-center gap-1.5 ml-auto">
+        <span class="text-xs uppercase tracking-wider text-ink-3">Download this view</span>
+        <button @click="exportCsv()" class="filter-pill"
+                title="Full-depth CSV of the shown companies — summary, each signal + source links, score trajectory (for Excel)">⬇ CSV</button>
+        <button @click="exportPdfList()" class="filter-pill"
+                title="PDF — LIST: a one-page table of the shown companies">⬇ PDF list</button>
+        <button @click="exportPdfDetail()" class="filter-pill"
+                title="PDF — DETAIL: one full brief per shown company (score, curve, summary, clickable sources)">⬇ PDF detail</button>
+      </div>
     </div>
 
     <!-- Grid-based "table" -->
@@ -722,5 +732,6 @@
 
 </div>
 
-<script src="/static/js/intel.js?v=15"></script>
+<script src="/static/js/view_export.js"></script>
+<script src="/static/js/intel.js?v=18"></script>
 {% endblock %}

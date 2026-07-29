@@ -246,6 +246,73 @@ function intelPage() {
 
     setTopN(n) { this.topN = (this.topN === n) ? 0 : n; },
 
+    /* ---- download the CURRENT view (filters + sort + top-N applied) ---- */
+    _deltaText(v) {
+      if (v === "new") return "new";
+      if (v === "base" || v === "off" || v === "absent") return "—";
+      if (v === 0) return "0";
+      return (v > 0 ? "+" : "") + v.toFixed(1);
+    },
+    _viewColumnsSales() {
+      return ["#", "Company", "Website", "Sector", "Location", "Geo", "Revenue",
+              "Score", "Δ vs May", "Δ period", "Coverage", "Eligible", "ICP",
+              "Review", "Run"];
+    },
+    _viewRowsSales() {
+      return this.displayedCompanies.map((c, i) => [
+        i + 1, c.name, c.website || "", c.sector_bucket || "", c.location || "",
+        c.geo_region || "", c.revenue || "",
+        (typeof c.assessed_score === "number") ? c.assessed_score.toFixed(1) : "",
+        this._deltaText(this.mayDelta(c)),
+        this.periodOn ? this._deltaText(this.periodDelta(c)) : "—",
+        (c.coverage || "").split(" ").slice(0, 3).join(" "),
+        c.outreach_eligible ? "yes" : "no", c.icp_flag ? "out" : "in",
+        c.review_flag ? "yes" : "no", c.run_label || "",
+      ]);
+    },
+    _viewSubtitleSales() {
+      const f = this.filters, parts = [];
+      const sortLabel = ({ assessed_score: "Score", period_delta: "Δ period",
+                           may_delta: "Δ vs May" })[this.sortKey] || this.sortKey;
+      parts.push(`sort: ${sortLabel} ${this.sortDesc ? "↓" : "↑"}`);
+      parts.push(`${this.displayedCompanies.length} shown`);
+      if (this.topN) parts.push(`top ${this.topN}`);
+      if (f.sector_bucket) parts.push(f.sector_bucket);
+      if (f.geo_region) parts.push(this.regionLabel(f.geo_region));
+      if (f.signal_type) parts.push(f.signal_type);
+      if (f.outreach_eligible) parts.push("eligible only");
+      if (f.review_flag) parts.push("review-flagged");
+      if (this.periodOn) parts.push(`${this.runLabelFor(this.period.from)} → ${this.runLabelFor(this.period.to)}`);
+      else if (f.vintage) parts.push(f.vintage);
+      return "Sales · " + parts.join(" · ");
+    },
+    // Rich exports: post the shown companies (in order) → full-depth CSV (summary,
+    // signals + source links, trajectory) and a detailed PDF (one brief per company:
+    // score + curve, summary, clickable sources).
+    _shownNames() { return this.displayedCompanies.map(c => c.name); },
+    exportCsv() {
+      tpdlPostDownload("/api/intel/export_rich.csv", {
+        names: this._shownNames(), filename: "tpdl_sales.csv",
+        title: "Lead Intelligence — Sales pipeline", subtitle: this._viewSubtitleSales(),
+      });
+    },
+    // PDF — LIST: a one-page table snapshot of the shown rows.
+    exportPdfList() {
+      tpdlDownloadViewPdf({
+        title: "Lead Intelligence — Sales pipeline", subtitle: this._viewSubtitleSales(),
+        columns: this._viewColumnsSales(), rows: this._viewRowsSales(),
+        widths: [5, 34, 30, 18, 30, 12, 20, 10, 12, 12, 14, 12, 8, 10, 12],
+        filename: "tpdl_sales_list.pdf",
+      });
+    },
+    // PDF — DETAIL: one full brief per shown company (score, curve, summary, links).
+    exportPdfDetail() {
+      tpdlPostDownload("/api/intel/view_briefs.pdf", {
+        names: this._shownNames(), filename: "tpdl_sales_briefs.pdf",
+        title: this._viewSubtitleSales(), subtitle: this._viewSubtitleSales(),
+      });
+    },
+
     distinctRegions() {
       const order = ["CH", "ES", "USA", "Middle East", "Europe", "APAC", "Other"];
       const present = new Set(this.companies.map(c => c.geo_region).filter(Boolean));

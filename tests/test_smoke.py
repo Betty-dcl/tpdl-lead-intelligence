@@ -416,3 +416,75 @@ def test_export_rejects_empty_content(client):
     for path in ("/api/marketing/carousel/export-pdf", "/api/marketing/deck/export-pptx"):
         r = client.post(path, json={"subject": "x", "content": "   "})
         assert r.status_code == 422
+
+
+def test_company_brief_pdf(client):
+    """Per-company PDF brief: a real PDF for an existing company, 404 otherwise."""
+    from app.models import Company
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        name = db.query(Company.name).first()[0]
+    r = client.get(f"/api/intel/companies/{name}/brief.pdf")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content[:5] == b"%PDF-"
+    assert "attachment" in r.headers.get("content-disposition", "")
+    assert client.get("/api/intel/companies/NoSuchCompanyXYZ/brief.pdf").status_code == 404
+
+
+def test_view_pdf_snapshot(client):
+    """POST /view.pdf renders a branded PDF from whatever columns/rows the client
+    posts (WYSIWYG snapshot of a filtered view)."""
+    payload = {
+        "title": "Companies that keep coming back",
+        "subtitle": "Recurring · sort: Biggest riser · 2 shown",
+        "columns": ["Company", "Location", "Seen", "May 25", "Jul 17", "Since first"],
+        "rows": [["LETI Pharma", "Madrid, Spain", "×2", "0.0", "6.2", "+6.2"],
+                 ["Medinova", "Zurich, Switzerland", "×2", "0.0", "6.0", "+6.0"]],
+        "widths": [30, 28, 10, 11, 11, 13],
+        "filename": "tpdl_recurring.pdf",
+    }
+    r = client.post("/api/intel/view.pdf", json=payload)
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content[:5] == b"%PDF-"
+    assert "tpdl_recurring.pdf" in r.headers.get("content-disposition", "")
+
+
+def test_export_rich_csv_filtered_by_names(client):
+    """POST names → full-depth CSV for exactly those, in the posted order, with the
+    same rich columns as the run export (summary, signal sources, trajectory)."""
+    from app.models import Company
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        names = [n for (n,) in db.query(Company.name).limit(3).all()]
+    r = client.post("/api/intel/export_rich.csv",
+                    json={"names": names, "filename": "tpdl_recurring.csv"})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    assert r.text.startswith("﻿sep=;")
+    header = r.text.lstrip("﻿").splitlines()[1]
+    for col in ("Company Name", "Intelligence Summary", "Signal 1 URLs",
+                "Signal 1 Corroboration (0-2)", "Tech Stack Summary"):
+        assert col in header
+    # rows are exactly the posted names, in order
+    body = r.text.lstrip("﻿").splitlines()[2:]
+    got = [ln.split(";")[0].strip('"') for ln in body if ln.strip()]
+    assert got == names
+
+
+def test_view_briefs_pdf(client):
+    """POST names → a detailed multi-company brief PDF (one full brief per name)."""
+    from app.models import Company
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        names = [n for (n,) in db.query(Company.name).limit(2).all()]
+    r = client.post("/api/intel/view_briefs.pdf",
+                    json={"names": names, "filename": "tpdl_recurring_briefs.pdf",
+                          "title": "Recurring"})
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content[:5] == b"%PDF-"
+    # empty view still yields a valid (1-page) PDF, never a crash
+    empty = client.post("/api/intel/view_briefs.pdf", json={"names": []})
+    assert empty.status_code == 200 and empty.content[:5] == b"%PDF-"

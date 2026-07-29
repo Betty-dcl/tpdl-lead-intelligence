@@ -287,12 +287,13 @@
         </dl>
       </div>
       <div class="tpdl-card p-6 lg:col-span-5">
-        <div class="text-xs uppercase tracking-wider text-ink-3 mb-3">Open the full data</div>
-        <p class="text-xs text-ink-2 mb-3">Everything you see here is in the run export — the same 42 columns, plus the Neotek delta, ready for Excel.</p>
+        <div class="text-xs uppercase tracking-wider text-ink-3 mb-3">Download this company</div>
+        <p class="text-xs text-ink-2 mb-3">A one-page PDF brief — score &amp; formula, the evolution curve, every signal with its sources, tech stack — laid out like this page, ready to send.</p>
         <div class="flex flex-col gap-2">
-          <a href="/api/intel/export.csv?scope=run" class="tpdl-btn tpdl-btn--dark text-xs text-center">⬇ Download this run (CSV)</a>
-          <a href="/api/intel/export.csv?scope=all" class="tpdl-btn tpdl-btn--outline text-xs text-center">⬇ Download full universe (CSV)</a>
-          <a href="/runs" class="tpdl-btn tpdl-btn--ghost text-xs text-center">See all runs & trajectories →</a>
+          <a :href="'/api/intel/companies/' + encodeURIComponent(c.name) + '/brief.pdf'"
+             class="tpdl-btn tpdl-btn--dark text-xs text-center">⬇ Download this company (PDF)</a>
+          <a href="/api/intel/export.csv?scope=run" class="tpdl-btn tpdl-btn--outline text-xs text-center">⬇ Download the whole run (CSV)</a>
+          <a href="/api/intel/export.csv?scope=all" class="tpdl-btn tpdl-btn--ghost text-xs text-center">⬇ Download full universe (CSV)</a>
         </div>
       </div>
     </section>

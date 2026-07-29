@@ -19,6 +19,28 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-29 (2) — **Exports téléchargeables riches : fiche société PDF + exports de vue (CSV / PDF liste /
+  PDF détails) sur Sales & Recurring (demandes Betty).** Suite de la session polish.
+  **(1) Fiche société PDF** (`app/tools/company_pdf.py` + `GET /api/intel/companies/{name}/brief.pdf` +
+  bouton sur la page société) : one-pager brandé reprenant la page société — identité, score + formule,
+  **courbe d'évolution** (sparkline dessinée), chaque signal (what/why/relevance, confiance, corroboration,
+  **liens sources cliquables**), tech stack, historique, delta Neotek. Réutilise TPDLPDF (fpdf2) + helper
+  Latin-1. ⚠️ Pièges fpdf2 corrigés : `multi_cell(wrapmode="CHAR", link=…)` **boucle à l'infini** → domaine
+  cliquable en `cell` + URL complète en gris `CHAR` sans lien ; curseur laissé à droite après `multi_cell`
+  → `new_x=LMARGIN` partout (sinon labels coupés à droite) ; corroboration est un **dict** {points,max} pas
+  un int. Décision Betty : CSV par société inutile (1 ligne, déjà dans le run CSV) → **PDF seul**.
+  **(2) Exports de vue** (Recurring + Sales) respectant **filtres + tri** (WYSIWYG) : helper JS partagé
+  `static/js/view_export.js` (CSV client-side Excel-friendly + `tpdlPostDownload`). Endpoints :
+  `POST /export_rich.csv` (CSV **full-depth** filtré aux sociétés affichées, dans l'ordre — 50 colonnes :
+  résumé, 3 signaux + sources + corroboration, tech stack, **trajectoire = courbe en données**) ;
+  `POST /view.pdf` (**liste** : tableau récap 1 page, `app/tools/view_pdf.py`, paysage) ;
+  `POST /view_briefs.pdf` (**détails** : une fiche complète par société, plafonné 60). `export_csv`
+  refactoré → helpers `_export_record` + `_csv_response` réutilisés. **3 boutons** par page : ⬇ CSV /
+  ⬇ PDF list / ⬇ PDF detail. Vérifié live (Recurring biggest-riser : CSV 50 col + trajectoire + liens,
+  PDF list 9 Ko, PDF detail ~17 p pour 8 sociétés) ; Sales (filtre Spain + tri Δ vs May → sous-titre
+  capturé). **224 tests verts**, 0 erreur console. ⚠️ `git reset` a été nécessaire (index vidé en cours
+  de session, motif `git rm --cached` ; HEAD intact, working tree intact — non destructif). Backups data
+  (`data/*_backup_*.json`) ajoutés au .gitignore.
 - 2026-07-29 — **CSV téléchargé actualisé + Excel-friendly, enrichissement CA/secteurs, section Home
   retirée, `**` markdown supprimés pour tous les agents (demandes Betty).** Session de polish plateforme.
   **(1) Revenus du run 23/07** : Betty téléchargeait le CSV sans revenus. Ajout `enrich_run.py

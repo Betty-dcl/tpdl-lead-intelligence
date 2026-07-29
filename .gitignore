@@ -49,3 +49,6 @@ data/duplicates_backup_*.json
 # Exported run CSVs (generated artifacts)
 data/csv/tpdl_run_*.csv
 data/csv/tpdl_universe_*.csv
+
+# One-off data backups (runtime artifacts from merges/deletes/enrichment)
+data/*_backup_*.json

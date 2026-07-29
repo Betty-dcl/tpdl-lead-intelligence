@@ -3,10 +3,12 @@
 Reads from the `companies` table (imported via import_csv.py).
 """
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session
 
@@ -223,6 +225,72 @@ def company_trajectory(name: str, db: Session = Depends(get_db)) -> dict:
         delta = round((c.assessed_score or 0.0) - (neo.assessed_score or 0.0), 1)
     return {"company": name, "points": points, "delta": delta,
             "reappeared": neo is not None}
+
+
+@router.get("/companies/{name}/brief.pdf")
+def company_brief_pdf(name: str, db: Session = Depends(get_db)):
+    """A branded one-page PDF for a single company — the same content as its
+    detail page (score + formula, evolution curve, signal cards with sources,
+    tech stack, flags), in a form you can send. The per-company CSV would be a
+    single row already present in the run export, so we offer the designed PDF."""
+    from fastapi.responses import Response
+    from app.tools.company_pdf import generate_company_brief_pdf
+
+    c = db.get(Company, name)
+    if c is None:
+        raise HTTPException(status_code=404, detail=f"Company '{name}' not found")
+    company = _serialize_company(c, _neotek_baseline(db))
+
+    # Evolution points: every scan of this company (run_snapshots), deduped to the
+    # latest score per run date, oldest → newest — the same curve as Recurring.
+    snaps = (
+        db.query(RunSnapshot)
+        .filter(RunSnapshot.company_name == name)
+        .order_by(RunSnapshot.run_date.asc())
+        .all()
+    )
+    by_day: dict[str, float] = {}
+    for s in snaps:
+        day = s.run_date.date().isoformat() if s.run_date else None
+        if day:
+            by_day[day] = s.assessed_score or 0.0
+    # make sure the company's own current run is represented
+    cur_day = c.run_date.date().isoformat() if c.run_date else None
+    if cur_day:
+        by_day[cur_day] = c.assessed_score or 0.0
+    points = [(_date_label(day), score) for day, score in sorted(by_day.items())]
+
+    pdf = generate_company_brief_pdf(company, points)
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("_") or "company"
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="tpdl_{safe}_brief.pdf"'})
+
+
+class ViewPdfPayload(BaseModel):
+    title: str = "TPDL view"
+    subtitle: str = ""
+    columns: list[str]
+    rows: list[list]
+    widths: Optional[list[float]] = None
+    filename: str = "tpdl_view.pdf"
+
+
+@router.post("/view.pdf")
+def view_pdf(payload: ViewPdfPayload):
+    """Designed snapshot of a table view (Recurring / Sales). The client posts the
+    columns + rows exactly as shown (filters applied, in sort order); we render a
+    branded landscape PDF. WYSIWYG — the server does no filtering of its own."""
+    from fastapi.responses import Response
+    from app.tools.view_pdf import generate_view_pdf
+
+    cols = payload.columns[:16]                     # guard against absurd widths
+    rows = [r[:16] for r in payload.rows[:2000]]    # and runaway payloads
+    pdf = generate_view_pdf(payload.title, payload.subtitle, cols, rows, payload.widths)
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", payload.filename).strip("_") or "tpdl_view.pdf"
+    if not safe.endswith(".pdf"):
+        safe += ".pdf"
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{safe}"'})
 
 
 @router.get("/stats")
@@ -493,6 +561,106 @@ def _history_by_company(db: Session) -> dict[str, list[dict]]:
 _EVOLUTION_COLS = ["Previous Run Date", "Previous Score", "Delta vs Previous Run",
                    "Neotek May Score", "Delta vs May", "Score Trajectory"]
 
+_IDENTITY_COLS = ["Company Name", "Sector", "Website", "Location", "Geo Region", "Revenue"]
+_RUN_COLS = ["Run Date", "Run Label", "Status", "Assessed Score", "Coverage",
+             "Outreach Eligible", "ICP Flag", "Review Flag", "Review Flag Reason"]
+_NARRATIVE_COLS = ["Intelligence Summary", "Signals Found", "Signals Not Evidenced"]
+_SIG_COLS = [c for i in (1, 2, 3) for c in (
+    f"Signal {i} Category", f"Signal {i} What Happened", f"Signal {i} Why It Matters",
+    f"Signal {i} TPDL Relevance", f"Signal {i} Confidence",
+    f"Signal {i} Corroboration (0-2)", f"Signal {i} Sources", f"Signal {i} URLs")]
+_CONTEXT_COLS = ["Tech Stack Summary", "Historical Context"]
+
+
+def _corroboration_n(urls_str: Optional[str]) -> int:
+    n = len([u for u in (urls_str or "").split(";") if u.strip()])
+    return 2 if n >= 2 else (1 if n == 1 else 0)
+
+
+def _export_record(c: Company, baseline: dict, history: dict) -> dict:
+    """One full export row for a company — identity, score/flags, evolution vs its
+    own history + Neotek, narrative, the 3 signals (sources/corroboration) and
+    context. Shared by the run/universe export and the filtered view export."""
+    day = c.run_date.date().isoformat() if c.run_date else None
+    hist = history.get(c.name, [])
+    prev = None
+    for h in hist:
+        if day and h["day"] < day:
+            prev = h
+    times = len(hist)
+    neo = baseline.get(c.name)
+    rec = {
+        "Company Name": c.name,
+        "Sector": c.sector_bucket or "",
+        "Website": c.website or "",
+        "Location": c.location or "",
+        "Geo Region": geo_region(c.location),
+        "Revenue": c.revenue or "",
+        "Run Date": day or "",
+        "Run Label": _date_label(day),
+        "Status": "New company" if prev is None else f"Re-scored ({times} scans)",
+        "Assessed Score": c.assessed_score,
+        "Coverage": c.coverage,
+        "Outreach Eligible": "YES" if c.outreach_eligible else "no",
+        "ICP Flag": "YES" if c.icp_flag else "no",
+        "Review Flag": "YES" if c.review_flag else "no",
+        "Review Flag Reason": c.review_flag_reason or "",
+        "Previous Run Date": prev["day"] if prev else "",
+        "Previous Score": prev["score"] if prev else "",
+        "Delta vs Previous Run": round((c.assessed_score or 0) - prev["score"], 1) if prev else "",
+        "Neotek May Score": neo if neo is not None else "",
+        "Delta vs May": round((c.assessed_score or 0) - neo, 1) if neo is not None else "",
+        "Score Trajectory": " → ".join(f"{_date_label(h['day'])} {h['score']:.1f}"
+                                       for h in hist) if times >= 2 else "",
+        "Intelligence Summary": c.intelligence_summary or "",
+        "Signals Found": c.signals_found,
+        "Signals Not Evidenced": c.signals_not_evidenced or "",
+        "Tech Stack Summary": c.tech_stack_summary or "",
+        "Historical Context": c.historical_context or "",
+    }
+    for i in (1, 2, 3):
+        cat = getattr(c, f"s{i}_category")
+        rec[f"Signal {i} Category"] = cat
+        rec[f"Signal {i} What Happened"] = getattr(c, f"s{i}_what_happened")
+        rec[f"Signal {i} Why It Matters"] = getattr(c, f"s{i}_why_it_matters")
+        rec[f"Signal {i} TPDL Relevance"] = getattr(c, f"s{i}_tpdl_relevance")
+        rec[f"Signal {i} Confidence"] = getattr(c, f"s{i}_confidence")
+        rec[f"Signal {i} Corroboration (0-2)"] = _corroboration_n(getattr(c, f"s{i}_urls")) if cat else ""
+        rec[f"Signal {i} Sources"] = getattr(c, f"s{i}_sources")
+        rec[f"Signal {i} URLs"] = getattr(c, f"s{i}_urls")
+    return rec
+
+
+def _csv_response(records: list[dict], fname: str):
+    """Excel-friendly CSV (BOM + `sep=;` + semicolon) from export records. Evolution
+    columns empty across ALL rows are dropped; every other group is always kept."""
+    import csv
+    import io
+    from fastapi.responses import Response
+
+    kept_evo = [col for col in _EVOLUTION_COLS
+                if any(str(r.get(col, "")).strip() for r in records)]
+    header = _IDENTITY_COLS + _RUN_COLS + kept_evo + _NARRATIVE_COLS + _SIG_COLS + _CONTEXT_COLS
+
+    buf = io.StringIO()
+    buf.write("sep=;\r\n")
+    w = csv.writer(buf, delimiter=";", lineterminator="\r\n", quoting=csv.QUOTE_MINIMAL)
+    w.writerow(header)
+
+    def cell(col: str, r: dict):
+        v = r.get(col, "")
+        if v is None:
+            return ""
+        if isinstance(v, float):
+            return f"{v:.1f}"
+        return str(v).replace("\r\n", " ").replace("\n", " ").replace("\r", " ").strip()
+
+    for r in records:
+        w.writerow([cell(col, r) for col in header])
+    content = "﻿" + buf.getvalue()
+    return Response(content=content, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
 
 @router.get("/export.csv")
 def export_csv(scope: str = "run", run: Optional[str] = None, db: Session = Depends(get_db)):
@@ -503,16 +671,11 @@ def export_csv(scope: str = "run", run: Optional[str] = None, db: Session = Depe
     row (e.g. the comparison columns on an all-new run) are omitted.
     scope=run → one run (default: latest; ?run=YYYY-MM-DD to pick one);
     scope=all → the whole universe."""
-    import csv
-    import io
-    from fastapi.responses import Response
-
     baseline = _neotek_baseline(db)
     history = _history_by_company(db)
 
     q = db.query(Company)
     fname = "tpdl_universe_full.csv"
-    target_day: Optional[str] = None
     if scope == "run":
         target_day = run
         if not target_day:
@@ -524,106 +687,69 @@ def export_csv(scope: str = "run", run: Optional[str] = None, db: Session = Depe
             fname = f"tpdl_run_{target_day}_full.csv"
     rows = q.order_by(Company.assessed_score.desc()).all()
 
-    def corroboration(urls_str: Optional[str]) -> int:
-        n = len([u for u in (urls_str or "").split(";") if u.strip()])
-        return 2 if n >= 2 else (1 if n == 1 else 0)
+    records = [_export_record(c, baseline, history) for c in rows]
+    return _csv_response(records, fname)
 
-    # Column groups. Identity + context are ALWAYS kept (stable schema, even when
-    # a field like Revenue is blank for a run). Evolution columns are pruned below.
-    identity = ["Company Name", "Sector", "Website", "Location", "Geo Region", "Revenue"]
-    runcols  = ["Run Date", "Run Label", "Status", "Assessed Score", "Coverage",
-                "Outreach Eligible", "ICP Flag", "Review Flag", "Review Flag Reason"]
-    narrative = ["Intelligence Summary", "Signals Found", "Signals Not Evidenced"]
-    sigcols = []
-    for i in (1, 2, 3):
-        sigcols += [f"Signal {i} Category", f"Signal {i} What Happened",
-                    f"Signal {i} Why It Matters", f"Signal {i} TPDL Relevance",
-                    f"Signal {i} Confidence", f"Signal {i} Corroboration (0-2)",
-                    f"Signal {i} Sources", f"Signal {i} URLs"]
-    context = ["Tech Stack Summary", "Historical Context"]
 
-    records: list[dict] = []
-    for c in rows:
-        day = c.run_date.date().isoformat() if c.run_date else None
-        hist = history.get(c.name, [])
-        prev = None                               # most recent scored date before this run
-        for h in hist:
-            if day and h["day"] < day:
-                prev = h
-        net_new = prev is None
-        times = len(hist)
-        neo = baseline.get(c.name)
-        rec = {
-            "Company Name": c.name,
-            "Sector": c.sector_bucket or "",      # ONE sector column (the bucket)
-            "Website": c.website or "",
-            "Location": c.location or "",
-            "Geo Region": geo_region(c.location),
-            "Revenue": c.revenue or "",
-            "Run Date": day or "",
-            "Run Label": _date_label(day),
-            "Status": "New company" if net_new else f"Re-scored ({times} scans)",
-            "Assessed Score": c.assessed_score,
-            "Coverage": c.coverage,
-            "Outreach Eligible": "YES" if c.outreach_eligible else "no",
-            "ICP Flag": "YES" if c.icp_flag else "no",
-            "Review Flag": "YES" if c.review_flag else "no",
-            "Review Flag Reason": c.review_flag_reason or "",
-            "Previous Run Date": prev["day"] if prev else "",
-            "Previous Score": prev["score"] if prev else "",
-            "Delta vs Previous Run": round((c.assessed_score or 0) - prev["score"], 1) if prev else "",
-            "Neotek May Score": neo if neo is not None else "",
-            "Delta vs May": round((c.assessed_score or 0) - neo, 1) if neo is not None else "",
-            # Trajectory only when there's more than one point (else it's degenerate).
-            "Score Trajectory": " → ".join(f"{_date_label(h['day'])} {h['score']:.1f}"
-                                           for h in hist) if times >= 2 else "",
-            "Intelligence Summary": c.intelligence_summary or "",
-            "Signals Found": c.signals_found,
-            "Signals Not Evidenced": c.signals_not_evidenced or "",
-            "Tech Stack Summary": c.tech_stack_summary or "",
-            "Historical Context": c.historical_context or "",
-        }
-        for i in (1, 2, 3):
-            cat = getattr(c, f"s{i}_category")
-            rec[f"Signal {i} Category"] = cat
-            rec[f"Signal {i} What Happened"] = getattr(c, f"s{i}_what_happened")
-            rec[f"Signal {i} Why It Matters"] = getattr(c, f"s{i}_why_it_matters")
-            rec[f"Signal {i} TPDL Relevance"] = getattr(c, f"s{i}_tpdl_relevance")
-            rec[f"Signal {i} Confidence"] = getattr(c, f"s{i}_confidence")
-            rec[f"Signal {i} Corroboration (0-2)"] = corroboration(getattr(c, f"s{i}_urls")) if cat else ""
-            rec[f"Signal {i} Sources"] = getattr(c, f"s{i}_sources")
-            rec[f"Signal {i} URLs"] = getattr(c, f"s{i}_urls")
-        records.append(rec)
+class NamesPayload(BaseModel):
+    names: list[str]
+    filename: str = "tpdl_view_full.csv"
+    title: str = "TPDL view"
+    subtitle: str = ""
 
-    # Drop evolution columns that are empty for EVERY exported row.
-    kept_evo = [col for col in _EVOLUTION_COLS
-                if any(str(r.get(col, "")).strip() for r in records)]
-    header = identity + runcols + kept_evo + narrative + sigcols + context
 
-    # Excel-friendly CSV: a leading `sep=;` line makes Excel split into columns in
-    # ANY locale, and the ";" delimiter matches European Excel's default. Combined
-    # with the UTF-8 BOM below, accents (é/à) and arrows (→) render correctly instead
-    # of mojibake. Long text cells (summaries, signals) wrap inside their column.
-    buf = io.StringIO()
-    buf.write("sep=;\r\n")
-    w = csv.writer(buf, delimiter=";", lineterminator="\r\n", quoting=csv.QUOTE_MINIMAL)
-    w.writerow(header)
+@router.post("/export_rich.csv")
+def export_rich_csv(payload: NamesPayload, db: Session = Depends(get_db)):
+    """Full-depth CSV for exactly the companies the client posts (a filtered view),
+    IN THE POSTED ORDER — every column the run export has: summary, each signal with
+    its sources & corroboration, tech stack, history, and the score trajectory (the
+    curve as data). WYSIWYG richness for the Recurring/Sales views."""
+    baseline = _neotek_baseline(db)
+    history = _history_by_company(db)
+    found = {c.name: c for c in db.query(Company).filter(Company.name.in_(payload.names[:2000])).all()}
+    records = [_export_record(found[n], baseline, history) for n in payload.names if n in found]
+    fname = re.sub(r"[^A-Za-z0-9._-]+", "_", payload.filename).strip("_") or "tpdl_view_full.csv"
+    if not fname.endswith(".csv"):
+        fname += ".csv"
+    return _csv_response(records, fname)
 
-    def cell(col: str, r: dict):
-        v = r.get(col, "")
-        if v is None:
-            return ""
-        # one-decimal scores; collapse hard newlines so a cell stays on one Excel line
-        if isinstance(v, float):
-            return f"{v:.1f}"
-        return str(v).replace("\r\n", " ").replace("\n", " ").replace("\r", " ").strip()
 
-    for r in records:
-        w.writerow([cell(col, r) for col in header])
+@router.post("/view_briefs.pdf")
+def view_briefs_pdf(payload: NamesPayload, db: Session = Depends(get_db)):
+    """Detailed PDF for a filtered view — ONE full company brief per posted name
+    (score + evolution curve, intelligence summary, signals with clickable sources,
+    tech stack), in the posted order. The visual counterpart to export_rich.csv.
+    Capped so a huge view can't produce a runaway document; the CSV carries all."""
+    from fastapi.responses import Response
+    from app.tools.company_pdf import generate_multi_brief_pdf
 
-    # UTF-8 BOM so Excel auto-detects the encoding (accents/→ render correctly).
-    content = "﻿" + buf.getvalue()
-    return Response(content=content, media_type="text/csv; charset=utf-8",
+    CAP = 60
+    names = payload.names[:CAP]
+    found = {c.name: c for c in db.query(Company).filter(Company.name.in_(names)).all()}
+    items: list[tuple[dict, list]] = []
+    for n in names:
+        c = found.get(n)
+        if c is None:
+            continue
+        company = _serialize_company(c, baseline=_neotek_baseline(db))
+        snaps = (db.query(RunSnapshot).filter(RunSnapshot.company_name == n)
+                 .order_by(RunSnapshot.run_date.asc()).all())
+        by_day: dict[str, float] = {}
+        for s in snaps:
+            day = s.run_date.date().isoformat() if s.run_date else None
+            if day:
+                by_day[day] = s.assessed_score or 0.0
+        cur_day = c.run_date.date().isoformat() if c.run_date else None
+        if cur_day:
+            by_day[cur_day] = c.assessed_score or 0.0
+        points = [(_date_label(day), score) for day, score in sorted(by_day.items())]
+        items.append((company, points))
+
+    pdf = generate_multi_brief_pdf(items, subject=payload.title or "TPDL view")
+    fname = re.sub(r"[^A-Za-z0-9._-]+", "_", payload.filename).strip("_") or "tpdl_view_briefs.pdf"
+    if not fname.endswith(".pdf"):
+        fname += ".pdf"
+    return Response(content=pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
