@@ -37,9 +37,9 @@
   + company_detail + exports PDF/PPTX DARK_INK + 5 avatars SVG, lift teal `#0d5b68/#0c5a68 → #232323`) ;
   fond **#fafaf8 → #EBEBEB** (token Tailwind `bg` + `--tpdl-bg`) ; police **Space Grotesk/Inter → Funnel
   Sans** (link Google Fonts + `--tpdl-font-*` + Tailwind fontFamily) ; vert #34D591 inchangé. Prompt Oliver
-  re-formé (charte appliquée, plus de « teal pending ») + re-seed. custom.css bumpé **v=6**. ⚠️ Logo officiel
-  `TPDL Logo (1).svg` PAS intégré (chemin non fourni) — la case sombre du mini-logo passe near-black via var ;
-  swap du vrai SVG à faire quand Betty donne le fichier. ⚠️ Si #EBEBEB trop gris → ajustable en 1 ligne.
+  re-formé (charte appliquée, plus de « teal pending ») + re-seed. custom.css bumpé **v=7**. ✅ **Logo officiel
+  intégré** (`static/img/tpdl-logo.svg`, copié de `~/Downloads/TPDL Logo (1).svg` = carré vert #34D591 + « TPDL »
+  blanc) : remplace le mini-logo pixel dans base.html (`.tpdl-logo-img`). ⚠️ Si #EBEBEB trop gris → ajustable en 1 ligne.
   **(5) Fix libellé cockpit Sales** ([intel.html]) : le run du 23/07 (135 **toutes neuves, 0 re-score**)
   et la stat base-entière (67 récurrentes, 45↑/18↓/4=) étaient collées → laissait croire que le 23 avait
   bougé. Séparé en 2 blocs étiquetés : « This run … all first-time scores, no within-run movement » +

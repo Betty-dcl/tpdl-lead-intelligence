@@ -240,6 +240,17 @@ main {
 }
 
 /* Logo mark — 2x2 pixel grid, nods to the pixel avatars */
+/* Official TPDL logo (green mark, "TPDL" in white) — replaces the legacy pixel mark. */
+.tpdl-logo-img {
+  height: 23px;
+  width: auto;
+  flex-shrink: 0;
+  display: block;
+  border-radius: 3px;
+  transition: transform 0.15s ease;
+}
+a:hover .tpdl-logo-img { transform: scale(1.05); }
+
 .tpdl-logo-mark {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
