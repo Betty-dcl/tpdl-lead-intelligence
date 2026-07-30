@@ -148,7 +148,7 @@ function marketingPage() {
             {
               label: "Impressions",
               data: this.engagement.map((p) => p.impressions),
-              borderColor: "#094752",
+              borderColor: "#0A0A0A",
               backgroundColor: "rgba(52, 213, 145, 0.18)",
               tension: 0.35,
               fill: true,

@@ -12,7 +12,7 @@ from fpdf.enums import XPos, YPos
 logger = logging.getLogger(__name__)
 
 # ── TPDL brand colours (RGB) ──────────────────────────────────────────────────
-DARK_INK   = (9,  71,  82)   # #094752
+DARK_INK   = (10, 10, 10)    # #0A0A0A — official charte near-black
 ACCENT     = (52, 213, 145)  # #34D591
 LIGHT_BG   = (245, 247, 246) # near-white
 TEXT       = (20,  20,  20)

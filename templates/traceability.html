@@ -156,7 +156,8 @@
              style="background: var(--tpdl-accent-soft)">
           <div>
             <p class="text-lg font-semibold" x-text="run.run_date || 'unknown date'"></p>
-            <p class="text-xs font-mono text-ink-3" x-text="'run ' + run.run_id.slice(0,8)"></p>
+            <p class="text-xs text-ink-3"
+               x-text="(run.batches > 1 ? run.batches + ' import batches unified' : 'single run')"></p>
           </div>
           <div class="flex gap-5 text-right">
             <div><p class="text-2xl font-semibold" x-text="run.companies"></p>

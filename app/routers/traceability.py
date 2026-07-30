@@ -26,6 +26,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 # July output against Neotek-May would be apples-to-oranges (different engines),
 # so the Neotek run is excluded from this page and from trajectory comparisons.
 NEOTEK_REFERENCE_RUN = "cb97cf5d50d2"
+NEOTEK_REFERENCE_DATE = "2026-05-25"   # the Neotek run's date (its identity here is the date)
 
 # SharePoint folder where run results are collected (opens in the browser where
 # the user is already logged in). Override with SHAREPOINT_RESULTS_URL in .env.
@@ -43,34 +44,58 @@ SHAREPOINT_FOLDER_URL = os.environ.get("SHAREPOINT_RESULTS_URL", (
 # Data helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _runs_ordered(db: Session) -> list[dict]:
-    """One row per run, oldest → newest. Aggregated in Python to avoid SQLite
-    boolean-SUM quirks; 'eligible' is counted as score ≥ 8 (the threshold's
-    definition), self-consistent with the number shown everywhere else."""
-    by_run: dict[str, list] = {}
+def _date_snapshots(db: Session, day: str) -> dict[str, RunSnapshot]:
+    """Best snapshot per company for a run DATE — dedups a company scored in more
+    than one import batch the SAME day (keeps the highest-scoring snapshot). This
+    is what makes the page show ONE run per date, not one per import batch."""
+    best: dict[str, RunSnapshot] = {}
     for r in db.query(RunSnapshot).all():
-        if r.import_run_id == NEOTEK_REFERENCE_RUN:
+        if not r.run_date or r.run_date.date().isoformat() != day:
+            continue
+        cur = best.get(r.company_name)
+        if cur is None or (r.assessed_score or 0) > (cur.assessed_score or 0):
+            best[r.company_name] = r
+    return best
+
+
+def _runs_ordered(db: Session) -> list[dict]:
+    """One row per run DATE (same-date import batches unified into one), oldest →
+    newest. The Neotek May reference is excluded. Companies are deduped within a
+    date; 'eligible' = score ≥ 8. The run identity here is the DATE string."""
+    by_day: dict[str, dict[str, RunSnapshot]] = {}
+    batches: dict[str, set] = {}
+    for r in db.query(RunSnapshot).all():
+        if not r.run_date:
+            continue
+        day = r.run_date.date().isoformat()
+        if day == NEOTEK_REFERENCE_DATE:
             continue                       # exclude the external Neotek reference
-        by_run.setdefault(r.import_run_id, []).append(r)
+        d = by_day.setdefault(day, {})
+        cur = d.get(r.company_name)
+        if cur is None or (r.assessed_score or 0) > (cur.assessed_score or 0):
+            d[r.company_name] = r
+        batches.setdefault(day, set()).add(r.import_run_id)
     out = []
-    for run_id, rows in by_run.items():
-        dates = [r.run_date for r in rows if r.run_date]
+    for day, snaps in by_day.items():
+        scores = [s.assessed_score or 0 for s in snaps.values()]
         out.append({
-            "run_id": run_id,
-            "companies": len(rows),
-            "eligible": sum(1 for r in rows if (r.assessed_score or 0) >= 8),
-            "top_score": max((r.assessed_score or 0) for r in rows) if rows else 0,
-            "run_date": min(dates).date().isoformat() if dates else None,
+            "run_id": day,                 # identity = the date (unifies same-day batches)
+            "run_date": day,
+            "companies": len(snaps),
+            "eligible": sum(1 for v in scores if v >= 8),
+            "top_score": max(scores) if scores else 0,
+            "batches": len(batches.get(day, set())),
         })
     out.sort(key=lambda x: x["run_date"] or "")
     return out
 
 
-def _top_company(db: Session, run_id: str) -> tuple[str, float] | None:
-    row = (db.query(RunSnapshot.company_name, RunSnapshot.assessed_score)
-           .filter(RunSnapshot.import_run_id == run_id)
-           .order_by(RunSnapshot.assessed_score.desc()).first())
-    return (row.company_name, float(row.assessed_score or 0)) if row else None
+def _top_company(db: Session, day: str) -> tuple[str, float] | None:
+    snaps = _date_snapshots(db, day)
+    if not snaps:
+        return None
+    name = max(snaps, key=lambda n: snaps[n].assessed_score or 0)
+    return (name, float(snaps[name].assessed_score or 0))
 
 
 def _hugo_recap(db: Session, run: dict) -> str:
@@ -87,11 +112,9 @@ def _maya_recap(db: Session, runs: list[dict], run: dict) -> str:
         return ("Maya: this is the earliest run in history — recurrence and "
                 "trajectory activate from the next run onward.")
     prev = runs[idx - 1]
-    # companies present in BOTH runs, with score deltas
-    cur = {r.company_name: r.assessed_score or 0 for r in
-           db.query(RunSnapshot).filter(RunSnapshot.import_run_id == run["run_id"]).all()}
-    old = {r.company_name: r.assessed_score or 0 for r in
-           db.query(RunSnapshot).filter(RunSnapshot.import_run_id == prev["run_id"]).all()}
+    # companies present in BOTH run dates, with score deltas
+    cur = _scores_for(db, run["run_id"])
+    old = _scores_for(db, prev["run_id"])
     common = [(n, cur[n] - old[n]) for n in cur if n in old]
     if not common:
         return (f"Maya: no company overlaps with the previous run "
@@ -116,9 +139,9 @@ def runs_page(request: Request) -> HTMLResponse:
                                        "sharepoint_url": SHAREPOINT_FOLDER_URL})
 
 
-def _scores_for(db: Session, run_id: str) -> dict[str, float]:
-    return {r.company_name: (r.assessed_score or 0) for r in
-            db.query(RunSnapshot).filter(RunSnapshot.import_run_id == run_id).all()}
+def _scores_for(db: Session, day: str) -> dict[str, float]:
+    """Company → score for a run DATE (deduped across same-day batches)."""
+    return {n: (s.assessed_score or 0) for n, s in _date_snapshots(db, day).items()}
 
 
 def _latest_tpdl_run(db: Session) -> dict | None:
@@ -134,7 +157,7 @@ def _neotek_compare(db: Session) -> dict:
     tpdl = _latest_tpdl_run(db)
     if tpdl is None:
         return {"available": False, "reason": "no TPDL run yet"}
-    neo = _scores_for(db, NEOTEK_REFERENCE_RUN)
+    neo = _scores_for(db, NEOTEK_REFERENCE_DATE)
     cur = _scores_for(db, tpdl["run_id"])
     if not neo:
         return {"available": False, "reason": "no Neotek reference in history"}
@@ -193,17 +216,12 @@ def api_runs(db: Session = Depends(get_db)) -> dict:
 # Trajectory helper (shared by maya.csv and combined.csv)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _trajectory(db: Session, run_id: str) -> dict[str, dict]:
-    """Per-company movement vs the previous TPDL-engine run (Neotek excluded)."""
+def _trajectory(db: Session, day: str) -> dict[str, dict]:
+    """Per-company movement vs the previous TPDL-engine run DATE (Neotek excluded)."""
     runs = _runs_ordered(db)
-    idx = next((i for i, r in enumerate(runs) if r["run_id"] == run_id), 0)
-    cur = {r.company_name: (r.assessed_score or 0) for r in
-           db.query(RunSnapshot).filter(RunSnapshot.import_run_id == run_id).all()}
-    old = {}
-    if idx > 0:
-        old = {r.company_name: (r.assessed_score or 0) for r in
-               db.query(RunSnapshot)
-               .filter(RunSnapshot.import_run_id == runs[idx - 1]["run_id"]).all()}
+    idx = next((i for i, r in enumerate(runs) if r["run_id"] == day), 0)
+    cur = _scores_for(db, day)
+    old = _scores_for(db, runs[idx - 1]["run_id"]) if idx > 0 else {}
     out = {}
     for name, score in cur.items():
         if name in old:
@@ -234,52 +252,49 @@ def _csv_response(rows: list[list], header: list[str], filename: str) -> Respons
 
 @router.get("/api/runs/{run_id}/hugo.csv")
 def hugo_csv(run_id: str, db: Session = Depends(get_db)) -> Response:
-    """Hugo's output for one run: every company + its score, ranked."""
-    rows = (db.query(RunSnapshot)
-            .filter(RunSnapshot.import_run_id == run_id)
-            .order_by(RunSnapshot.assessed_score.desc()).all())
+    """Hugo's output for one run DATE: every company + its score, ranked."""
+    snaps = sorted(_date_snapshots(db, run_id).values(),
+                   key=lambda r: -(r.assessed_score or 0))
     data = [[r.company_name, r.assessed_score, r.coverage,
              "YES" if r.outreach_eligible else "no", r.signals_found]
-            for r in rows]
+            for r in snaps]
     return _csv_response(data,
                          ["Company", "Assessed Score", "Coverage",
                           "Outreach Eligible", "Signals Found"],
-                         f"hugo_run_{run_id[:8]}.csv")
+                         f"hugo_run_{run_id}.csv")
 
 
 @router.get("/api/runs/{run_id}/maya.csv")
 def maya_csv(run_id: str, db: Session = Depends(get_db)) -> Response:
-    """Maya's read for one run: each company's trajectory vs the previous run."""
+    """Maya's read for one run DATE: each company's trajectory vs the previous run."""
     traj = _trajectory(db, run_id)
-    scores = {r.company_name: (r.assessed_score or 0) for r in
-              db.query(RunSnapshot).filter(RunSnapshot.import_run_id == run_id).all()}
+    scores = _scores_for(db, run_id)
     data = [[name, scores[name], traj[name]["trajectory"],
              traj[name]["movement"], traj[name]["delta"]]
             for name in sorted(scores, key=lambda n: -scores[n])]
     return _csv_response(data,
                          ["Company", "Current Score", "Trajectory", "Movement", "Delta"],
-                         f"maya_run_{run_id[:8]}.csv")
+                         f"maya_run_{run_id}.csv")
 
 
 @router.get("/api/runs/{run_id}/combined.csv")
 def combined_csv(run_id: str, db: Session = Depends(get_db)) -> Response:
-    """Hugo × Maya side by side: what Hugo scored AND how Maya reads its movement,
-    one row per company — the 'diff' between the two agents in a single file."""
+    """Hugo × Maya side by side for one run DATE: what Hugo scored AND how Maya
+    reads its movement, one row per company — the 'diff' in a single file."""
     traj = _trajectory(db, run_id)
-    rows = (db.query(RunSnapshot)
-            .filter(RunSnapshot.import_run_id == run_id)
-            .order_by(RunSnapshot.assessed_score.desc()).all())
+    snaps = sorted(_date_snapshots(db, run_id).values(),
+                   key=lambda r: -(r.assessed_score or 0))
     data = [[r.company_name,
              r.assessed_score, r.coverage, "YES" if r.outreach_eligible else "no",
              traj.get(r.company_name, {}).get("trajectory", ""),
              traj.get(r.company_name, {}).get("movement", ""),
              traj.get(r.company_name, {}).get("delta", "")]
-            for r in rows]
+            for r in snaps]
     return _csv_response(
         data,
         ["Company", "Hugo — Score", "Hugo — Coverage", "Hugo — Eligible",
          "Maya — Trajectory", "Maya — Movement", "Maya — Delta"],
-        f"hugo_x_maya_run_{run_id[:8]}.csv")
+        f"hugo_x_maya_run_{run_id}.csv")
 
 
 @router.post("/api/runs/{run_id}/export")
@@ -296,7 +311,7 @@ def export_to_folder(run_id: str, db: Session = Depends(get_db)) -> dict:
         return {"ok": False, "error": "run not found"}
 
     base = Path(os.environ.get("AGENT_RESULTS_DIR", "data/agent_results"))
-    folder = base / f"run_{run['run_date'] or 'undated'}_{run_id[:8]}"
+    folder = base / f"run_{run['run_date'] or 'undated'}"
     folder.mkdir(parents=True, exist_ok=True)
 
     def _dump(resp: Response, name: str):

@@ -19,6 +19,32 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-29 (3) — **Runs unifiés par date + carte Serper + $ estimé par provider + REBRAND charte
+  officielle + fix libellé cockpit (demandes Betty).** Suite de la session polish.
+  **(1) Page Runs (traceability) re-clée sur la DATE** (au lieu de `import_run_id`) : les batchs d'une
+  même date fusionnent en UNE carte (23/07 = « 3 import batches unified », 135 sociétés dédupliquées ;
+  17/07 = « single run »). `_date_snapshots(db, day)` (best snapshot/société, score max) partagé ;
+  `_runs_ordered`/`_top_company`/`_maya_recap`/`_scores_for`/`_trajectory`/`_neotek_compare` + les CSV
+  hugo/maya/combined + export folder filtrent par date. `NEOTEK_REFERENCE_DATE` ajouté. Template : ligne
+  « run <id> » → « N import batches unified / single run ».
+  **(2) Carte Serper** ajoutée sur Usage (`serper_panel`, free tier 2 500/mois, compteur local + note
+  dashboard). **(3) $ estimé** pour les providers sans API d'usage : `_SEARCH_UNIT_USD` (exa/perplexity
+  ~$0.005, serper ~$0.001) → « est. spend ~$X all-time (rough, list price) » dans le détail (Exa ~$2,15,
+  Perplexity ~$4,17). Les autres (SerpAPI searches, Firecrawl credits, Apify USD, Anthropic $) exposent
+  déjà du réel ; « restant » exact = dashboard pour ceux sans API.
+  **(4) REBRAND charte officielle Nathalie** (purement visuel, 0 contenu/filtre/catégorie/format touché) :
+  teal **#094752 → near-black #0A0A0A** (3 vars CSS + token Tailwind `dark` + `--tpdl-info` + graphes JS
+  + company_detail + exports PDF/PPTX DARK_INK + 5 avatars SVG, lift teal `#0d5b68/#0c5a68 → #232323`) ;
+  fond **#fafaf8 → #EBEBEB** (token Tailwind `bg` + `--tpdl-bg`) ; police **Space Grotesk/Inter → Funnel
+  Sans** (link Google Fonts + `--tpdl-font-*` + Tailwind fontFamily) ; vert #34D591 inchangé. Prompt Oliver
+  re-formé (charte appliquée, plus de « teal pending ») + re-seed. custom.css bumpé **v=6**. ⚠️ Logo officiel
+  `TPDL Logo (1).svg` PAS intégré (chemin non fourni) — la case sombre du mini-logo passe near-black via var ;
+  swap du vrai SVG à faire quand Betty donne le fichier. ⚠️ Si #EBEBEB trop gris → ajustable en 1 ligne.
+  **(5) Fix libellé cockpit Sales** ([intel.html]) : le run du 23/07 (135 **toutes neuves, 0 re-score**)
+  et la stat base-entière (67 récurrentes, 45↑/18↓/4=) étaient collées → laissait croire que le 23 avait
+  bougé. Séparé en 2 blocs étiquetés : « This run … all first-time scores, no within-run movement » +
+  « ACROSS ALL RUNS · WHOLE DATABASE (NOT THIS RUN) ». Vérifié live (Home + Sales à la charte, 0 erreur
+  console), **224 tests verts**. ⚠️ Index git s'est encore vidé → `git reset` (non destructif) avant commit.
 - 2026-07-29 (2) — **Exports téléchargeables riches : fiche société PDF + exports de vue (CSV / PDF liste /
   PDF détails) sur Sales & Recurring (demandes Betty).** Suite de la session polish.
   **(1) Fiche société PDF** (`app/tools/company_pdf.py` + `GET /api/intel/companies/{name}/brief.pdf` +

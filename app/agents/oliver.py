@@ -19,7 +19,7 @@ from app.config import AgentID
 
 OLIVER_ID: str = AgentID.OLIVER.value
 
-# TPDL brand: dark green #094752, accent #34D591, clean typography.
+# TPDL brand (official charte): near-black #0A0A0A, accent #34D591, Funnel Sans.
 FORMAT_SPECS: dict[str, str] = {
     "a4": (
         "A4 LONG-FORM ARTICLE — sophisticated, detailed, professional. Sections with "
@@ -106,7 +106,7 @@ class OliverAgent(BaseAgent):
         augmented = (
             f"The user wants a **{fmt.upper()}** for: {theme}\n\n"
             f"FORMAT SPEC: {FORMAT_SPECS[fmt]}\n\n"
-            f"TPDL BRANDING: dark green #094752, accent #34D591, clean typography, no AI hype.\n\n"
+            f"TPDL BRANDING (official charte): near-black #0A0A0A, accent #34D591, Funnel Sans, no AI hype.\n\n"
             f"As Oliver, produce this format. If you don't have Marc's full content, build the "
             f"best version from the theme and note one line on what Marc's content would add. "
             f"Keep substance intact; you own the form."

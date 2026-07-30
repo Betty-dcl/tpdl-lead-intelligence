@@ -184,6 +184,11 @@ def _local_search_tally(db: Session, provider: str) -> tuple[int, int]:
     return total, month
 
 
+# Rough list price per request, USD — ONLY for the local spend ESTIMATE on
+# providers with no usage API. Real balances live on each dashboard.
+_SEARCH_UNIT_USD = {"exa": 0.005, "perplexity": 0.005, "serper": 0.001}
+
+
 def _search_detail(db: Session, provider: str, fallback: str) -> str:
     try:
         total, month = _local_search_tally(db, provider)
@@ -191,8 +196,10 @@ def _search_detail(db: Session, provider: str, fallback: str) -> str:
         return fallback
     if not total:
         return fallback + " Local engine count: 0 requests logged so far."
-    return (f"Local engine count: {month} requests this month · {total} all-time "
-            f"(counted by the engine — no public usage API; exact balance on "
+    unit = _SEARCH_UNIT_USD.get(provider, 0)
+    est = f" · est. spend ~${total * unit:.2f} all-time (rough, list price)" if unit else ""
+    return (f"Local engine count: {month} requests this month · {total} all-time"
+            f"{est} (counted by the engine — no public usage API; exact balance on "
             f"the provider dashboard).")
 
 
@@ -216,6 +223,21 @@ def perplexity_panel(db: Session) -> dict:
         detail=_search_detail(db, "perplexity",
                               "No public usage API — balance lives on the API portal."),
         dashboard_url="https://www.perplexity.ai/settings/api")
+
+
+def serper_panel(db: Session) -> dict:
+    """Serper — the SERP engine replacing SerpAPI (News + Jobs, and Iris's web
+    search). No public usage API, so we show the engine's own request count + a
+    rough spend estimate; the real balance lives on the Serper dashboard."""
+    return _panel(
+        provider="serper", label="Serper",
+        role="SERP engine (News + Jobs) — replacing SerpAPI · free tier 2,500/month",
+        configured=bool(settings.serper_api_key),
+        ok=bool(settings.serper_api_key),
+        detail=_search_detail(db, "serper",
+                              "Configured — free tier is 2,500 searches/month; "
+                              "balance lives on the Serper dashboard."),
+        dashboard_url="https://serper.dev/dashboard")
 
 
 def anthropic_panel(db: Session) -> dict:
@@ -292,6 +314,7 @@ def all_panels(db: Session) -> list[dict]:
     return [
         anthropic_panel(db),                                # local, no cache needed
         _cached("serpapi", serpapi_panel),
+        serper_panel(db),
         _cached("apify", apify_panel),
         _cached("firecrawl", firecrawl_panel),
         exa_panel(db),

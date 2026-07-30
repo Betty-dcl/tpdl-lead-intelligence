@@ -15,7 +15,7 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
 # ── TPDL brand (same palette as pdf_export.py) ──────────────────────────────
-DARK_INK = RGBColor(0x09, 0x47, 0x52)   # #094752
+DARK_INK = RGBColor(0x0A, 0x0A, 0x0A)   # #0A0A0A — official charte near-black
 ACCENT   = RGBColor(0x34, 0xD5, 0x91)   # #34D591
 TEXT     = RGBColor(0x14, 0x14, 0x14)
 MUTED    = RGBColor(0x64, 0x6E, 0x6C)

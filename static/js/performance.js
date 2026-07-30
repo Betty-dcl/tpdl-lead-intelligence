@@ -1,7 +1,7 @@
 /* Performance dashboard */
 
 const CHART_COLORS = [
-  "#094752", "#34D591", "#6366f1", "#f59e0b",
+  "#0A0A0A", "#34D591", "#6366f1", "#f59e0b",
   "#10b981", "#ec4899", "#0ea5e9", "#d946ef",
 ];
 
@@ -84,7 +84,7 @@ function performancePage() {
               label: "All activity",
               data: this.timeline.all,
               backgroundColor: "rgba(9,71,82,0.18)",
-              borderColor: "#094752",
+              borderColor: "#0A0A0A",
               borderWidth: 1.5,
               borderRadius: 3,
             },

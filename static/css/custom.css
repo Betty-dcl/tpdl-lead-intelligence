@@ -1,17 +1,17 @@
 /* ============================================================================
-   TPDL design system — v2 "studio grade"
-   Palette from www.thepharmadatalab.com — warm off-white, deep teal, signature
-   mint-green. Type: Space Grotesk (display) · Inter (body) · JetBrains Mono
-   (labels & data). Pixel-art avatars: local set from scripts/gen_avatars.py.
+   TPDL design system — v3 official charte (Nathalie 2026-07-16)
+   Palette: light #EBEBEB · near-black #0A0A0A · signature green #34D591.
+   Type: Funnel Sans (display + body) · JetBrains Mono (labels & data).
+   Pixel-art avatars: local set from scripts/gen_avatars.py.
    ============================================================================ */
 
 :root {
   /* Surfaces */
-  --tpdl-bg:          #fafaf8;
+  --tpdl-bg:          #EBEBEB;   /* official charte — light */
   --tpdl-surface:     #ffffff;
   --tpdl-surface-2:   #f3f3ef;
-  --tpdl-dark:        #094752;   /* deep teal */
-  --tpdl-dark-2:      #0c5a68;   /* teal lift for gradients */
+  --tpdl-dark:        #0A0A0A;   /* official charte — near-black */
+  --tpdl-dark-2:      #232323;   /* near-black lift for gradients */
   --tpdl-dark-ink:    #0a0a0a;
 
   /* Text */
@@ -34,7 +34,7 @@
   --tpdl-success:     #34D591;
   --tpdl-warn:        #d97706;
   --tpdl-error:       #e32d23;
-  --tpdl-info:        #094752;
+  --tpdl-info:        #0A0A0A;
 
   /* Radii */
   --tpdl-radius-sm:   6px;
@@ -50,8 +50,8 @@
   --tpdl-shadow-glow: 0 0 0 2px rgba(52, 213, 145, 0.9), 0 0 0 4px rgba(9, 71, 82, 0.55);
 
   /* Type */
-  --tpdl-font-display: 'Space Grotesk', 'Inter', sans-serif;
-  --tpdl-font-body:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --tpdl-font-display: 'Funnel Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --tpdl-font-body:    'Funnel Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --tpdl-font-mono:    'JetBrains Mono', 'SF Mono', Menlo, monospace;
 }
 
