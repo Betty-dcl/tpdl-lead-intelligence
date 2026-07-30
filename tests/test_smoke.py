@@ -488,3 +488,25 @@ def test_view_briefs_pdf(client):
     # empty view still yields a valid (1-page) PDF, never a crash
     empty = client.post("/api/intel/view_briefs.pdf", json={"names": []})
     assert empty.status_code == 200 and empty.content[:5] == b"%PDF-"
+
+
+def test_compare_runs_span_full_folds_in_middle(client):
+    """span=full folds every run between from/to into the comparison, so a company
+    scored at the start AND a middle run counts as recurring (not '0 in both')."""
+    runs = client.get("/api/intel/runs").json()["runs"]
+    if len(runs) < 3:
+        import pytest
+        pytest.skip("need ≥3 runs to exercise the middle")
+    lo, hi = runs[0]["run_id"], runs[-1]["run_id"]
+    two = client.get(f"/api/intel/compare?from_run={lo}&to_run={hi}&span=two").json()
+    full = client.get(f"/api/intel/compare?from_run={lo}&to_run={hi}&span=full").json()
+    # full spans all the run dates in [lo, hi]; two spans none
+    assert len(full["span_runs"]) >= 3
+    assert two["span_runs"] == []
+    # folding in the middle recovers recurring companies the endpoint-only view misses
+    two_common = two["summary"]["rising"] + two["summary"]["fading"] + two["summary"]["stable"]
+    full_common = full["summary"]["rising"] + full["summary"]["fading"] + full["summary"]["stable"]
+    assert full_common > two_common
+    # full-span movers carry a trajectory across the middle runs
+    movers = [c for c in full["companies"] if c["delta"] is not None]
+    assert movers and any(len(c["trajectory"]) >= 2 for c in movers)

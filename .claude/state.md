@@ -19,6 +19,23 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-07-29 (4) — **Frise « inclure les runs du milieu » (Sales + Runs) + textes raccourcis +
+  entrée démo Guest retirée (demandes Betty).**
+  **(1) Frise à 2 modes** (`/api/intel/compare?...&span=two|full`) : `span=full` replie TOUS les runs
+  entre from et to — chaque société suivie de sa **1re→dernière apparition dans la plage** avec sa
+  **trajectoire** (ex. Cantabria `7.0→8.5`). Répond au « Neotek→23 Jul = 0 in both » : en full, le 17/07
+  du milieu est replié → **67 recurring** (45↑/18↓/4=). Renvoie `span_runs` + `trajectory[]`. Toggle
+  **« These two runs / Include runs between »** sur **Sales** (intel.js/intel.html : `period.span`,
+  filtre = sociétés à ≥2 points, trajectoire sous le pill Δ, « new » masqué en full) ET **Runs**
+  (traceability.html : `cmpSpan`, résumé « recurring », « new » masqué). intel.js → v=19. +1 test.
+  **(2) Textes** : hero Home raccourci (plus d'Alex ; « Europe, Middle East and beyond » ; 2 moteurs) ;
+  intro Sales réécrite (explique le **Δ** : comparaison au score précédent en base, seuil **≥8**, mais
+  le Δ fait ressortir les risers sous 8) ; cockpit : ligne « 135 companies scored… » retirée (répétait
+  le « ·135 new » d'à côté).
+  **(3) Entrée démo « Guest claimed Cantabria Labs » retirée** (unique ligne `company_assignments`,
+  user 6=guest ; backup `data/guest_assignment_backup_2026-07-29.json`, gitignoré). Le user guest reste
+  (fallback mode public). Explications données à Betty : « claimed » = fil d'activité d'équipe ;
+  « Include ICP-flagged » = réaffiche les hors-cible cachés par défaut. **225 tests verts**, 0 erreur console.
 - 2026-07-29 (3) — **Runs unifiés par date + carte Serper + $ estimé par provider + REBRAND charte
   officielle + fix libellé cockpit (demandes Betty).** Suite de la session polish.
   **(1) Page Runs (traceability) re-clée sur la DATE** (au lieu de `import_run_id`) : les batchs d'une

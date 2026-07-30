@@ -1000,12 +1000,16 @@ def baseline_scores(run: str, db: Session = Depends(get_db)) -> dict:
 def compare_runs(
     from_run: str,
     to_run: str,
+    span: str = "two",
     db: Session = Depends(get_db),
 ) -> dict:
-    """Per-company movement between ANY two scan DATES. `from_run`/`to_run` are
-    date strings (see /runs). Returns each company with its from/to score, the
-    delta, and a status: new (only in `to`), dropped (only in `from`),
-    rising / fading / stable (present in both)."""
+    """Per-company movement between two scan DATES. `from_run`/`to_run` are date
+    strings (see /runs). Two modes:
+    - span="two"  (default): compares ONLY the two endpoint runs.
+    - span="full": includes EVERY run between from and to. Each company is tracked
+      from its FIRST to its LAST appearance in the range, carrying the full
+      trajectory across the middle runs (so e.g. Neotek→23 Jul folds in 17 Jul).
+    Status: new (a single data point in the span), rising / fading / stable."""
     by_date = _runs_by_date(db)
     a = by_date.get(from_run, {})
     b = by_date.get(to_run, {})
@@ -1013,23 +1017,45 @@ def compare_runs(
         raise HTTPException(status_code=404, detail="Unknown run id(s)")
 
     companies = []
-    for name in sorted(set(a) | set(b)):
-        fa = a.get(name)
-        fb = b.get(name)
-        if fa is not None and fb is not None:
-            delta = round(fb - fa, 1)
-            status = "rising" if delta > 0 else "fading" if delta < 0 else "stable"
-        elif fb is not None:      # in `to` only
-            delta, status = None, "new"
-        else:                     # in `from` only
-            delta, status = None, "dropped"
-        companies.append({
-            "company":    name,
-            "from_score": fa,
-            "to_score":   fb,
-            "delta":      delta,
-            "status":     status,
-        })
+    span_dates: list[str] = []
+
+    if span == "full":
+        # every run date within [from_run, to_run] inclusive, chronological
+        lo, hi = sorted((from_run, to_run))
+        span_dates = sorted(d for d in by_date if lo <= d <= hi)
+        for name in sorted({n for d in span_dates for n in by_date[d]}):
+            appearances = [(d, by_date[d][name]) for d in span_dates if name in by_date[d]]
+            traj = [{"label": _run_label(d), "score": s} for d, s in appearances]
+            fa = appearances[0][1]
+            fb = appearances[-1][1]
+            if len(appearances) >= 2:
+                delta = round(fb - fa, 1)
+                status = "rising" if delta > 0 else "fading" if delta < 0 else "stable"
+            else:                 # a single data point in the span — no movement
+                delta, status = None, "new"
+            companies.append({
+                "company": name, "from_score": fa, "to_score": fb,
+                "delta": delta, "status": status, "trajectory": traj,
+            })
+    else:
+        for name in sorted(set(a) | set(b)):
+            fa = a.get(name)
+            fb = b.get(name)
+            if fa is not None and fb is not None:
+                delta = round(fb - fa, 1)
+                status = "rising" if delta > 0 else "fading" if delta < 0 else "stable"
+            elif fb is not None:      # in `to` only
+                delta, status = None, "new"
+            else:                     # in `from` only
+                delta, status = None, "dropped"
+            companies.append({
+                "company":    name,
+                "from_score": fa,
+                "to_score":   fb,
+                "delta":      delta,
+                "status":     status,
+                "trajectory": [],
+            })
 
     def _cnt(s: str) -> int:
         return sum(1 for c in companies if c["status"] == s)
@@ -1041,6 +1067,8 @@ def compare_runs(
     # run metadata for labels
     runs = {r["run_id"]: r for r in list_runs(db)["runs"]}
     return {
+        "span": span,
+        "span_runs": [{"run_id": d, "label": _run_label(d)} for d in span_dates],
         "from": runs.get(from_run, {"run_id": from_run}),
         "to":   runs.get(to_run,   {"run_id": to_run}),
         "summary": {

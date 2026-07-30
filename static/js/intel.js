@@ -112,10 +112,11 @@ function intelPage() {
     // "Frise" — bank-statement style period picker. Pick a From run and a To run;
     // the table narrows to the To run and the period-Δ column shows To − From.
     // Empty by default → period-Δ shows "—" and the story rests on the May column.
-    period: { from: "", to: "", newOnly: false },
-    periodData: {},          // company → { from_score, to_score, delta, status }
+    period: { from: "", to: "", newOnly: false, span: "two" },  // span: 'two' | 'full'
+    periodData: {},          // company → { from_score, to_score, delta, status, trajectory }
     periodSummary: null,
     periodMeta: null,
+    periodSpanRuns: [],      // when span='full', the runs folded into the comparison
     periodLoading: false,
     loading: true,
     error: null,
@@ -169,13 +170,16 @@ function intelPage() {
       }
       this.periodLoading = true;
       try {
-        const url = `/api/intel/compare?from_run=${encodeURIComponent(this.period.from)}&to_run=${encodeURIComponent(this.period.to)}`;
+        const url = `/api/intel/compare?from_run=${encodeURIComponent(this.period.from)}`
+                  + `&to_run=${encodeURIComponent(this.period.to)}`
+                  + `&span=${this.period.span || 'two'}`;
         const d = await fetch(url).then(r => r.json());
         const map = {};
         (d.companies || []).forEach(c => { map[c.company] = c; });
         this.periodData = map;
         this.periodSummary = d.summary;
         this.periodMeta = { from: d.from, to: d.to };
+        this.periodSpanRuns = d.span_runs || [];   // the runs folded into a full-span compare
       } catch (e) {
         console.error("period load failed:", e);
         this.periodData = {}; this.periodSummary = null;
@@ -183,9 +187,17 @@ function intelPage() {
         this.periodLoading = false;
       }
     },
+    // Toggle between comparing just the two endpoints and folding in every run
+    // between them (the "include the middle" view).
+    setSpan(mode) {
+      if (this.period.span === mode) return;
+      this.period.span = mode;
+      if (this.periodOn) this.loadPeriod();
+    },
     clearPeriod() {
-      this.period = { from: "", to: "", newOnly: false };
+      this.period = { from: "", to: "", newOnly: false, span: "two" };
       this.periodData = {}; this.periodSummary = null; this.periodMeta = null;
+      this.periodSpanRuns = [];
       if (this.sortKey === "period_delta") this.sortKey = "assessed_score";
     },
 
@@ -209,7 +221,14 @@ function intelPage() {
       const periodOK   = (c) => {
         if (!this.periodOn) return true;
         const e = this.periodData[c.name];
-        if (!e || e.to_score == null) return false;     // not in the To run
+        if (!e) return false;
+        // Full-span mode: show the companies that actually RECUR across the span
+        // (≥2 data points = a real trajectory through the middle runs). Single-point
+        // companies aren't "compared", so they'd just be noise here.
+        if (this.period.span === "full") {
+          return !!(e.trajectory && e.trajectory.length >= 2);
+        }
+        if (e.to_score == null) return false;            // not in the To run
         if (this.period.newOnly && e.status !== "new") return false;
         return true;
       };
@@ -417,11 +436,22 @@ function intelPage() {
     },
     periodTitle(c) {
       if (!this.periodOn) return "Pick two runs above to compare them (like a bank statement)";
+      const e = this.periodData[c.name];
+      // Full-span mode: show the whole path through the middle runs.
+      if (this.period.span === "full" && e && e.trajectory && e.trajectory.length) {
+        return e.trajectory.map(p => `${p.label} ${p.score.toFixed(1)}`).join("  →  ");
+      }
       const v = this.periodDelta(c);
       if (v === "absent") return "Not scored in the " + this.runLabelFor(this.period.to) + " run";
       if (v === "new")    return "New in " + this.runLabelFor(this.period.to) + " — wasn't in " + this.runLabelFor(this.period.from);
-      const e = this.periodData[c.name];
       return `${this.runLabelFor(this.period.from)}: ${e.from_score.toFixed(1)}  →  ${this.runLabelFor(this.period.to)}: ${e.to_score.toFixed(1)}`;
+    },
+    // Compact trajectory string for the Δ cell in full-span mode, e.g. "7.0→8.5→6.2".
+    periodTrajectory(c) {
+      if (this.period.span !== "full") return "";
+      const e = this.periodData[c.name];
+      if (!e || !e.trajectory || e.trajectory.length < 2) return "";
+      return e.trajectory.map(p => p.score.toFixed(1)).join("→");
     },
 
     /* ---- Δ vs May column (the base of the base — Neotek) — always shown ---- */

@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Traceability — TPDL{% endblock %}
 
+{% block head %}
+<style>
+  .cmp-tab {
+    display: inline-flex; align-items: center;
+    padding: 0.3rem 0.7rem; font-size: 0.75rem; border-radius: 9999px;
+    border: 1px solid var(--tpdl-border); background: white;
+    color: var(--tpdl-text-muted); cursor: pointer; transition: all 0.15s ease;
+  }
+  .cmp-tab:hover { border-color: var(--tpdl-dark-ink); color: var(--tpdl-text); }
+  .cmp-tab.is-active { background: var(--tpdl-dark-ink); color: white; border-color: var(--tpdl-dark-ink); }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-5xl mx-auto px-4 md:px-8 py-8" x-data="traceability()" x-init="load()">
 
@@ -71,9 +84,23 @@
             </template>
           </select></label>
       </div>
+      <!-- Mode: two endpoints, or fold in every run between (each company tracked first→last) -->
+      <div class="flex flex-wrap items-center gap-2 mt-3">
+        <span class="text-[11px] uppercase tracking-wider text-ink-3">Compare</span>
+        <button @click="setCmpSpan('two')"
+                :class="cmpSpan==='two' ? 'cmp-tab is-active' : 'cmp-tab'"
+                title="Just the two runs you picked — endpoint to endpoint">These two runs</button>
+        <button @click="setCmpSpan('full')"
+                :class="cmpSpan==='full' ? 'cmp-tab is-active' : 'cmp-tab'"
+                title="Fold in every run between them — each company tracked first→last across the middle runs">Include runs between</button>
+        <span class="text-[11px] text-ink-3" x-show="cmpSpan==='full' && cmpSpanRuns.length">
+          spanning <strong x-text="cmpSpanRuns.length"></strong> runs:
+          <span x-text="cmpSpanRuns.map(r => r.label).join(' · ')"></span>
+        </span>
+      </div>
     </div>
     <div class="px-5 py-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-center" x-show="cmpSummary" x-cloak>
-      <div><p class="text-2xl font-semibold" style="color:var(--tpdl-accent-ink)" x-text="cmpSummary?.new"></p>
+      <div x-show="cmpSpan!=='full'"><p class="text-2xl font-semibold" style="color:var(--tpdl-accent-ink)" x-text="cmpSummary?.new"></p>
            <p class="text-[11px] uppercase tracking-wide text-ink-3">new</p></div>
       <div><p class="text-2xl font-semibold" style="color:#0a3a26" x-text="cmpSummary?.rising"></p>
            <p class="text-[11px] uppercase tracking-wide text-ink-3">rising</p></div>
@@ -82,7 +109,7 @@
       <div><p class="text-2xl font-semibold text-ink-3" x-text="cmpSummary?.stable"></p>
            <p class="text-[11px] uppercase tracking-wide text-ink-3">stable</p></div>
       <div><p class="text-2xl font-semibold text-ink" x-text="cmpSummary?.common"></p>
-           <p class="text-[11px] uppercase tracking-wide text-ink-3">in both</p></div>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3" x-text="cmpSpan==='full' ? 'recurring' : 'in both'"></p></div>
     </div>
     <div class="px-5 pb-4 text-sm text-ink-2 flex flex-wrap gap-x-6 gap-y-1" x-show="cmpSummary">
       <span x-show="cmpSummary?.top_riser">Top riser
@@ -219,6 +246,8 @@ function traceability() {
   return {
     runs: [], loading: true, neo: null,
     cmpRuns: [], cmpFrom: '', cmpTo: '', cmpSummary: null, cmpMeta: null,
+    cmpSpan: 'two', cmpSpanRuns: [],
+    setCmpSpan(mode) { if (this.cmpSpan !== mode) { this.cmpSpan = mode; this.runCompare(); } },
     sharepointUrl: {{ sharepoint_url | tojson }},
     async load() {
       try {
@@ -249,9 +278,11 @@ function traceability() {
       }
       try {
         const d = await fetch(`/api/intel/compare?from_run=${encodeURIComponent(this.cmpFrom)}`
-                              + `&to_run=${encodeURIComponent(this.cmpTo)}`).then(x => x.json());
+                              + `&to_run=${encodeURIComponent(this.cmpTo)}`
+                              + `&span=${this.cmpSpan}`).then(x => x.json());
         this.cmpSummary = d.summary || null;
         this.cmpMeta = { from: d.from, to: d.to };
+        this.cmpSpanRuns = d.span_runs || [];
       } catch (e) { this.cmpSummary = null; }
     },
     async exportRun(run) {
