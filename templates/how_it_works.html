@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}How it works — TPDL{% endblock %}
+
+{% block head %}
+<style>
+  .hiw-step {
+    display:flex; gap:1rem; align-items:flex-start;
+    padding:1rem 1.15rem; border:1px solid var(--tpdl-border);
+    border-radius:14px; background:var(--tpdl-surface);
+  }
+  .hiw-num {
+    flex-shrink:0; width:30px; height:30px; border-radius:9px;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:0.9rem;
+    background:var(--tpdl-dark); color:#fff; font-variant-numeric:tabular-nums;
+  }
+  .hiw-chip {
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.2rem .6rem; border-radius:9999px; font-size:.72rem; font-weight:600;
+    background:var(--tpdl-accent-soft); color:var(--tpdl-accent-ink);
+  }
+  .hiw-term { border:1px solid var(--tpdl-border); border-radius:12px; padding:.9rem 1rem; background:var(--tpdl-surface); }
+  .hiw-arrow { color:var(--tpdl-text-faint); font-weight:700; }
+  .sig-row { display:grid; grid-template-columns: minmax(120px,180px) 24px 1fr; gap:.5rem; align-items:center;
+             padding:.55rem 0; border-bottom:1px solid var(--tpdl-border); font-size:.86rem; }
+  .sig-row:last-child { border-bottom:none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+
+  <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">How it works</p>
+  <h1 class="text-3xl md:text-4xl font-semibold mb-3 leading-tight">
+    From the open web to a scored, traceable shortlist
+  </h1>
+  <p class="text-ink-2 max-w-2xl mb-10">
+    TPDL's engine scans life-sciences companies for real commercial buying signals,
+    scores each one on a fixed formula, and keeps every claim traceable to a source.
+    Nothing here is a guess — a score exists only where dated, sourced evidence does.
+  </p>
+
+  <!-- ============ THE PIPELINE ============ -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold mb-4">The pipeline, step by step</h2>
+    <div class="space-y-3">
+      <div class="hiw-step"><div class="hiw-num">1</div><div>
+        <div class="font-semibold">Discover</div>
+        <p class="text-sm text-ink-2 mt-0.5">Find candidate companies on the open web (life sciences: pharma,
+        medtech, dental, diagnostics) — not just a fixed list, but new names surfacing in the news.</p></div></div>
+      <div class="hiw-step"><div class="hiw-num">2</div><div>
+        <div class="font-semibold">Tech scan</div>
+        <p class="text-sm text-ink-2 mt-0.5">Detect each company's stack (CRM, analytics, marketing automation) —
+        an absent CRM at scale is itself a signal of a commercial-infrastructure gap.</p></div></div>
+      <div class="hiw-step"><div class="hiw-num">3</div><div>
+        <div class="font-semibold">Research — 8 sources</div>
+        <p class="text-sm text-ink-2 mt-0.5">Pull recent evidence from neural search (Exa ×3), financial press
+        (Perplexity), Google News &amp; Jobs (Serper), EU registries and investor pages.</p></div></div>
+      <div class="hiw-step"><div class="hiw-num">4</div><div>
+        <div class="font-semibold">Extract — verbatim</div>
+        <p class="text-sm text-ink-2 mt-0.5">A first model isolates <strong>exact quotes</strong> from the raw
+        text. It never judges or paraphrases — it only lifts the sentences that carry a signal.</p></div></div>
+      <div class="hiw-step"><div class="hiw-num">5</div><div>
+        <div class="font-semibold">Score — interpret</div>
+        <p class="text-sm text-ink-2 mt-0.5">A second model reads <strong>only the isolated quotes</strong> (never
+        the raw web) and scores relevance on the formula below. Separating the two is what makes it hard to
+        hallucinate — the judge has no raw material to invent from.</p></div></div>
+      <div class="hiw-step"><div class="hiw-num">6</div><div>
+        <div class="font-semibold">Output</div>
+        <p class="text-sm text-ink-2 mt-0.5">A scored, sourced row per company — summary, signals, links, tech
+        stack — that lands in the Sales pipeline and the run history.</p></div></div>
+    </div>
+  </section>
+
+  <!-- ============ THE FORMULA ============ -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold mb-2">How a score is built</h2>
+    <p class="text-ink-2 text-sm mb-4">Deterministic — no black box. Computed per signal, then
+      <strong>averaged over the signals actually found</strong> (never over all six categories).</p>
+    <div class="tpdl-card p-5 mb-4">
+      <p class="font-mono text-sm text-ink">score = signal&nbsp;strength (0–6) + recency (0–2) + corroboration (0–2)</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+      <div class="hiw-term">
+        <div class="text-xs font-semibold uppercase tracking-wide mb-1">Signal strength · 0–6</div>
+        <p class="text-xs text-ink-2">Commercial relevance of the signal — the only judgement the model makes.</p>
+      </div>
+      <div class="hiw-term">
+        <div class="text-xs font-semibold uppercase tracking-wide mb-1">Recency · 0–2</div>
+        <p class="text-xs text-ink-2">≤ 90 days = 2 · ≤ 6 months = 1 · no date = 0.</p>
+      </div>
+      <div class="hiw-term">
+        <div class="text-xs font-semibold uppercase tracking-wide mb-1">Corroboration · 0–2</div>
+        <p class="text-xs text-ink-2">2+ independent sources = 2 · one verified URL = 1 · unsourced = 0.</p>
+      </div>
+    </div>
+    <p class="text-sm text-ink-2">
+      <span class="hiw-chip">≥ 8 = outreach-eligible</span>
+      &nbsp; the bar we act on. Below it, a company is monitored — and the <strong>Δ</strong> (change vs its
+      previous score) surfaces the ones climbing toward 8: early good signs worth watching before they clear the bar.
+    </p>
+  </section>
+
+  <!-- ============ THE SIGNALS ============ -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold mb-2">The six signals we score</h2>
+    <p class="text-ink-2 text-sm mb-4">Each maps to where TPDL creates value. Product launches, certifications
+      and undated claims are <em>not</em> signals — they're context, never scored.</p>
+    <div class="tpdl-card p-5">
+      <div class="sig-row"><span class="font-medium">Leadership change</span><span class="hiw-arrow">→</span><span class="text-ink-2">Operating model · Commercial effectiveness</span></div>
+      <div class="sig-row"><span class="font-medium">Hiring</span><span class="hiw-arrow">→</span><span class="text-ink-2">Commercial effectiveness · Digital execution</span></div>
+      <div class="sig-row"><span class="font-medium">M&amp;A / expansion</span><span class="hiw-arrow">→</span><span class="text-ink-2">Operating model alignment · CRM &amp; data strategy</span></div>
+      <div class="sig-row"><span class="font-medium">PE event</span><span class="hiw-arrow">→</span><span class="text-ink-2">Operating model alignment</span></div>
+      <div class="sig-row"><span class="font-medium">Digital initiative</span><span class="hiw-arrow">→</span><span class="text-ink-2">Digital execution · Customer journey optimisation</span></div>
+      <div class="sig-row"><span class="font-medium">Org restructuring</span><span class="hiw-arrow">→</span><span class="text-ink-2">Operating model alignment · CRM &amp; data strategy</span></div>
+    </div>
+  </section>
+
+  <!-- ============ ICP + RUNS ============ -->
+  <section class="mb-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div>
+      <h2 class="text-xl font-semibold mb-2">Who's in scope (ICP)</h2>
+      <p class="text-sm text-ink-2 mb-3">The engine discovers broadly, then an ICP layer marks who's on-target.
+        In scope: <strong>mid-size life-sciences brand owners</strong> (Europe, Middle East and beyond).</p>
+      <p class="text-sm text-ink-2">Flagged <strong>out of ICP</strong> (hidden by default, one click to show):
+        consultancies, CDMO / CRO / pure manufacturing, and companies with known revenue under €100M.
+        Private companies with undisclosed revenue are kept.</p>
+    </div>
+    <div>
+      <h2 class="text-xl font-semibold mb-2">Runs &amp; trajectory</h2>
+      <p class="text-sm text-ink-2 mb-3">Every scan is a dated <strong>run</strong>. A company scored again in a
+        later run keeps its history, so you can read its trajectory over time.</p>
+      <p class="text-sm text-ink-2">Compare any two runs — or switch to <strong>“include runs between”</strong> to
+        fold in every scan in the range and follow a company first-to-last across the middle
+        (<a href="/recurring" class="text-[color:var(--tpdl-info)] hover:underline">Recurring</a> lays this out
+        as a matrix).</p>
+    </div>
+  </section>
+
+  <!-- ============ TRUST ============ -->
+  <section class="mb-12">
+    <div class="tpdl-card--dark rounded-xl p-6" style="background:var(--tpdl-dark);color:var(--tpdl-text-on-dark)">
+      <div class="text-[11px] uppercase tracking-[0.2em] mb-2" style="color:var(--tpdl-accent)">Why you can trust a score</div>
+      <ul class="text-sm space-y-2 opacity-90">
+        <li>• Every claim traces to a specific source sentence and URL — open it and check.</li>
+        <li>• The model that judges never sees the raw web, only pre-isolated quotes — it can't invent facts.</li>
+        <li>• Unproven or undated signals are excluded, not scored.</li>
+        <li>• A QA pass flags anything thin for a 60-second human check before you act on it.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="flex flex-wrap gap-3">
+    <a href="/intel" class="tpdl-btn tpdl-btn--dark text-sm">Open the Sales pipeline →</a>
+    <a href="/runs" class="tpdl-btn tpdl-btn--outline text-sm">See the run history →</a>
+  </div>
+
+</div>
+{% endblock %}

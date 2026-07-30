@@ -20,6 +20,15 @@ def office(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/how-it-works", response_class=HTMLResponse)
+def how_it_works(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "how_it_works.html",
+        {"active_page": "how"},
+    )
+
+
 @router.get("/marketing", response_class=HTMLResponse)
 def marketing(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(

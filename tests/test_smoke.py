@@ -15,7 +15,7 @@ from app.models import Company
 EXPECTED_ROSTER = {a.value for a in AgentID}  # manager + 7 specialists
 
 PAGES = ["/", "/intel", "/intel/company?c=Roche", "/marketing", "/contacts",
-         "/runs", "/performance", "/data", "/login"]
+         "/runs", "/performance", "/data", "/login", "/how-it-works"]
 
 
 @pytest.fixture(scope="module")
