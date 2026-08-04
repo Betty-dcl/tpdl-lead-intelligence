@@ -19,6 +19,56 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-08-03 (3) — **Maya BRANCHÉE sur Inès (décision Betty « la brancher à Inès + garder »).** Question
+  Betty « Maya est-elle vraiment utile ? » → constat honnête : `/top` et `/recurring` **doublent** les pages
+  Sales/Recurring ; seule `/trends` (mix de signaux + service areas) + le récit executive summary sont
+  uniques ; et la shortlist n'était **pas** câblée sur Inès (partage de DB, pas de tuyau). Choix Betty =
+  lui donner un rôle pipeline réel. **Fait** : (1) `app/tools/shortlist.py` NOUVEAU = **définition unique
+  de la shortlist** (`shortlist_bands` : ACT NOW in-scope ≥8 / MONITOR 5-7, tri score→couverture→fraîcheur) ;
+  (2) `/shortlist` de Maya **refactoré** dessus (même source de vérité) ; (3) Inès : **`/contacts shortlist`**
+  = batch hand-off qui prend la bande ACT NOW de Maya et sort le brief scraper par société (rôles pilotés par
+  le signal + radar + tie-back + Med-Affairs séparé, plafond 15, jamais de nom inventé). Vérifié live : ACT NOW
+  37 sociétés → batch top-15 (Organon 9.5, Hologic 9.5, CNX 9.0…). Prompt ines.md §8 + docstrings + re-seed ;
+  +2 tests (`tests/test_maya_ines_wiring.py`) ; **230 tests verts**. Le trou Maya→Inès est comblé. ⚠️ Reste
+  ouvert (reco non retenue cette fois) : déprécier `/top`/`/recurring` de Maya (redondants avec l'UI) — à
+  reconsidérer plus tard. Batch = Mode A (brief) tant qu'Apollo/Kaspr débranché ; en Mode B il tirerait par société.
+- 2026-08-03 (2) — **Inès RE-FORMÉE depuis les documents sources (demande Betty : « relis les
+  transcripts + Word qui expliquent comment doit être Inès »).** Apollo reste débranché (câblé, gated,
+  clé vide — connexion « plus tard ») ; on améliore le CONTENU du prompt. Sources relues : brief
+  `TPDL_ICP_Targeting_Brief_Market Intel campaign July 2026.docx` (Parts 1-4 : companies / role framework /
+  Sales Nav config / SDR acknowledge), email Outlook « week 30 Scrapping » (Nathalie→Megha@marketeering.ai =
+  handoff réel = liste 6 sociétés + « ICP: review the document »), 2 transcripts 22/07. **4 trous comblés
+  dans `app/agents/prompts/ines.md`** (édits chirurgicaux, structure gardée) : (1) **§3c NOUVEAU « tie-back »** —
+  demande explicite Nathalie (« tie it back to existing PipeDrive contacts + 1st-degree LinkedIn, reconnect
+  subtly ») : vérifier « on connaît déjà ? » (Andrés/**Pierre à Barcelone**, PipeDrive, 1er degré) AVANT de
+  traiter en froid = cœur du Segment 1 ; (2) **config Sales Navigator exacte** reproduite (titres/séniorité/
+  companies/géo/keywords, brief Part 3) comme livrable scraper v1 « à retravailler avec l'agence/SDR » ;
+  (3) capture **recent-join <3 mois** (pilote la règle SDR « pas de félicitations sauf arrivée récente ») ;
+  (4) **Mode A sort un brief prêt pour le scraper** (plus « je tirerais plus tard »). + hygiène chiffres
+  (490→620, 38→44 éligibles, 48→53 CH) + Segment 1 relié au tie-back. Re-seed OK (DB==fichier), **29 tests
+  ines/segmentation/connector/seed verts**. ⚠️ RESTE : (a) l'upgrade ICP Apollo non commité (apollo.py +
+  segmentation.py + tests, 24 verts, ajoute Medical Affairs + plancher Director+ à la REQUÊTE) toujours en
+  attente de commit ; (b) idée future = commande `/brief` dédiée (le scraper-brief est pour l'instant intégré
+  à /contacts Mode A, sans toucher au .py).
+- 2026-08-03 — **Passe qualité données (choix Betty « améliorer la plateforme » → axe #4).** Audit Vera
+  réel lancé AVANT d'agir → mes notes étaient périmées : **secteurs Unknown 273→5** (pas 273), **0
+  doublon**, **0 localisation manquante**, ligne poubelle « …Director | NA » **déjà supprimée**. Dette
+  réelle = seulement (a) 5 secteurs Unknown, (b) 16 résumés verbeux, (c) la paire derma.
+  **(1) 4 secteurs classifiés** (`scripts/fix_unknown_sectors.py`, réversible, backup
+  `data/sector_backup_2026-08-03.json`) via `import_csv.bucket_for` : Slingshot Biosciences +
+  SYNLAB → Diagnostics ; Henke Sass Wolf + UNIMED → Medtech. **Shealed GARDÉE Unknown** (obscure,
+  score 0, jamais deviner). Unknown 5→1.
+  **(2) 16 résumés « hors-format » = FAUX défaut** : lus (Samsung Medison 9.0, Kedrion, Biogen) →
+  excellents, 5 phrases car plusieurs événements simultanés, suivent l'intention (situation/signaux/
+  timing). **Non touchés** (les rogner détruirait de l'info ; se normalisent au prochain re-score).
+  Reste `issue_count=16` = uniquement ces résumés = bruit d'audit assumé, pas une dette.
+  **(3) Mediderma/Sesderma FUSIONNÉ en nommant les deux** (décision Betty « fusionne mais nomme qd mm
+  les 2 ») : `scripts/merge_mediderma.py` (réversible, backup `data/mediderma_backup_2026-08-03.json`)
+  garde la ligne ICP éligible (Mediderma 8.0, ses 3 signaux + historique 6.0→8.0) et la **renomme
+  « Mediderma / Sesderma »** ; supprime la ligne Sesderma 7.8 (aucun contact/note sur les 2). Base
+  **621→620**, 0 doublon. ⚠️ Tout écrit dans `data/app.db` (gitignoré) = correctif de propreté démo ;
+  un futur re-score réécrit ces champs (durable = enrichissement à l'ingestion, `enrich_run.py
+  --missing-sector` existe). Aucun code applicatif touché, aucun commit demandé.
 - 2026-07-29 (4) — **Frise « inclure les runs du milieu » (Sales + Runs) + textes raccourcis +
   entrée démo Guest retirée (demandes Betty).**
   **(1) Frise à 2 modes** (`/api/intel/compare?...&span=two|full`) : `span=full` replie TOUS les runs
@@ -892,6 +942,15 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-08-03
+- Fait : **passe qualité données** (Betty « comment améliorer la plateforme » → axe #4 choisi). Audit
+  Vera réel d'abord (notes périmées : Unknown 273→5, 0 doublon, 0 loc manquante, poubelle déjà nettoyée).
+  Actions réversibles à backup : 4 secteurs classifiés (Unknown 5→1, Shealed gardée exprès), fusion
+  Mediderma/Sesderma en « Mediderma / Sesderma » (base 621→620). Les 16 résumés « hors-format » =
+  faux défaut (excellents, non touchés). Détail : log 2026-08-03 en haut. Aucun code app, aucun commit.
+  Scripts : `scripts/fix_unknown_sectors.py`, `scripts/merge_mediderma.py`. RESTE (idées, non urgent) :
+  enrichir Shealed au prochain run ; les 16 résumés se normalisent au re-score ; axes plateforme non
+  encore faits = hébergement permanent (#2) + boucle terrain export/outcome (#1) + run mensuel (#3).
 - Date : 2026-07-27
 - Fait : **refonte Sales (frise de comparaison de runs + double colonne Δ), Recurring en matrice,
   Candidats rendus honnêtes, export CSV run complet (53 col.), garde-fou anti-fuite découverte**

@@ -59,3 +59,27 @@ def test_crm_segment_never_returns_one():
         for fn in (None, "commercial", "data", "digital"):
             for sen in (None, "c_level", "vp", "director", "other"):
                 assert initial_crm_segment(elig, fn, sen) in (2, 3)
+
+
+def test_function_medical_affairs():
+    """Medical Affairs is a named ICP target family (Nathalie §3b) → its own bucket,
+    ahead of digital/commercial (a 'Head of HCP Engagement' is med-affairs, not digital)."""
+    from app.tools.segmentation import classify_function
+    assert classify_function("VP Medical Affairs") == "medical_affairs"
+    assert classify_function("Head of Medical Education") == "medical_affairs"
+    assert classify_function("Medical Science Liaison") == "medical_affairs"
+    assert classify_function("Head of HCP Engagement") == "medical_affairs"
+    # a plain commercial/digital title is unaffected
+    assert classify_function("VP Sales") == "commercial"
+    assert classify_function("Chief Digital Officer") == "digital"
+
+
+def test_apollo_icp_targeting_and_seniority_floor():
+    """The Apollo query carries Nathalie's 4-function ICP baseline + a Director+
+    seniority floor, so a pull is never C-suite-only and never junior noise."""
+    from app.tools.apollo import ICP_BASELINE_TITLES, SENIORITY_FLOOR
+    joined = " · ".join(ICP_BASELINE_TITLES).lower()
+    for fam in ("commercial operations", "medical affairs", "head of crm", "omnichannel"):
+        assert fam in joined
+    assert "director" in SENIORITY_FLOOR and "vp" in SENIORITY_FLOOR
+    assert "manager" not in SENIORITY_FLOOR and "entry" not in SENIORITY_FLOOR

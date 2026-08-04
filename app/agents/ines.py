@@ -5,6 +5,7 @@ Apollo and tags them with three radars (Lunch Campaign, Language, Premium 5).
 
 Slash commands:
   - /contacts [company] → pull + tag decision-makers for a company (Apollo).
+  - /contacts shortlist → batch hand-off: build the brief for Maya's whole ACT NOW band.
   - /radars             → Lunch Campaign (CH/Spain) & Language (ES) candidates.
   - /premium            → the Premium 5 hand-picked for Andrés (a real human).
   - /generate [company] → alias of /contacts (used by the workspace "Generate brief" button).
@@ -23,6 +24,7 @@ from app.models import Company, Contact
 from app.tools import apollo, kaspr
 from app.tools.radars import apply_radars, detect_country
 from app.tools.segmentation import classify_function, classify_seniority, initial_crm_segment
+from app.tools.shortlist import shortlist_bands
 
 INES_ID: str = AgentID.INES.value
 
@@ -60,6 +62,62 @@ class InesAgent(BaseAgent):
                     "task_title": "/contacts (no company)",
                 }
             name = parts[1].strip()
+            # ── Batch hand-off from Maya: /contacts shortlist ────────────────
+            # Instead of one company at a time, take Maya's current ACT NOW band
+            # (the SAME shortlist_bands definition Maya uses) and build the
+            # scraper-ready brief for each. This is the Maya → Inès pipe.
+            if name.lower() in ("shortlist", "batch", "maya"):
+                with SessionLocal() as db:
+                    act, _monitor = shortlist_bands(db)
+                if not act:
+                    return {
+                        "augmented_message": (
+                            "The user ran `/contacts shortlist`. Maya's ACT NOW band "
+                            "(in-scope, score ≥ 8) is EMPTY this run — there is nothing "
+                            "above the outreach bar to pull. As Inès, say so honestly: the "
+                            "MONITOR bench (5-7) is not outreach yet; don't invent targets."
+                        ),
+                        "action": "pulled_contacts",
+                        "task_title": "Contacts batch — shortlist (empty)",
+                    }
+                CAP = 15
+                shown = act[:CAP]
+                provider = kaspr if kaspr.is_configured() else apollo
+                engine = ("no contact engine connected (Mode A: brief only)"
+                          if not provider.is_configured()
+                          else f"{'Kaspr' if provider is kaspr else 'Apollo'} connected")
+                lines = []
+                for c in shown:
+                    radar = apply_radars(None, c.location)
+                    roles = ", ".join(provider.titles_for_signal(c.s1_category))
+                    lines.append(
+                        f"  - {c.name} — score {c.assessed_score} · "
+                        f"{c.sector_bucket or '—'} · {c.location or 'location unknown'} · "
+                        f"signal {c.s1_category or 'none'} → {roles} · "
+                        f"country={radar['country'] or 'other'} "
+                        f"lunch={radar['lunch_campaign']} lang={radar['language']}"
+                    )
+                more = (f"\n(+{len(act) - CAP} more ≥8 not shown — narrow with filters)"
+                        if len(act) > CAP else "")
+                augmented = (
+                    f"The user ran `/contacts shortlist` — the BATCH hand-off from Maya. "
+                    f"Maya's ACT NOW band (in-scope, score ≥ 8) has {len(act)} companies; "
+                    f"here are the top {len(shown)} by score/coverage/freshness:\n\n"
+                    + "\n".join(lines) + more +
+                    f"\n\nEngine status: {engine}. As Inès, produce the SCRAPER-READY BRIEF "
+                    f"batch: per company, the signal-driven priority roles layered over the 4 "
+                    f"ICP functions (§3b), the Sales Navigator config, and the capture fields + "
+                    f"tie-back checks (partner-known / PipeDrive / 1st-degree; Med-Affairs → "
+                    f"separate sub-batch). No invented names. Name the 3-5 companies to start "
+                    f"with. This is the list that goes to Nathalie / Marketeering.ai."
+                )
+                return {
+                    "augmented_message": augmented,
+                    "action": "pulled_contacts",
+                    "task_title": f"Contacts batch — {len(shown)} from Maya's shortlist",
+                    "metadata": {"companies": len(shown), "act_total": len(act),
+                                 "provider_configured": provider.is_configured()},
+                }
             c = _find_company(name)
             if c is None:
                 return {

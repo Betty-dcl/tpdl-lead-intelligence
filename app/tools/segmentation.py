@@ -1,7 +1,7 @@
 """Inès's people-segmentation — pure functions, no DB, no network (unit-testable).
 
 Three derivations from a contact's job title + the company's score:
-  1. function  — commercial | data | digital  (which TPDL conversation they own)
+  1. function  — commercial | data | digital | medical_affairs  (which TPDL conversation they own)
   2. seniority — c_level | vp | director | other
   3. crm_segment — 1 (warm) | 2 (active) | 3 (nurture)
 
@@ -30,7 +30,16 @@ def _has(norm: str, hints: tuple[str, ...]) -> bool:
     return any(f" {h} " in norm for h in hints)
 
 
-# Checked most-specific first: data, then digital, then commercial.
+# Checked most-specific first: medical affairs, then data, digital, commercial.
+# Medical Affairs is a NAMED target family in Nathalie's ICP brief (§3b) and is
+# routed to a SEPARATE sub-batch — so it must classify ahead of the others (a
+# "Head of HCP Engagement" belongs to med-affairs, not "digital").
+_MEDICAL_HINTS = (
+    "medical affairs", "med affairs", "medical education", "med ed",
+    "medical science liaison", "msl", "hcp engagement", "hcp",
+    "medical director", "head of medical", "chief medical", "medical excellence",
+    "scientific affairs",
+)
 _DATA_HINTS = (
     "chief data", "data officer", "data", "analytics", "business intelligence",
     "bi", "data science", "head of data", "machine learning",
@@ -53,6 +62,8 @@ def classify_function(title: str | None) -> str | None:
     if not title:
         return None
     norm = _norm(title)
+    if _has(norm, _MEDICAL_HINTS):
+        return "medical_affairs"
     if _has(norm, _DATA_HINTS):
         return "data"
     if _has(norm, _DIGITAL_HINTS):

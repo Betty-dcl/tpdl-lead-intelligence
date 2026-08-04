@@ -24,6 +24,7 @@ from app.agents.base import BaseAgent
 from app.config import AgentID
 from app.database import SessionLocal
 from app.models import Company, Signal
+from app.tools.shortlist import shortlist_bands
 
 MAYA_ID: str = AgentID.MAYA.value
 
@@ -116,21 +117,17 @@ class MayaAgent(BaseAgent):
         if low == "/shortlist" or low.startswith("/shortlist"):
             SOFT_CAP = 40    # only bites when the eligible band is unusually large
             with SessionLocal() as db:
-                rows = (db.query(Company)
-                        .filter(Company.icp_flag.is_(False))
-                        .order_by(Company.assessed_score.desc()).all())
+                # Single source of truth (shared with Inès's batch hand-off):
+                act, monitor = shortlist_bands(db)
+                total = (db.query(Company)
+                         .filter(Company.icp_flag.is_(False)).count())
                 latest = db.query(func.max(Company.run_date)).scalar()
-            if not rows:
+            if total == 0:
                 return {
                     "augmented_message": "The user ran `/shortlist` but the scored universe is empty. Say so and suggest Hugo runs the pipeline.",
                     "action": "built_shortlist", "task_title": "Shortlist (empty)",
                 }
             latest_day = latest.date() if latest else None
-
-            def _sig(c):   # tiebreakers: coverage depth, then freshness
-                cov = int((c.coverage or "0")[0]) if (c.coverage or "")[:1].isdigit() else 0
-                fresh = 1 if (c.run_date and c.run_date.date() == latest_day) else 0
-                return (c.assessed_score, cov, fresh)
 
             def _line(c):
                 fresh = ("fresh" if c.run_date and c.run_date.date() == latest_day
@@ -138,8 +135,6 @@ class MayaAgent(BaseAgent):
                 return (f"  - {c.name} — {c.assessed_score} · {c.coverage} · "
                         f"{c.sector_bucket or '—'} · {fresh}")
 
-            act = sorted([c for c in rows if c.assessed_score >= 8], key=_sig, reverse=True)
-            monitor = sorted([c for c in rows if 5 <= c.assessed_score < 8], key=_sig, reverse=True)
             capped = len(act) > SOFT_CAP
             act_shown = act[:SOFT_CAP]
             act_str = "\n".join(_line(c) for c in act_shown) or "  (none clear ≥8 this run)"

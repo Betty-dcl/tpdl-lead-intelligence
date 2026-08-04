@@ -18,6 +18,32 @@ DEFAULT_TITLES = ("CEO", "Chief Executive Officer",
                   "CTO", "Chief Technology Officer",
                   "CFO", "Chief Financial Officer")
 
+# Nathalie's "Market Intel July 2026" ICP role framework (Inès prompt §3b): the
+# four target functions we ALWAYS want represented at a mid-size life-sciences
+# brand-owner, beyond the signal-driven priority. Passed on every pull so a search
+# never comes back C-suite-only and misses the commercial / med-affairs / digital
+# problem-owners Nathalie named.
+ICP_BASELINE_TITLES = (
+    # C-suite
+    "CEO", "COO", "CMO", "Chief Commercial Officer", "CIO", "Chief Digital Officer",
+    # Commercial & Marketing
+    "VP Commercial Operations", "Head of Commercial Operations", "VP Marketing",
+    "Head of Omnichannel", "Head of Customer Engagement", "VP Sales Operations",
+    "Head of Brand", "Director Digital Marketing",
+    # Medical Affairs / Med Ed (routed to a separate sub-batch for Nathalie)
+    "VP Medical Affairs", "Head of Medical Education", "Head of HCP Engagement",
+    "Medical Science Liaison",
+    # Digital & Technology
+    "VP Digital Transformation", "Head of CRM", "Head of Digital Health",
+    "Head of Commercial Data and Analytics", "IT Director",
+)
+
+# Apollo `person_seniorities` values that clear Nathalie's "Director and above"
+# floor — cuts junior noise at query time (a Senior Manager at a small company can
+# still be VP-equivalent; Inès flags those for review rather than the API dropping
+# them, so "manager"/"senior" are intentionally left out of the hard floor).
+SENIORITY_FLOOR = ("owner", "founder", "c_suite", "partner", "vp", "head", "director")
+
 # Signal-driven targeting (Inès prompt §3): the company's lead signal points at
 # WHICH decision-makers matter — not a generic CEO/CTO/CFO pull for everyone.
 SIGNAL_TITLES: dict[str, tuple[str, ...]] = {
@@ -73,10 +99,16 @@ def fetch_contacts(company_name: str, titles: tuple[str, ...] = DEFAULT_TITLES) 
     import urllib.error
     import urllib.request
 
+    # Query = the signal-driven priority titles UNION Nathalie's 4-function ICP
+    # baseline (deduped, order-preserving), gated to Director-and-above. Broad
+    # enough to surface the commercial / med-affairs / digital owners, tight
+    # enough (seniority floor) to keep out junior noise.
+    person_titles = list(dict.fromkeys([*titles, *ICP_BASELINE_TITLES]))
     payload = {
         "organization_names": [company_name],
-        "person_titles": list(titles),
-        "per_page": 10,
+        "person_titles": person_titles,
+        "person_seniorities": list(SENIORITY_FLOOR),
+        "per_page": 25,
     }
     req = urllib.request.Request(
         "https://api.apollo.io/v1/mixed_people/search",
