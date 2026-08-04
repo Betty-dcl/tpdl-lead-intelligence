@@ -24,6 +24,26 @@
   .sig-row { display:grid; grid-template-columns: minmax(120px,180px) 24px 1fr; gap:.5rem; align-items:center;
              padding:.55rem 0; border-bottom:1px solid var(--tpdl-border); font-size:.86rem; }
   .sig-row:last-child { border-bottom:none; }
+  /* live sales-chain */
+  .chain-select { border:1px solid var(--tpdl-border); border-radius:9px; padding:.35rem .6rem;
+                  background:var(--tpdl-surface); color:var(--tpdl-text); font-size:.85rem; max-width:280px; }
+  .chain-card { border:1px solid var(--tpdl-border); border-radius:14px; background:var(--tpdl-surface);
+                overflow:hidden; display:flex; flex-direction:column; position:relative; }
+  .chain-card::after { content:"→"; position:absolute; right:-13px; top:50%; transform:translateY(-50%);
+                       color:var(--tpdl-text-faint); font-weight:700; z-index:2; }
+  .chain-card:last-child::after { content:none; }
+  @media (max-width:1023px){ .chain-card::after{ content:"↓"; right:50%; top:auto; bottom:-15px; transform:translateX(50%);} }
+  .chain-head { padding:.65rem .85rem; border-bottom:1px solid var(--tpdl-border); }
+  .chain-role { font-size:.64rem; text-transform:uppercase; letter-spacing:.1em; color:var(--tpdl-text-faint); }
+  .chain-name { font-weight:700; font-size:.95rem; }
+  .chain-body { padding:.75rem .85rem; font-size:.8rem; color:var(--tpdl-text-2); }
+  .chain-body .k { color:var(--tpdl-text-faint); }
+  .chain-chip { display:inline-flex; align-items:center; padding:.12rem .5rem; border-radius:9999px;
+                font-size:.66rem; font-weight:700; }
+  .chip-green { background:var(--tpdl-accent-soft); color:var(--tpdl-accent-ink); }
+  .chip-grey  { background:var(--tpdl-border); color:var(--tpdl-text-faint); }
+  .role-chip  { display:inline-block; padding:.08rem .4rem; border:1px solid var(--tpdl-border);
+                border-radius:7px; font-size:.68rem; margin:0 .22rem .25rem 0; white-space:nowrap; }
 </style>
 {% endblock %}
 
@@ -70,6 +90,26 @@
         <p class="text-sm text-ink-2 mt-0.5">A scored, sourced row per company — summary, signals, links, tech
         stack — that lands in the Sales pipeline and the run history.</p></div></div>
     </div>
+  </section>
+
+  <!-- ============ THE TEAM CHAIN (LIVE) ============ -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold mb-1">See the team work a real company</h2>
+    <p class="text-ink-2 text-sm mb-4">Once a company is scored, four agents act on it in turn — and each one
+      <strong>reads the previous agent's output</strong>. Pick a company from Maya's current shortlist and watch it flow.</p>
+
+    <div class="flex flex-wrap items-center gap-2 mb-5">
+      <label for="chainPick" class="text-xs text-ink-3">Company</label>
+      <select id="chainPick" class="chain-select" aria-label="Pick a shortlisted company"></select>
+      <span id="chainMeta" class="text-xs text-ink-3"></span>
+    </div>
+
+    <div id="chainFlow" class="grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-6">
+      <div class="text-sm text-ink-3">Loading the shortlist…</div>
+    </div>
+    <p class="text-[11px] text-ink-3 mt-4 max-w-2xl">Assembled live from the scored row — no message is generated here;
+      Julie's card shows what she'd draft <em>from</em>. Real contacts fill in once Apollo / Kaspr is connected;
+      until then Inès shows the exact persona set and search she'd hand to the scraper.</p>
   </section>
 
   <!-- ============ THE FORMULA ============ -->
@@ -156,4 +196,80 @@
   </div>
 
 </div>
+
+<script>
+(function () {
+  const esc = s => (s == null ? "" : String(s).replace(/[&<>"]/g, c =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c])));
+  const pick = document.getElementById("chainPick");
+  const flow = document.getElementById("chainFlow");
+  const meta = document.getElementById("chainMeta");
+
+  const card = (role, name, body) =>
+    `<div class="chain-card"><div class="chain-head">
+       <div class="chain-role">${esc(role)}</div><div class="chain-name">${esc(name)}</div>
+     </div><div class="chain-body">${body}</div></div>`;
+
+  function render(d) {
+    if (d.empty) { flow.innerHTML = '<div class="text-sm text-ink-3">No company in the ACT NOW band yet.</div>'; return; }
+    meta.textContent = `${d.sector || "—"} · ${d.location || "location unknown"}` + (d.icp_flag ? " · ⚠ out of ICP" : "");
+
+    const h = d.hugo, sig = (h.signals && h.signals[0]) || null;
+    const hugo = card("1 · Detect & score", "Hugo",
+      `<div><span class="chain-chip ${h.eligible ? "chip-green" : "chip-grey"}">score ${esc(h.score)}${h.eligible ? " · eligible" : ""}</span>
+        ${h.review_flag ? '<span class="chain-chip chip-grey" style="margin-left:.25rem">review</span>' : ""}</div>
+       <div style="margin-top:.5rem"><span class="k">coverage</span> ${esc(h.coverage || "—")}</div>
+       ${sig ? `<div style="margin-top:.5rem"><span class="k">top signal</span><br><strong>${esc(sig.category)}</strong>
+         <span class="chain-chip chip-grey" style="margin-left:.2rem">${esc(sig.confidence || "?")} · ${sig.corroboration ? sig.corroboration.points : 0}/2</span>
+         <div style="margin-top:.25rem;color:var(--tpdl-text-faint)">${esc((sig.what_happened || "").slice(0,110))}${(sig.what_happened||"").length>110?"…":""}</div></div>` : ""}`);
+
+    const m = d.maya;
+    const dChip = (m.delta == null) ? '<span class="k">Δ vs May —</span>'
+      : `<span class="chain-chip ${m.delta >= 0 ? "chip-green" : "chip-grey"}">Δ vs May ${m.delta > 0 ? "+" : ""}${esc(m.delta)}</span>`;
+    const maya = card("2 · Rank", "Maya",
+      `<div><span class="chain-chip ${m.band === "ACT NOW" ? "chip-green" : "chip-grey"}">${esc(m.band)}</span></div>
+       <div style="margin-top:.5rem"><span class="k">rank</span> #${esc(m.rank)} of ${esc(m.total_in_scope)} in scope</div>
+       <div style="margin-top:.4rem">${dChip}</div>
+       <div style="margin-top:.4rem"><span class="k">scan</span> ${esc(m.run_label)}${m.vintage === "neotek_may" ? " (not re-scored since)" : ""}</div>`);
+
+    const n = d.ines;
+    const roles = (n.target_roles || []).map(r => `<span class="role-chip">${esc(r)}</span>`).join("");
+    const rad = n.radar || {};
+    const ines = card("3 · Contacts", "Inès",
+      `<div><span class="k">signal → roles</span><br><strong>${esc(n.lead_signal)}</strong></div>
+       <div style="margin-top:.4rem">${roles}</div>
+       <div style="margin-top:.5rem"><span class="k">radar</span> ${esc(rad.country || "other")}${rad.lunch_campaign ? " · 🍽 lunch" : ""} · ${esc(rad.language)}</div>
+       <div style="margin-top:.5rem"><span class="k">tie-back check</span>
+         <div style="color:var(--tpdl-text-faint);margin-top:.15rem">${(n.tieback||[]).map(esc).join("<br>")}</div></div>
+       <div style="margin-top:.5rem"><span class="chain-chip chip-grey">${n.engine_connected ? "engine connected" : "Mode A · brief only"}</span></div>`);
+
+    const j = d.julie;
+    const julie = card("4 · Draft", "Julie",
+      `<div><span class="k">sector angle</span>
+         <span class="chain-chip ${j.angle_defined ? "chip-green" : "chip-grey"}" style="margin-left:.2rem">${j.angle_defined ? "defined" : "cross-sector"}</span></div>
+       <div style="margin-top:.35rem;color:var(--tpdl-text-faint)">${esc((j.angle || "").slice(0,120))}${(j.angle||"").length>120?"…":""}</div>
+       ${j.signal_hook ? `<div style="margin-top:.5rem"><span class="k">hook (from Hugo's signal)</span>
+         <div style="margin-top:.15rem">${esc(j.signal_hook.slice(0,120))}${j.signal_hook.length>120?"…":""}</div></div>` : ""}
+       <div style="margin-top:.5rem"><span class="chain-chip ${j.contact_ready ? "chip-green" : "chip-grey"}">${j.contact_ready ? "contact ready" : "awaiting contact"}</span></div>`);
+
+    flow.innerHTML = hugo + maya + ines + julie;
+  }
+
+  function load(company) {
+    fetch("/api/intel/pipeline" + (company ? "?company=" + encodeURIComponent(company) : ""))
+      .then(r => r.json())
+      .then(d => {
+        if (!pick.options.length && d.picker) {
+          pick.innerHTML = d.picker.map(p => `<option value="${esc(p.name)}">${esc(p.name)} — ${esc(p.score)}</option>`).join("");
+        }
+        if (d.company) pick.value = d.company;
+        render(d);
+      })
+      .catch(() => { flow.innerHTML = '<div class="text-sm text-ink-3">Could not load the chain.</div>'; });
+  }
+
+  pick.addEventListener("change", () => load(pick.value));
+  load();
+})();
+</script>
 {% endblock %}

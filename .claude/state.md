@@ -19,6 +19,19 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-08-03 (4) — **Vue « pipeline démontrable » (choix Betty : rendre la plateforme lisible).** Après le
+  constat que les agents sont bons + câblés (Hugo→Maya→Inès→Julie, chaque maillon lit la sortie du précédent
+  en code), Betty a choisi une **démo live** plutôt que plus de tuning. **Fait** : (1) endpoint
+  `GET /api/intel/pipeline?company=` (`app/routers/intel.py`) qui assemble les 4 étapes pour UNE société,
+  **déterministe, 0 appel LLM** (réutilise `_serialize_company`, `shortlist_bands`, `apollo.titles_for_signal`,
+  `apply_radars`, `sectors.get_sector_angle`) : Hugo (score/coverage/signaux) → Maya (bande/rang/#N of 498/Δ) →
+  Inès (signal→rôles + radar + tie-back + Med-Affairs) → Julie (angle sectoriel + hook tiré du signal réel).
+  Picker = bande ACT NOW de Maya (top 30). (2) Section interactive AJOUTÉE dans `templates/how_it_works.html`
+  (« See the team work a real company ») : sélecteur + 4 cartes en flux (flèches → entre elles), JS vanilla
+  inline, fetch on change. **Vérifié live** (instance QA :8010, 0 erreur console) : Organon (US, rang 1/498,
+  pas de lunch) vs Cantabria Labs (ES, rank #10, Δ +1.5, radar ES·🍽lunch·es) → la chaîne s'adapte par société.
+  ⚠️ Screenshot du preview headless rend gris (bug d'outil) → vérif faite en DOM/texte (fiable). +1 test,
+  **231 verts**. Complète (ne double PAS) la page méthodo moteur du même fichier. Pas encore commité.
 - 2026-08-03 (3) — **Maya BRANCHÉE sur Inès (décision Betty « la brancher à Inès + garder »).** Question
   Betty « Maya est-elle vraiment utile ? » → constat honnête : `/top` et `/recurring` **doublent** les pages
   Sales/Recurring ; seule `/trends` (mix de signaux + service areas) + le récit executive summary sont

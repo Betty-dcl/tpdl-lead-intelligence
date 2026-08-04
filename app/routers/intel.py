@@ -184,6 +184,95 @@ def get_company(name: str, db: Session = Depends(get_db)) -> dict:
     return _serialize_company(c, _neotek_baseline(db))
 
 
+@router.get("/pipeline")
+def sales_pipeline(company: Optional[str] = None, db: Session = Depends(get_db)) -> dict:
+    """Live view of the Sales chain on ONE company: Hugo → Maya → Inès → Julie.
+
+    Every stage shows its REAL contribution assembled deterministically from the
+    scored row — no LLM call, no invention. The picker lists Maya's ACT NOW band;
+    the default is its top company. This is the wiring made visible: each stage
+    consumes the previous stage's output exactly as the agents do in chat.
+    """
+    from app.models import Contact
+    from app.tools import apollo, sectors
+    from app.tools.radars import apply_radars
+    from app.tools.shortlist import shortlist_bands
+
+    act, monitor = shortlist_bands(db)
+    picker = [{"name": c.name, "score": c.assessed_score} for c in act[:30]]
+
+    target = None
+    if company:
+        target = db.get(Company, company)
+        if target is None:
+            low = company.strip().lower()
+            target = next((c for c in db.query(Company).all()
+                           if c.name.lower() == low or low in c.name.lower()), None)
+    if target is None:
+        target = act[0] if act else (monitor[0] if monitor else None)
+    if target is None:
+        return {"empty": True, "picker": picker}
+
+    ser = _serialize_company(target, _neotek_baseline(db))
+
+    # Maya: score band + rank among in-scope companies
+    in_scope = [s or 0.0 for (s,) in db.query(Company.assessed_score)
+                .filter(Company.icp_flag.is_(False)).all()]
+    score = target.assessed_score or 0.0
+    rank = sum(1 for s in in_scope if s > score) + 1
+    band = "ACT NOW" if score >= 8 else ("MONITOR" if score >= 5 else "PARKED")
+
+    # Inès: signal-driven roles + radar + tie-back checks
+    lead_signal = target.s1_category
+    radar = apply_radars(None, target.location)
+    n_contacts = db.query(Contact).filter(Contact.company_name == target.name).count()
+
+    # Julie: sector angle + a hook drawn from the strongest real signal
+    angle = sectors.get_sector_angle(target.sector_bucket)
+    strongest = ser["signals"][0] if ser["signals"] else None
+    hook = (f"{strongest['category']}: {(strongest['what_happened'] or '')[:150]}"
+            if strongest else None)
+
+    return {
+        "empty": False,
+        "picker": picker,
+        "company": target.name,
+        "sector": target.sector_bucket or "—",
+        "location": target.location,
+        "icp_flag": target.icp_flag,
+        "hugo": {
+            "score": ser["assessed_score"], "coverage": ser["coverage"],
+            "eligible": ser["outreach_eligible"], "review_flag": ser["review_flag"],
+            "summary": ser["intelligence_summary"], "signals": ser["signals"],
+        },
+        "maya": {
+            "band": band, "rank": rank, "total_in_scope": len(in_scope),
+            "delta": ser["delta"], "neotek_score": ser["neotek_score"],
+            "vintage": ser["vintage"], "run_label": ser["run_label"],
+        },
+        "ines": {
+            "lead_signal": lead_signal or "none evidenced",
+            "target_roles": list(apollo.titles_for_signal(lead_signal)),
+            "radar": radar,
+            "tieback": [
+                "Partner (Andrés / Pierre) already connected?",
+                "Already in PipeDrive?",
+                "1st-degree LinkedIn connection?",
+            ],
+            "med_affairs_subbatch": True,
+            "contacts_stored": n_contacts,
+            "engine_connected": apollo.is_configured(),
+        },
+        "julie": {
+            "angle": angle["angle"],
+            "angle_defined": sectors.is_defined(target.sector_bucket),
+            "proof_points": angle.get("proof_points", []),
+            "signal_hook": hook,
+            "contact_ready": n_contacts > 0,
+        },
+    }
+
+
 @router.get("/companies/{name}/trajectory")
 def company_trajectory(name: str, db: Session = Depends(get_db)) -> dict:
     """Score history for one company, oldest → newest, for the evolution curve.

@@ -30,3 +30,23 @@ def test_ines_batch_consumes_maya_shortlist():
         assert act[0].name in out["augmented_message"]
     else:
         assert "EMPTY" in out["augmented_message"]
+
+
+def test_sales_pipeline_endpoint_assembles_four_stages():
+    """The /pipeline view assembles all four agent stages from the scored row,
+    deterministically (no LLM), and the picker comes from Maya's ACT NOW band."""
+    from app.routers.intel import sales_pipeline
+    with SessionLocal() as db:
+        r = sales_pipeline(None, db)
+        act, _ = shortlist_bands(db)
+    if not act:
+        assert r.get("empty") is True
+        return
+    assert r["company"] == act[0].name              # defaults to top ACT NOW
+    assert len(r["picker"]) == min(30, len(act))
+    # every stage present and reads the previous stage's real output
+    assert r["hugo"]["score"] == act[0].assessed_score
+    assert r["maya"]["band"] in ("ACT NOW", "MONITOR", "PARKED")
+    assert r["maya"]["rank"] >= 1
+    assert isinstance(r["ines"]["target_roles"], list) and r["ines"]["target_roles"]
+    assert "angle" in r["julie"]
