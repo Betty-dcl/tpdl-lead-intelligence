@@ -1,21 +1,30 @@
 """Maya — Analyst (step 2 of the sales pipeline).
 
-Maya takes Hugo's scored universe (the `companies` table) and the evidenced
-`signals` table and turns raw research into a decision: the current-run Top
-50/100, the companies that recur run over run, and the run-level trends.
-(Cadence: ~one engine run per month for now — never imply weekly freshness.)
+Hugo scores ONE company at a time (research → evidence → deterministic score) —
+a point. Maya reads the whole scored PORTFOLIO, and reads it over TIME. That is
+the division of labour: a scorer and a portfolio analyst are different jobs.
 
-Slash commands (read the scored DB — no API key needed for the data; Claude
-interprets):
-  - /shortlist     → the ACTIONABLE list handed to Inès: score-banded, not a
-                     fixed count (ACT NOW ≥8 · MONITOR bench 5-7), soft-capped.
-  - /top [N?]      → secondary SCAN view: the N best in-scope companies regardless.
-  - /trends        → dominant signal types + TPDL service areas, latest run vs stock.
-  - /recurring     → risers/faders/new across runs (needs ≥2 runs in history).
-  - /generate [company] → analyst brief positioning one company in the universe
-                          (used by the workspace "Generate brief" button).
+Maya answers three questions Hugo never touches:
+  1. Of the hundreds Hugo scored, which handful do we act on this run, in what
+     order, and why?          → /shortlist  (the deliverable handed to Inès)
+  2. What is MOVING?           → /summary    (the run's executive read: top
+     scores + why, biggest before/after movers, low-but-rising to watch)
+  3. What is the SHAPE of the field? → /trends (dominant signal types + TPDL
+     service areas → hands content themes to Iris)
+
+She never re-scores and never researches — her only input is the scored
+`companies` table + the `signals` and `run_snapshots` history.
+
+Cadence: ~one engine run per MONTH for now — never imply weekly freshness.
+
+Slash commands:
+  - /shortlist          → the ACTIONABLE list for Inès (ACT NOW ≥8 · MONITOR 5-7).
+  - /summary            → the run's executive summary (scores + movement + risers).
+  - /trends             → dominant signal types + TPDL service areas (→ Iris).
+  - /generate [company] → analyst positioning brief for ONE company (workspace button).
+  - /top, /recurring    → DEPRECATED (folded into the Sales/Recurring pages +
+                          /shortlist + /summary); they now redirect, don't duplicate.
 """
-import re
 from typing import Optional
 
 from sqlalchemy import func
@@ -27,6 +36,65 @@ from app.models import Company, Signal
 from app.tools.shortlist import shortlist_bands
 
 MAYA_ID: str = AgentID.MAYA.value
+
+
+def _run_movement(db) -> dict:
+    """Cross-run trajectory of every company appearing in ≥2 runs.
+
+    Trajectory is CHRONOLOGICAL (earliest run → latest run). A min→max display
+    would invert every decline (a company falling 7.5→4.6 shown as a fake
+    4.6→7.5 rise). Risers and faders are returned separately so a big decliner
+    can never be pushed below a single capped 'hottest first' cut.
+    """
+    from datetime import datetime as _dt
+
+    from app.models import RunSnapshot
+
+    snaps = (db.query(RunSnapshot)
+             .order_by(RunSnapshot.run_date, RunSnapshot.id).all())
+    runs = len({s.import_run_id for s in snaps})
+    if runs <= 1:
+        return {"runs": runs, "recurring": 0, "risers": [], "faders": [],
+                "stable": 0, "new": [], "not_rescanned": 0, "latest_score": {}}
+
+    by_company: dict[str, list] = {}
+    for s in snaps:
+        by_company.setdefault(s.company_name, []).append(s)
+    recurring = [
+        (name, len({s.import_run_id for s in lst}),
+         lst[0].assessed_score or 0, lst[-1].assessed_score or 0)
+        for name, lst in by_company.items()
+        if len({s.import_run_id for s in lst}) >= 2
+    ]
+    risers = sorted((t for t in recurring if t[3] > t[2]),
+                    key=lambda t: -(t[3] - t[2]))[:20]
+    faders = sorted((t for t in recurring if t[3] < t[2]),
+                    key=lambda t: t[3] - t[2])[:20]
+    stable = sum(1 for t in recurring if t[3] == t[2])
+
+    def _run_key(rid):
+        dates = [s.run_date for s in snaps if s.import_run_id == rid and s.run_date]
+        return max(dates) if dates else _dt.min
+
+    latest_run_id = max({s.import_run_id for s in snaps}, key=_run_key)
+    new_names = sorted(
+        (name for name, lst in by_company.items()
+         if {s.import_run_id for s in lst} == {latest_run_id}),
+        key=lambda name: -(by_company[name][-1].assessed_score or 0))
+    not_rescanned = sum(
+        1 for lst in by_company.values()
+        if latest_run_id not in {s.import_run_id for s in lst})
+    return {"runs": runs, "recurring": len(recurring), "risers": risers,
+            "faders": faders, "stable": stable, "new": new_names,
+            "not_rescanned": not_rescanned,
+            "latest_score": {n: by_company[n][-1].assessed_score for n in new_names}}
+
+
+def _fmt_trajectory(rows, arrow) -> str:
+    return "\n".join(
+        f"  - {name}: seen in {n} runs · {first}→{last} {arrow} ({last - first:+.1f})"
+        for name, n, first, last in rows
+    ) or "  (none)"
 
 
 class MayaAgent(BaseAgent):
@@ -54,7 +122,7 @@ class MayaAgent(BaseAgent):
                             break
                 if c is None:
                     return {
-                        "augmented_message": f"The user asked for a positioning brief on '{name}', not found in the scored universe. Suggest checking the name or running `/top`.",
+                        "augmented_message": f"The user asked for a positioning brief on '{name}', not found in the scored universe. Suggest checking the name or running `/summary`.",
                         "action": "company_positioning",
                         "task_title": f"/generate: {name} (not found)",
                     }
@@ -114,7 +182,7 @@ class MayaAgent(BaseAgent):
         # Quality over a fixed count: a "top 50" pads the list with score-2
         # noise on a small run. The bar is score ≥ 8 (= outreach-eligible, the
         # constitution's threshold). 5-7 is a "monitor bench", <5 is parked.
-        if low == "/shortlist" or low.startswith("/shortlist"):
+        if low.startswith("/shortlist"):
             SOFT_CAP = 40    # only bites when the eligible band is unusually large
             with SessionLocal() as db:
                 # Single source of truth (shared with Inès's batch hand-off):
@@ -160,70 +228,92 @@ class MayaAgent(BaseAgent):
                 "metadata": {"eligible": len(act), "monitor": len(monitor), "capped": capped},
             }
 
-        # ── /top [N?] — a "give me the N best regardless" SCAN view (secondary) ─
-        if low == "/top" or low.startswith("/top"):
-            # Accept both "/top 5" and the glued "/top5" (the latter used to
-            # silently fall through to the default 50).
-            m = re.match(r"/top\s*(\d+)?", low)
-            n = 50
-            if m and m.group(1):
-                n = max(5, min(100, int(m.group(1))))
+        # ── /summary — the run's EXECUTIVE READ (Maya's flagship) ──────────
+        # Nathalie's ask (§4b): lead with the top scores AND why they're valid,
+        # spotlight the biggest before/after MOVERS, and flag low-but-rising
+        # companies to start building contacts on early. This is the analyst
+        # narrative — the Sales/Recurring pages hold the raw tables; Maya holds
+        # the "so what". Absorbs what used to be split across /top + /recurring.
+        if low.startswith("/summary") or low.startswith("/run"):
             with SessionLocal() as db:
-                rows = (
-                    db.query(Company)
-                    .filter(Company.icp_flag.is_(False))
-                    .order_by(Company.assessed_score.desc())
-                    .limit(n)
-                    .all()
-                )
+                act, monitor = shortlist_bands(db)
+                total = (db.query(Company)
+                         .filter(Company.icp_flag.is_(False)).count())
                 latest = db.query(func.max(Company.run_date)).scalar()
-            if not rows:
+                flagged_act = sum(1 for c in act if c.review_flag)
+                move = _run_movement(db)
+            if total == 0:
                 return {
-                    "augmented_message": "The user ran `/top` but the scored universe is empty. Say so and suggest Hugo runs the pipeline.",
-                    "action": "built_top_list",
-                    "task_title": "Top list (empty)",
+                    "augmented_message": "The user ran `/summary` but the scored universe is empty. Say so and suggest Hugo runs the pipeline.",
+                    "action": "run_summary", "task_title": "Run summary (empty)",
                 }
-            latest_day = latest.date() if latest else None
+            latest_day = latest.date() if latest else "?"
 
-            def _freshness(c) -> str:
-                # The universe mixes vintages: a company kept from an older run
-                # carries a score that was never re-verified. Say so per line —
-                # otherwise a stale May 9.0 silently outranks a fresh July 8.5.
-                if not c.run_date:
-                    return "run date unknown"
-                day = c.run_date.date()
-                return (f"scored {day} (latest run)" if day == latest_day
-                        else f"scored {day} — STALE, not refreshed since")
+            def _why(c) -> str:
+                sig = c.s1_category or "no lead signal"
+                rel = f" → {c.s1_tpdl_relevance}" if c.s1_tpdl_relevance else ""
+                flag = " ⚠REVIEW" if c.review_flag else ""
+                return (f"  - {c.name} — {c.assessed_score} · {c.sector_bucket or '—'} · "
+                        f"signal: {sig}{rel}{flag}")
 
-            lines = [
-                f"{i+1}. {c.name} — {c.assessed_score} · {c.coverage} · "
-                f"{c.sector_bucket or '—'}{' · ELIGIBLE' if c.outreach_eligible else ''} "
-                f"· {_freshness(c)}"
-                for i, c in enumerate(rows)
-            ]
-            eligible = sum(1 for c in rows if c.outreach_eligible)
-            stale = sum(1 for c in rows if c.run_date and c.run_date.date() != latest_day)
+            top_act = "\n".join(_why(c) for c in act[:8]) or "  (none clear ≥8 this run)"
+
+            # Movement section — chronological trajectory (risers/faders) + the
+            # low-but-rising watch list (climbing but still under the 8 bar).
+            if move["runs"] <= 1:
+                movement_block = (
+                    "MOVEMENT: only ONE run in history — before/after movement "
+                    "activates from the second imported run."
+                )
+            else:
+                watch = [t for t in move["risers"] if t[3] < 8][:8]
+                watch_str = "\n".join(
+                    f"  - {name}: {first}→{last} (+{last - first:.1f}) — still under 8, "
+                    f"start building contacts early"
+                    for name, n, first, last in watch) or "  (none)"
+                new_str = "\n".join(
+                    f"  - {name}: {move['latest_score'].get(name)}"
+                    for name in move["new"][:10]) or "  (none)"
+                movement_block = (
+                    f"MOVEMENT across {move['runs']} runs "
+                    f"({move['recurring']} companies seen in ≥2 runs):\n"
+                    f"TOP RISERS (heating up):\n{_fmt_trajectory(move['risers'][:8], '↑')}\n"
+                    f"TOP FADERS (cooling):\n{_fmt_trajectory(move['faders'][:8], '↓')}\n"
+                    f"Stable: {move['stable']}. "
+                    f"{move['not_rescanned']} historical companies were not re-scanned "
+                    f"in the latest run (absence there = 'not scanned', not 'signal gone').\n"
+                    f"LOW-BUT-RISING watch (climbing, still <8):\n{watch_str}\n"
+                    f"NEW this run (first appearance ever):\n{new_str}"
+                )
+
             augmented = (
-                f"The user ran `/top {n}`. Here is the ranked Top {len(rows)} from Hugo's "
-                f"scored universe (in-scope only, highest assessed_score first; "
-                f"{eligible} are Outreach Eligible; {stale} of these scores are STALE — "
-                f"from an earlier run, not re-verified in the latest one):\n\n"
-                + "\n".join(lines) +
-                "\n\nPresent this as Maya's current-run shortlist: group by score band "
-                "(8+ Eligible / 5-7 Monitor), call out the standouts and the dominant "
-                "sectors, and flag the 3-5 to prioritise. Weigh freshness explicitly: "
-                "a fresh score is act-on-now; a STALE high score means 'verify before "
-                "acting — signals may have moved'. This list hands to Inès for contacts."
+                f"The user ran `/summary` — Maya's executive read of the latest run "
+                f"({latest_day}). Data from the scored universe + run history:\n\n"
+                f"HEADLINE: {len(act)} outreach-eligible (≥8) of {total} in-scope companies; "
+                f"{len(monitor)} on the 5-7 monitor bench; {flagged_act} of the ACT NOW band "
+                f"carry a ⚠ review flag (60-second human check before acting).\n\n"
+                f"TOP SCORES (act-now band, strongest first) — with their lead signal:\n"
+                f"{top_act}\n\n"
+                f"{movement_block}\n\n"
+                f"As Maya, write the RUN EXECUTIVE SUMMARY the way Nathalie asks: lead with "
+                f"the top scores AND why they're interesting/valid (name the signal), then "
+                f"spotlight the biggest before/after movers — a company that jumped from a "
+                f"weak score to eligible is a headline, not a footnote. Call out the low-but-"
+                f"rising names as 'worth monitoring / start building contacts now' even below "
+                f"8: the movement itself is the signal. Keep review flags visible. Reason only "
+                f"from the data above — never invent a number or a trajectory."
             )
             return {
                 "augmented_message": augmented,
-                "action": "built_top_list",
-                "task_title": f"Top {n} (current run)",
-                "metadata": {"n": len(rows), "eligible": eligible, "stale": stale},
+                "action": "run_summary",
+                "task_title": f"Run summary — {len(act)} eligible",
+                "metadata": {"eligible": len(act), "monitor": len(monitor),
+                             "runs": move["runs"], "risers": len(move["risers"]),
+                             "faders": len(move["faders"]), "new": len(move["new"])},
             }
 
         # ── /trends ──────────────────────────────────────────────────────
-        if low == "/trends" or low.startswith("/trends"):
+        if low.startswith("/trends"):
             with SessionLocal() as db:
                 # The signals table mixes vintages (companies kept from older
                 # runs still carry their old signals). Counting everything as
@@ -293,103 +383,33 @@ class MayaAgent(BaseAgent):
                              "fresh_companies": fresh_companies},
             }
 
-        # ── /recurring ───────────────────────────────────────────────────
-        if low == "/recurring" or low.startswith("/recurring"):
-            from app.models import RunSnapshot
-            with SessionLocal() as db:
-                runs = (db.query(func.count(func.distinct(RunSnapshot.import_run_id)))
-                        .scalar() or 0)
-                if runs <= 1:
-                    augmented = (
-                        "The user ran `/recurring`. The run-history table holds only ONE "
-                        "run so far, so run-over-run recurrence cannot be computed yet. "
-                        "As Maya, explain this view tracks companies whose signals persist "
-                        "or re-appear across engine runs (~monthly cadence for now — a "
-                        "strong prioritisation cue), and that it activates automatically "
-                        "from the second imported run."
-                    )
-                    meta = {"runs": runs}
-                else:
-                    # Companies appearing in ≥2 runs, with their CHRONOLOGICAL
-                    # score trajectory (first run → latest run). min→max would
-                    # invert every decline: a company falling 7.5→4.6 would be
-                    # displayed as "4.6→7.5 ↑ rising" — the exact opposite call.
-                    snaps = (db.query(RunSnapshot)
-                             .order_by(RunSnapshot.run_date, RunSnapshot.id).all())
-                    by_company: dict[str, list] = {}
-                    for s in snaps:
-                        by_company.setdefault(s.company_name, []).append(s)
-                    recurring = [
-                        (name, len({s.import_run_id for s in lst}),
-                         lst[0].assessed_score or 0, lst[-1].assessed_score or 0)
-                        for name, lst in by_company.items()
-                        if len({s.import_run_id for s in lst}) >= 2
-                    ]
-                    # Two explicit sections. A single "hottest latest score
-                    # first" list capped at 40 would push every big DECLINER
-                    # below the cut — Maya would never see the faders she is
-                    # meant to call out.
-                    risers = sorted((t for t in recurring if t[3] > t[2]),
-                                    key=lambda t: -(t[3] - t[2]))[:20]
-                    faders = sorted((t for t in recurring if t[3] < t[2]),
-                                    key=lambda t: t[3] - t[2])[:20]
-                    stable = len(recurring) - sum(1 for t in recurring if t[3] != t[2])
-
-                    # New vs repeated (the dedup question): who shows up for the
-                    # FIRST time in the latest run, and how much of the history
-                    # was simply not re-scanned this time (runs may deliberately
-                    # target a subset, so absence ≠ signal gone).
-                    from datetime import datetime as _dt
-
-                    def _run_key(rid):
-                        dates = [s.run_date for s in snaps
-                                 if s.import_run_id == rid and s.run_date]
-                        return max(dates) if dates else _dt.min
-
-                    latest_run_id = max({s.import_run_id for s in snaps}, key=_run_key)
-                    new_names = sorted(
-                        (name for name, lst in by_company.items()
-                         if {s.import_run_id for s in lst} == {latest_run_id}),
-                        key=lambda name: -(by_company[name][-1].assessed_score or 0))
-                    not_rescanned = sum(
-                        1 for lst in by_company.values()
-                        if latest_run_id not in {s.import_run_id for s in lst})
-                    new_str = "\n".join(
-                        f"  - {name}: {by_company[name][-1].assessed_score}"
-                        for name in new_names[:15]) or "  (none)"
-
-                    def _fmt(rows_, arrow):
-                        return "\n".join(
-                            f"  - {name}: seen in {n} runs · score {first}→{last} "
-                            f"{arrow} ({last - first:+.1f})"
-                            for name, n, first, last in rows_
-                        ) or "  (none)"
-
-                    augmented = (
-                        f"The user ran `/recurring`. Across {runs} runs in the history, "
-                        f"{len(recurring)} companies persist (appear in ≥2 runs). Chronological "
-                        f"score trajectory = earliest run → latest run.\n\n"
-                        f"TOP RISERS (score climbing):\n{_fmt(risers, '↑')}\n\n"
-                        f"TOP FADERS (score falling):\n{_fmt(faders, '↓')}\n\n"
-                        f"Stable: {stable} companies with an unchanged score.\n\n"
-                        f"NEW THIS RUN (first appearance ever, by score):\n{new_str}\n"
-                        f"({len(new_names)} new in total; {not_rescanned} historical companies "
-                        f"were not re-scanned in the latest run — absence there means 'not "
-                        f"scanned', not 'signal gone'.)\n\n"
-                        f"As Maya, rank the persistent ones (recurrence = higher priority): "
-                        f"risers are heating up (flag the top ones for Inès), faders are "
-                        f"cooling (say whether to keep monitoring or deprioritise), and call "
-                        f"out the strongest NEW entrants — fresh blood is what widens the "
-                        f"funnel."
-                    )
-                    meta = {"runs": runs, "recurring": len(recurring),
-                            "risers": len(risers), "faders": len(faders),
-                            "new": len(new_names)}
+        # ── /top, /recurring — DEPRECATED (folded into pages + /shortlist + /summary) ─
+        # These duplicated UI pages. They no longer render a second copy of the
+        # list; they point to the right surface so nobody hits a dead command.
+        if low.startswith("/top"):
             return {
-                "augmented_message": augmented,
-                "action": "recurring_analysis",
-                "task_title": "Recurring companies",
-                "metadata": meta,
+                "augmented_message": (
+                    "The user ran `/top`. This scan view now lives on the Sales dashboard "
+                    "(ranked, filterable, with per-run deltas). As Maya, say this in one or "
+                    "two lines and point them to the real analyst outputs instead: "
+                    "`/shortlist` for what to ACT ON now (Inès-ready), and `/summary` for the "
+                    "run's executive read (top scores + who's moving). Do NOT reproduce a "
+                    "ranked list here — that would just duplicate the Sales page."
+                ),
+                "action": "redirect",
+                "task_title": "/top → Sales page + /shortlist",
+            }
+        if low.startswith("/recurring"):
+            return {
+                "augmented_message": (
+                    "The user ran `/recurring`. Run-over-run movement now lives in two "
+                    "places: the Recurring page (the full matrix of every company across "
+                    "scans) and Maya's `/summary` (the executive read of who's rising/falling "
+                    "and why). As Maya, point them there in a line or two — the risers/faders "
+                    "narrative is part of `/summary` now. Do NOT reproduce the matrix here."
+                ),
+                "action": "redirect",
+                "task_title": "/recurring → Recurring page + /summary",
             }
 
         return None

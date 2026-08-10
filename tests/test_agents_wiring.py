@@ -172,16 +172,35 @@ def test_marc_angles_and_content(client):
         assert "[STAT TO VERIFY]" in c["augmented_message"]   # never-invent-data guardrail
 
 
-# ── Maya /top glued form (finding: /top5 fell through to default 50) ────────
+# ── Maya /top and /recurring are DEPRECATED (folded into pages + /shortlist/summary) ─
 
-def test_maya_top_accepts_glued_number(client):
+def test_maya_top_and_recurring_are_deprecated_redirects(client):
+    """/top duplicated the Sales page and /recurring the Recurring page — both now
+    redirect to the real analyst surfaces instead of rendering a second copy."""
     from app.agents import AGENT_CLASSES
     from app.database import SessionLocal
     with SessionLocal() as db:
         maya = AGENT_CLASSES["maya"].load(db, "maya")
-        meta = maya._dispatch_command("/top5")
-        # task_title carries n — glued "/top5" must resolve n=5, not 50.
-        assert meta["task_title"] == "Top 5 (current run)"
+        top = maya._dispatch_command("/top")
+        assert top["action"] == "redirect"
+        assert "/shortlist" in top["augmented_message"] and "/summary" in top["augmented_message"]
+        # glued form still caught, still a redirect (no silent fall-through)
+        assert maya._dispatch_command("/top5")["action"] == "redirect"
+        rec = maya._dispatch_command("/recurring")
+        assert rec["action"] == "redirect"
+        assert "Recurring page" in rec["augmented_message"] and "/summary" in rec["augmented_message"]
+
+
+def test_maya_summary_is_the_run_executive_read(client):
+    """/summary is Maya's flagship: eligible headline + top scores + movement."""
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    with SessionLocal() as db:
+        maya = AGENT_CLASSES["maya"].load(db, "maya")
+        out = maya._dispatch_command("/summary")
+        assert out["action"] == "run_summary"
+        assert "eligible" in out["metadata"]
+        assert "HEADLINE" in out["augmented_message"]
 
 
 # ── Oliver newsletter format (70/10/20 mix, feeds MailChimp) ────────────────
@@ -208,9 +227,9 @@ def test_oliver_newsletter_is_supported(client):
         assert "newsletter" in bad["augmented_message"]
 
 
-# ── #16 Maya /recurring on real run history ─────────────────────────────────
+# ── #16 Maya movement analysis (now inside /summary) on real run history ─────
 
-def test_maya_recurring_uses_run_snapshots(client):
+def test_maya_summary_uses_run_snapshots(client):
     from app.agents import AGENT_CLASSES
     from app.database import SessionLocal
     from app.models import RunSnapshot
@@ -226,7 +245,7 @@ def test_maya_recurring_uses_run_snapshots(client):
         db.commit()
         try:
             maya = AGENT_CLASSES["maya"].load(db, "maya")
-            meta = maya._dispatch_command("/recurring")
+            meta = maya._dispatch_command("/summary")
             msg = meta["augmented_message"]
             assert meta["metadata"]["runs"] >= 2
             assert "Zzy Recurring Co" in msg                 # appears across runs
@@ -237,15 +256,15 @@ def test_maya_recurring_uses_run_snapshots(client):
             db.commit()
 
 
-def test_maya_recurring_trajectory_is_chronological_not_minmax(client):
-    """Regression: a DECLINING company (7.5 in May → 4.6 in July) must be shown
-    as 7.5→4.6 under FADERS. The old min→max display inverted every decline
-    into a fake rise (4.6→7.5 ↑)."""
+def test_maya_summary_trajectory_is_chronological_not_minmax(client):
+    """Regression: a DECLINING company (9.6 → 0.2) must be shown as 9.6→0.2 under
+    FADERS. The old min→max display inverted every decline into a fake rise. Big
+    delta so it's guaranteed inside the capped FADERS section on the real DB."""
     from app.agents import AGENT_CLASSES
     from app.database import SessionLocal
     from app.models import RunSnapshot
     with SessionLocal() as db:
-        for run, day, score in (("declA", 25, 7.5), ("declB", 26, 4.6)):
+        for run, day, score in (("declA", 25, 9.6), ("declB", 26, 0.2)):
             db.add(RunSnapshot(
                 import_run_id=run, company_name="Zzy Declining Co",
                 assessed_score=score, coverage="1 of 6", outreach_eligible=False,
@@ -253,10 +272,10 @@ def test_maya_recurring_trajectory_is_chronological_not_minmax(client):
         db.commit()
         try:
             maya = AGENT_CLASSES["maya"].load(db, "maya")
-            msg = maya._dispatch_command("/recurring")["augmented_message"]
+            msg = maya._dispatch_command("/summary")["augmented_message"]
             line = next(l for l in msg.splitlines() if "Zzy Declining Co" in l)
-            assert "7.5→4.6" in line and "↓" in line          # chronological + falling
-            assert "4.6→7.5" not in line                      # the inverted form
+            assert "9.6→0.2" in line and "↓" in line          # chronological + falling
+            assert "0.2→9.6" not in line                      # the inverted form
             faders = msg.split("TOP FADERS")[1].split("Stable:")[0]
             assert "Zzy Declining Co" in faders               # listed as a fader
         finally:

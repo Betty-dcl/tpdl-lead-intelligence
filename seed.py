@@ -403,7 +403,7 @@ AGENTS_SEED = [
     {
         "id": AgentID.MAYA.value,
         "name": "Maya",
-        "role": "Analyst — Top 50 & Trends",
+        "role": "Analyst — Shortlist & Trends",
         "avatar_seed": "maya-tpdl-analyst",
         "color": "#10B981",  # emerald
         "system_prompt": MAYA_PROMPT,

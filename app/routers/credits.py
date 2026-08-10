@@ -38,8 +38,8 @@ async def credits(db: Session = Depends(get_db)) -> dict:
 def engine_runs(db: Session = Depends(get_db)) -> dict:
     """Engine/import run history — one row per import_run_id.
 
-    This is what unblocks Maya's /recurring narrative: 1 run today (25/05),
-    the counter increments as the rebuilt engine produces new runs.
+    This is what unblocks Maya's /summary movement narrative: multiple runs
+    today, the counter increments as the rebuilt engine produces new runs.
     """
     rows = (
         db.query(

@@ -19,6 +19,41 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-08-10 (2) — **Maya REFONDUE (demande Betty « elle sert à quoi si Hugo score déjà ? refais-la, la
+  plus pro possible »).** Diagnostic honnête re-posé : Hugo score UNE société (un point) ; Maya lit le
+  PORTEFEUILLE + dans le TEMPS (priorisation, mouvement, forme du terrain) = 2 métiers. Le vrai problème
+  n'était pas Maya mais **2 commandes redondantes** (`/top` doublait la page Sales, `/recurring` la page
+  Recurring). **Fait** : (1) nouveau **`/summary`** = flagship analyste (executive read du run : headline
+  eligible + top scores avec leur signal + mouvement risers/faders + low-but-rising watch + nouveaux) —
+  absorbe la moitié utile de `/recurring` (§4b Nathalie) ; logique de mouvement extraite dans
+  `_run_movement(db)` (trajectoire CHRONOLOGIQUE, jamais min→max). (2) **`/top` et `/recurring` dépréciés**
+  → renvoient une redirection vers les pages + `/shortlist`/`/summary`, ne dupliquent plus de liste.
+  (3) `/shortlist`, `/trends`, `/generate` inchangés. (4) `maya.md` réécrit (rôle net « scoreur vs
+  analyste de portefeuille », règle trajectoire chronologique) + re-seed. (5) Sous-titre carte
+  `seed.py` « Analyst — Top 50 & Trends » → **« Analyst — Shortlist & Trends »**. (6) 2 textes page Usage
+  (credits.html + credits.py) : `/recurring` → `/summary`. Régressions importantes (trajectoire
+  chronologique, faders) PRÉSERVÉES, repointées sur `/summary` (deltas de test agrandis pour rester dans
+  le cap [:8]). +2 tests nets. **243 tests verts.** Vérifié LIVE (serveur QA :8010) : `/summary` sort un
+  vrai executive summary (37 eligible/498, pattern « 2 specialty-pharma ES qui refroidissent ensemble »,
+  low-but-rising watch, caveats 611 non re-scannées, what-to-do-next) ; `/top`/`/recurring` redirigent ;
+  carte à jour. ⚠️ Leçon : le serveur preview tourne SANS `--reload` → redémarrer pour charger un
+  changement de code (1er test `/summary` a échoué là-dessus). Pas encore commité au moment de l'écriture.
+- 2026-08-10 (1) — **Inès améliorée sur 2 axes (demande Betty « ameliores la, sois le plus pro possible »),
+  Apollo/Kaspr toujours débranché (on améliore le CONTENU + le classifieur, pas la connexion).**
+  **Axe 1 — brief scraper exploitable** : nouveau module `app/tools/scraper_brief.py` (déterministe, 0
+  réseau) branché dans `/contacts <company>` (Mode A) ET `/contacts shortlist`. Met en CODE ce qui n'était
+  que prose : (a) **tie-back §3c** en checklist 3 points (partner-known Andrés/**Pierre** nommé pour l'ES /
+  PipeDrive / 1er degré) sur chaque contact ; (b) **sous-lot Medical Affairs réellement séparé** dans la
+  sortie ; (c) **config Sales Navigator par société** (recherche par nom · plancher séniorité · géo dérivée
+  du pays · keywords) + champs de capture dont `recent join <3 mois`. Résultat : en Mode A, Inès sort un
+  livrable prêt pour Marketeering.ai au lieu de « je tirerais plus tard ». **Axe 2 — robustesse du
+  classifieur** (`app/tools/segmentation.py`) : bug corrigé — `_norm` SUPPRIMAIT les accents (« Médicos »
+  → « m dicos », cassé) → il les **replie** (NFKD) ; titres ES/FR reconnus (« Director Comercial », « Ventas »,
+  « Datos y Analítica », « Asuntos Médicos », « Transformación ») qui tombaient en None ; fix métier
+  **« Director/Directora General » / « Gerente General » = c_level** (PDG), plus rétrogradés en director ;
+  flag **`flags_vp_equivalent`** (Senior Manager sous le plancher mais VP-equivalent en petite boîte → à
+  flagger, §3b). +11 tests (test_scraper_brief.py + test_segmentation.py). Vérifié LIVE : `/contacts
+  Cantabria Labs` sort le brief complet en voix d'Inès. Pas encore commité au moment de l'écriture.
 - 2026-08-03 (4) — **Vue « pipeline démontrable » (choix Betty : rendre la plateforme lisible).** Après le
   constat que les agents sont bons + câblés (Hugo→Maya→Inès→Julie, chaque maillon lit la sortie du précédent
   en code), Betty a choisi une **démo live** plutôt que plus de tuning. **Fait** : (1) endpoint
@@ -955,6 +990,15 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-08-10
+- Fait : **Inès améliorée (brief scraper exploitable + classifieur ES/FR durci) puis Maya REFONDUE**
+  (voir logs 2026-08-10 (1) et (2) en haut). Réponses aux vraies questions de Betty : le « 90 » sur la
+  page Sales = rang, pas total (135 = 90 in-scope affichées + 45 hors-ICP masquées) ; Maya ABSENTE de la
+  table de dépense = 0 appel LLM ≠ inutile ; verdict Maya = garder + resserrer (scoreur vs analyste de
+  portefeuille, `/top`+`/recurring` dépréciés, `/summary` flagship). **243 tests verts**, vérifié LIVE.
+  ⚠️ Serveur preview sans `--reload` → redémarrer pour charger le code. RESTE : 2 commits (Inès / Maya) +
+  décider quel agent avancer ensuite (Julie content-bloquée sur chiffres clients Andrés + contacts réels ;
+  Iris/Marc/Oliver avançables sans contenu neuf — moteur marketing = candidat naturel).
 - Date : 2026-08-03
 - Fait : **passe qualité données** (Betty « comment améliorer la plateforme » → axe #4 choisi). Audit
   Vera réel d'abord (notes périmées : Unknown 273→5, 0 doublon, 0 loc manquante, poubelle déjà nettoyée).
