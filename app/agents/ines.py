@@ -23,6 +23,11 @@ from app.database import SessionLocal
 from app.models import Company, Contact
 from app.tools import apollo, kaspr
 from app.tools.radars import apply_radars, detect_country
+from app.tools.scraper_brief import (
+    render_batch_line,
+    render_company_brief,
+    render_shared_config,
+)
 from app.tools.segmentation import classify_function, classify_seniority, initial_crm_segment
 from app.tools.shortlist import shortlist_bands
 
@@ -86,30 +91,23 @@ class InesAgent(BaseAgent):
                 engine = ("no contact engine connected (Mode A: brief only)"
                           if not provider.is_configured()
                           else f"{'Kaspr' if provider is kaspr else 'Apollo'} connected")
-                lines = []
-                for c in shown:
-                    radar = apply_radars(None, c.location)
-                    roles = ", ".join(provider.titles_for_signal(c.s1_category))
-                    lines.append(
-                        f"  - {c.name} — score {c.assessed_score} · "
-                        f"{c.sector_bucket or '—'} · {c.location or 'location unknown'} · "
-                        f"signal {c.s1_category or 'none'} → {roles} · "
-                        f"country={radar['country'] or 'other'} "
-                        f"lunch={radar['lunch_campaign']} lang={radar['language']}"
-                    )
+                # One deterministic brief skeleton so §3b (4 ICP functions +
+                # Med-Affairs sub-batch) and §3c (tie-back) can never be dropped:
+                # the shared config once, then the per-company varying part.
+                lines = [render_batch_line(c) for c in shown]
                 more = (f"\n(+{len(act) - CAP} more ≥8 not shown — narrow with filters)"
                         if len(act) > CAP else "")
                 augmented = (
                     f"The user ran `/contacts shortlist` — the BATCH hand-off from Maya. "
                     f"Maya's ACT NOW band (in-scope, score ≥ 8) has {len(act)} companies; "
-                    f"here are the top {len(shown)} by score/coverage/freshness:\n\n"
+                    f"here are the top {len(shown)} by score/coverage/freshness.\n\n"
+                    f"{render_shared_config()}\n\nPER-COMPANY TARGETING:\n"
                     + "\n".join(lines) + more +
-                    f"\n\nEngine status: {engine}. As Inès, produce the SCRAPER-READY BRIEF "
-                    f"batch: per company, the signal-driven priority roles layered over the 4 "
-                    f"ICP functions (§3b), the Sales Navigator config, and the capture fields + "
-                    f"tie-back checks (partner-known / PipeDrive / 1st-degree; Med-Affairs → "
-                    f"separate sub-batch). No invented names. Name the 3-5 companies to start "
-                    f"with. This is the list that goes to Nathalie / Marketeering.ai."
+                    f"\n\nEngine status: {engine}. As Inès, present this as the SCRAPER-READY "
+                    f"BRIEF batch for Nathalie / Marketeering.ai — keep the 4 ICP functions, the "
+                    f"Medical Affairs SEPARATE sub-batch, the Sales Nav config, the capture "
+                    f"fields, and the §3c tie-back checks intact for every company. No invented "
+                    f"names. Name the 3-5 companies to start with."
                 )
                 return {
                     "augmented_message": augmented,
@@ -145,14 +143,16 @@ class InesAgent(BaseAgent):
             if not provider.is_configured():
                 augmented = (
                     f"The user ran `/contacts {c.name}`. No contact engine is connected yet "
-                    f"(neither KASPR_API_KEY nor APOLLO_API_KEY set), so I cannot pull the live "
-                    f"CEO/CTO/CFO + LinkedIn data.\n\n{company_line}\n\n"
-                    f"As Inès, explain: once Kaspr (target) or Apollo is connected I'll pull the "
-                    f"decision-makers "
-                    f"(CEO, CTO, CFO) with their LinkedIn, then auto-tag each with the radars "
-                    f"(Lunch Campaign for Switzerland/Spain, Language ES for Spain or Spanish "
-                    f"names) and let the user hand-pick the Premium 5 for Andrés. For now, note "
-                    f"the company-level radar read above."
+                    f"(neither KASPR_API_KEY nor APOLLO_API_KEY set), so I cannot pull live "
+                    f"people. Instead of stopping at 'I'd pull later', hand over the "
+                    f"scraper-ready brief the team can give Marketeering.ai NOW:\n\n"
+                    f"{render_company_brief(c)}\n\n"
+                    f"As Inès, present this brief in your own voice, keeping every part intact "
+                    f"(signal-driven priority roles, the 4 ICP functions, the Medical Affairs "
+                    f"SEPARATE sub-batch, the Sales Nav config, capture fields, and the §3c "
+                    f"tie-back checks). Note that once Kaspr/Apollo is connected the actual "
+                    f"names + LinkedIn get pulled and auto-tagged, and the Premium 5 hand-picked "
+                    f"for Andrés. No invented people."
                 )
             else:
                 fetched = provider.fetch_contacts(c.name, target_titles)

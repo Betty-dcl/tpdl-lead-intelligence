@@ -1,6 +1,7 @@
 from app.tools.segmentation import (
     classify_function,
     classify_seniority,
+    flags_vp_equivalent,
     initial_crm_segment,
 )
 
@@ -72,6 +73,45 @@ def test_function_medical_affairs():
     # a plain commercial/digital title is unaffected
     assert classify_function("VP Sales") == "commercial"
     assert classify_function("Chief Digital Officer") == "digital"
+
+
+def test_function_spanish_french_titles():
+    """The campaign is Spain-focused → common ES/FR titles must classify, not fall to None."""
+    assert classify_function("Director Comercial") == "commercial"     # ES
+    assert classify_function("Directora de Ventas") == "commercial"    # ES
+    assert classify_function("Directeur Commercial") == "commercial"   # FR
+    assert classify_function("Director de Transformación Digital") == "digital"  # ES + accent
+    assert classify_function("Responsable de Datos y Analítica") == "data"       # ES + accent
+    assert classify_function("Director de Asuntos Médicos") == "medical_affairs" # ES + accent
+
+
+def test_accents_are_folded_not_stripped():
+    """'Médicos' must fold to 'medicos' (a real hint), not be mangled to 'm dicos'."""
+    assert classify_function("Directora Médica") == "medical_affairs"
+    assert classify_function("Président") == "commercial"
+
+
+def test_seniority_director_general_is_c_level():
+    """In ES/FR a 'Director General' IS the CEO — must not be demoted to 'director'."""
+    assert classify_seniority("Director General") == "c_level"
+    assert classify_seniority("Directora General") == "c_level"
+    assert classify_seniority("Directeur Général") == "c_level"
+    assert classify_seniority("Gerente General") == "c_level"
+    # a plain directorship is still 'director'
+    assert classify_seniority("Director Comercial") == "director"
+    assert classify_seniority("Directrice Marketing") == "director"
+
+
+def test_vp_equivalent_flag():
+    """Senior Manager is below the floor but may be VP-equivalent at a small company → flag."""
+    assert flags_vp_equivalent("Senior Manager, Commercial Operations") is True
+    assert flags_vp_equivalent("Gerente Senior") is True
+    # anyone already at/above the floor is not 'VP-equivalent-borderline'
+    assert flags_vp_equivalent("VP Sales") is False
+    assert flags_vp_equivalent("Director General") is False
+    # a plain junior with no VP-equivalent signal is not flagged
+    assert flags_vp_equivalent("Analyst") is False
+    assert flags_vp_equivalent(None) is False
 
 
 def test_apollo_icp_targeting_and_seniority_floor():
