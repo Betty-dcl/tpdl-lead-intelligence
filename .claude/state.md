@@ -19,6 +19,18 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-08-10 (7) — **Audit des 3 agents non revus (Hugo, Vera, Alex) + fix des obsolescences de routage
+  (demande Betty « vérifie chaque agent »).** Verdict : **Hugo** (moteur : /scan, /company brief intégral +
+  fraîcheur, /stats, /candidates, /rerun honnête) et **Vera** (audit d'intégrité déterministe univers +
+  par société, file review, stats) = SOLIDES, rien à changer. **Vraies obsolescences trouvées** (en partie
+  causées par ma refonte Maya cette session — principe « code/mémoire ne divergent jamais ») : (1) hugo.md
+  pointait les questions de récurrence vers `/recurring` de Maya (déprécié) → repointé sur `/summary`
+  (mouvement) ; (2) manager.md décrivait le moteur « needs API keys / dry-run only » (FAUX depuis le 16/07 :
+  clés dans .env + runs live faits le 17/07) → cadrage corrigé (dry-run gratuit ; live possible mais gated
+  coût/intention, CLI, ~1/mois) ; (3) manager.md décrivait Maya « weekly Top 50/100 + recurring » (déprécié)
+  → « shortlist / summary+mouvement / trends, cadence mensuelle » ; (4) Inès « via Apollo » → « Kaspr/Apollo ».
+  Aucune logique de code touchée (fixes de prompt) + re-seed. **256 tests verts.** BILAN SESSION : les 8
+  agents de chat sont tous câblés sur la vraie donnée ET leurs prompts sont cohérents entre eux. Pas encore commité.
 - 2026-08-10 (6) — **Maya `/generate` porte enfin sa signature : la TRAJECTOIRE par société (demande
   Betty « continue à améliorer un agent, ou Maya ? »).** Après la refonte des commandes (log (2)), il
   restait un trou spécifique Maya : `/generate <company>` (brief de positionnement, bouton workspace)
