@@ -19,6 +19,7 @@ from typing import Optional
 
 from app.agents.base import BaseAgent
 from app.config import AgentID
+from app.tools.campaign_themes import render_shortlist
 
 IRIS_ID: str = AgentID.IRIS.value
 logger = logging.getLogger(__name__)
@@ -73,9 +74,31 @@ class IrisAgent(BaseAgent):
                 "metadata": {"topic": topic},
             }
 
-        # ── /trends [sector?]  and  /themes ──────────────────────────────
-        if low.startswith("/trends") or low.startswith("/themes"):
-            cmd = "/themes" if low.startswith("/themes") else "/trends"
+        # ── /campaign  and  /themes — the standing campaign spine (deterministic) ─
+        # The 5 Market Intel themes are Nathalie's fixed brief (campaign_themes.py),
+        # the SAME definition Marc grounds each piece in. /themes = the standing
+        # shortlist Iris hands down the chain; /campaign = an explicit alias.
+        if low.startswith("/campaign") or low.startswith("/themes"):
+            cmd = "/campaign" if low.startswith("/campaign") else "/themes"
+            augmented = (
+                f"The user ran `{cmd}`. This is TPDL's standing campaign shortlist — "
+                f"Nathalie's five Market Intel July 2026 themes, the same definition Marc "
+                f"builds content from:\n\n{render_shortlist()}\n\n"
+                f"As Iris, present these as the priority themes for the ICP audience (the six "
+                f"Spanish targets + lookalikes), each framed as a BUSINESS problem not an IT "
+                f"problem, and recommend which ONE is freshest to hand to Marc now (run "
+                f"`/trends <sector>` if you want a live-news read to break the tie). Name the "
+                f"business principle each theme proves — never reframe them as technology stories."
+            )
+            return {
+                "augmented_message": augmented,
+                "action": "scored_themes",
+                "task_title": "Campaign themes",
+                "metadata": {"source": "campaign_spine"},
+            }
+
+        # ── /trends [sector?] — LIVE research + scoring (fresh angles on top) ──
+        if low.startswith("/trends"):
             parts = text.split(maxsplit=1)
             sector = parts[1].strip() if len(parts) > 1 else "pharma medtech dental"
             ctx = _research(f"{sector} industry trends news 2026")
@@ -83,11 +106,13 @@ class IrisAgent(BaseAgent):
                          "(Live web search returned nothing — work from known industry context, "
                          "do not fabricate sources.)\n\n")
             augmented = (
-                f"The user ran `{cmd} {sector}`. {ctx_block}"
+                f"The user ran `/trends {sector}`. {ctx_block}"
                 f"As Iris, identify the most interesting THEMES of the week for {sector} and "
                 f"**score each 0-10** on content-worthiness for TPDL's audience (relevance × "
-                f"timeliness × differentiation). Return a ranked shortlist: theme — score — "
-                f"one-line angle — source if any. Recommend the top 1-2 to hand to Marc for content."
+                f"timeliness × differentiation). Prefer angles that map to one of the five "
+                f"standing campaign themes (see `/campaign`) and to a TPDL business principle. "
+                f"Return a ranked shortlist: theme — score — one-line angle — source if any. "
+                f"Recommend the top 1-2 to hand to Marc for content."
             )
             return {
                 "augmented_message": augmented,

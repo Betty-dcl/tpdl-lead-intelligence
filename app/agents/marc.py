@@ -13,9 +13,18 @@ from typing import Optional
 
 from app.agents.base import BaseAgent
 from app.config import AgentID
+from app.tools.campaign_themes import find_theme, render_brief
 from app.tools.memory import get_brand_dna_block, get_brand_voice_block
 
 MARC_ID: str = AgentID.MARC.value
+
+
+def _campaign_block(theme: str) -> str:
+    """If the free-text theme is one of Iris/Nathalie's campaign themes, hand Marc
+    its structured brief (business principle + audience + reframe) so he grounds
+    the piece correctly instead of starting blind. Empty string when no match."""
+    match = find_theme(theme)
+    return f"\n\n{render_brief(match)}" if match else ""
 
 
 class MarcAgent(BaseAgent):
@@ -34,10 +43,13 @@ class MarcAgent(BaseAgent):
                 }
             theme = parts[1].strip()
             augmented = (
-                f"The user ran `/angles {theme}`.\n\n{get_brand_dna_block()}\n\n{get_brand_voice_block()}\n\n"
+                f"The user ran `/angles {theme}`.\n\n{get_brand_dna_block()}\n\n{get_brand_voice_block()}"
+                f"{_campaign_block(theme)}\n\n"
                 f"As Marc, propose 3-4 DISTINCT content angles for this theme, each tailored to "
                 f"TPDL's audience (C-suite/VP in pharma, medtech, dental, surgery). For each: "
-                f"angle title — the thesis in one line — why it lands now. Recommend the strongest."
+                f"angle title — the thesis in one line — why it lands now. Recommend the strongest. "
+                f"If a campaign theme match is shown above, every angle must prove that business "
+                f"principle and speak to that audience."
             )
             return {
                 "augmented_message": augmented,
@@ -57,12 +69,15 @@ class MarcAgent(BaseAgent):
                 }
             theme = parts[1].strip()
             augmented = (
-                f"The user ran `/content {theme}`.\n\n{get_brand_dna_block()}\n\n{get_brand_voice_block()}\n\n"
+                f"The user ran `/content {theme}`.\n\n{get_brand_dna_block()}\n\n{get_brand_voice_block()}"
+                f"{_campaign_block(theme)}\n\n"
                 f"As Marc, write the intelligent content for this theme, grounded in TPDL's brand "
-                f"voice and (anonymised) real positioning. Structure: strong hook → thesis → "
-                f"argument with concrete points → TPDL angle → clear takeaway. Mark any unconfirmed "
-                f"number as [STAT TO VERIFY] — never invent data, clients or results. This is the "
-                f"substance; hand it to Oliver to format (A4 / carousel / PPT / website)."
+                f"voice and (anonymised) real positioning. If a campaign theme match is shown above, "
+                f"START from that business principle (never from a technology) and write for that "
+                f"audience. Follow the 7-part doctrine: business principle → the pattern → the "
+                f"misdiagnosis → TPDL's principle → evidence → executive implications → takeaway. "
+                f"Mark any unconfirmed number as [STAT TO VERIFY] — never invent data, clients or "
+                f"results. This is the substance; hand it to Oliver to format (A4 / carousel / PPT / website)."
             )
             return {
                 "augmented_message": augmented,

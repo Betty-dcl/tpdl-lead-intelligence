@@ -153,8 +153,12 @@ def test_iris_research_and_themes(client, monkeypatch):
         iris = AGENT_CLASSES["iris"].load(db, "iris")
         r = iris._dispatch_command("/research CRM in pharma")
         assert r["metadata"]["topic"] == "CRM in pharma"
-        t = iris._dispatch_command("/themes dental")
+        # /trends [sector] is the live-research scoring command
+        t = iris._dispatch_command("/trends dental")
         assert t["action"] == "scored_themes" and t["metadata"]["sector"] == "dental"
+        # /themes is now the standing campaign spine (deterministic, no sector)
+        th = iris._dispatch_command("/themes")
+        assert th["action"] == "scored_themes" and th["metadata"]["source"] == "campaign_spine"
 
 
 # ── Marc dispatch (was entirely untested) ───────────────────────────────────

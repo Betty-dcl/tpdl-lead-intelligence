@@ -19,6 +19,27 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-08-10 (3) — **Moteur marketing câblé : Iris → Marc → Oliver sur une colonne vertébrale de
+  thèmes partagée (demande Betty « continue » ; même trou que Maya→Inès avant câblage).** Constat : la
+  chaîne marketing était un RÉCIT, pas un flux — Iris scorait des thèmes dans le vide, Marc/Oliver
+  repartaient d'un thème en TEXTE LIBRE, rien de persisté. Levier : les **5 thèmes de campagne de
+  Nathalie** (Market Intel July 2026) ne vivaient qu'en prose (iris.md §6b + brand-editorial.md §8).
+  **Fait** : (1) nouveau `app/tools/campaign_themes.py` (déterministe, 0 réseau) = les 5 thèmes en
+  DONNÉES structurées (titre · audience · **principe métier prouvé** parmi les 10 · angle · reframe
+  « business problem not IT » · match_terms) + `find_theme()` (route un thème texte-libre) +
+  `render_shortlist()` / `render_brief()`. C'est le `shortlist.py` du marketing (une seule définition
+  pour les 3 agents). (2) **Iris** : `/themes` (+ alias `/campaign`) affiche la colonne vertébrale
+  déterministe ; `/trends [secteur]` reste la recherche LIVE qui score par-dessus (préférer les angles
+  qui mappent la campagne). (3) **Marc** : `/content` + `/angles` injectent le brief campagne quand le
+  thème matche (`_campaign_block`) → part du bon principe métier + audience, plus aveugle ; rappel de la
+  doctrine 7 étapes. (4) **Oliver** : injecte l'audience cible quand le thème matche. Prompts iris.md
+  (§4 + `/campaign`) + marc.md (note grounding) re-formés + re-seed. +10 tests nets (test_campaign_themes.py
+  + test_agents_wiring `/themes`→spine). **252 tests verts.** Vérifié DISPATCH déterministe : le brief
+  campagne traverse Iris→Marc→Oliver (principe « Hidden Cost of Fragmentation » + audience Ferrer/ISDIN
+  sur omnichannel ; audience Med-Affairs sur HCP). ⚠️ Œil-LIVE non fait cette fois (navigateur headless
+  dégradé : refs (0,0), screenshots gris = bug d'outil) — mais chemin chat→LLM = même base.py déjà
+  confirmé live aujourd'hui (Inès/Maya). Pas encore commité au moment de l'écriture. RESTE (maillon
+  suivant proposé) : persister le CONTENU de Marc → Oliver formate le vrai texte (aujourd'hui copier-coller).
 - 2026-08-10 (2) — **Maya REFONDUE (demande Betty « elle sert à quoi si Hugo score déjà ? refais-la, la
   plus pro possible »).** Diagnostic honnête re-posé : Hugo score UNE société (un point) ; Maya lit le
   PORTEFEUILLE + dans le TEMPS (priorisation, mouvement, forme du terrain) = 2 métiers. Le vrai problème

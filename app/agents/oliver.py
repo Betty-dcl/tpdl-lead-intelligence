@@ -16,6 +16,7 @@ from typing import Optional
 
 from app.agents.base import BaseAgent
 from app.config import AgentID
+from app.tools.campaign_themes import find_theme
 
 OLIVER_ID: str = AgentID.OLIVER.value
 
@@ -103,8 +104,14 @@ class OliverAgent(BaseAgent):
                 "task_title": f"/{fmt} (no theme)",
             }
 
+        match = find_theme(theme)
+        audience_line = (
+            f"TARGET AUDIENCE (campaign theme): {match.audience} — prioritise the "
+            f"information this audience cares about first.\n\n" if match else ""
+        )
         augmented = (
             f"The user wants a **{fmt.upper()}** for: {theme}\n\n"
+            f"{audience_line}"
             f"FORMAT SPEC: {FORMAT_SPECS[fmt]}\n\n"
             f"TPDL BRANDING (official charte): near-black #0A0A0A, accent #34D591, Funnel Sans, no AI hype.\n\n"
             f"As Oliver, produce this format. If you don't have Marc's full content, build the "
