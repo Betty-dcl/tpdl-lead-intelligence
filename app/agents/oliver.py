@@ -14,11 +14,43 @@ carousel get refined as we form Oliver further.
 """
 from typing import Optional
 
+from sqlalchemy.orm import Session
+
 from app.agents.base import BaseAgent
 from app.config import AgentID
+from app.models import Task
 from app.tools.campaign_themes import find_theme
 
 OLIVER_ID: str = AgentID.OLIVER.value
+_MARC_CONTENT_PREFIX = "Content — "
+
+
+def find_marc_content(db: Session, theme: str) -> Optional[str]:
+    """Most recent Marc `/content` output matching this theme, or None.
+
+    Marc's chat flow persists each /content piece as a Task (agent_id=marc,
+    title='Content — <theme>', output=<the piece>). Oliver reads it back so he
+    formats Marc's REAL text instead of re-deriving from a bare topic. Match on
+    the campaign theme (both route to the same one) or on the theme text
+    appearing in Marc's task title. Deterministic DB read, no network."""
+    if not theme:
+        return None
+    wanted = find_theme(theme)
+    wanted_norm = theme.strip().lower()
+    tasks = (db.query(Task)
+             .filter(Task.agent_id == AgentID.MARC.value,
+                     Task.title.like(_MARC_CONTENT_PREFIX + "%"),
+                     Task.output.isnot(None))
+             .order_by(Task.id.desc()).limit(30).all())
+    for t in tasks:
+        marc_theme = t.title[len(_MARC_CONTENT_PREFIX):].strip()
+        marc_match = find_theme(marc_theme)
+        if wanted and marc_match and marc_match.key == wanted.key:
+            return t.output
+        ml = marc_theme.lower()
+        if ml and (ml in wanted_norm or wanted_norm in ml):
+            return t.output
+    return None
 
 # TPDL brand (official charte): near-black #0A0A0A, accent #34D591, Funnel Sans.
 FORMAT_SPECS: dict[str, str] = {
@@ -109,18 +141,36 @@ class OliverAgent(BaseAgent):
             f"TARGET AUDIENCE (campaign theme): {match.audience} — prioritise the "
             f"information this audience cares about first.\n\n" if match else ""
         )
+        # Pull Marc's actual content for this theme if he has produced it — then
+        # Oliver formats the REAL piece rather than re-deriving from the topic.
+        marc_content = find_marc_content(self.db, theme)
+        if marc_content:
+            content_block = (
+                f"MARC'S CONTENT — format THIS, do not rewrite the argument:\n"
+                f"\"\"\"\n{marc_content}\n\"\"\"\n\n"
+            )
+            content_instruction = (
+                "Format Marc's content above into the requested layout, preserving his "
+                "argument and every [STAT TO VERIFY] marker exactly. You own the form, not "
+                "the substance."
+            )
+        else:
+            content_block = ""
+            content_instruction = (
+                "You don't have Marc's content for this theme yet (he hasn't run `/content` "
+                "on it). Build the best version from the theme and note in one line that "
+                "Marc's content would sharpen it. Keep substance intact; you own the form."
+            )
         augmented = (
             f"The user wants a **{fmt.upper()}** for: {theme}\n\n"
-            f"{audience_line}"
+            f"{audience_line}{content_block}"
             f"FORMAT SPEC: {FORMAT_SPECS[fmt]}\n\n"
             f"TPDL BRANDING (official charte): near-black #0A0A0A, accent #34D591, Funnel Sans, no AI hype.\n\n"
-            f"As Oliver, produce this format. If you don't have Marc's full content, build the "
-            f"best version from the theme and note one line on what Marc's content would add. "
-            f"Keep substance intact; you own the form."
+            f"As Oliver, produce this format. {content_instruction}"
         )
         return {
             "augmented_message": augmented,
             "action": "produced_format",
             "task_title": f"{fmt.upper()} — {theme[:50]}",
-            "metadata": {"format": fmt, "theme": theme},
+            "metadata": {"format": fmt, "theme": theme, "used_marc_content": bool(marc_content)},
         }

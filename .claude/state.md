@@ -19,6 +19,20 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-08-10 (4) — **Maillon Marc → Oliver câblé : Oliver formate le VRAI contenu de Marc (suite
+  « continue » Betty).** Constat : après avoir câblé Iris→Marc sur la colonne vertébrale (log (3)), il
+  restait le copier-coller Marc→Oliver — Oliver re-dérivait le contenu depuis le thème nu. Levier : le
+  flux chat persiste DÉJÀ chaque `/content` de Marc comme `Task` (agent_id=marc, title=« Content — <thème> »,
+  output=<la pièce>) — donc AUCUNE nouvelle table. **Fait** : `find_marc_content(db, theme)` dans
+  `oliver.py` (lecture DB déterministe) retrouve la dernière pièce de Marc qui matche le thème (match par
+  thème de campagne via `find_theme`, ou par titre) ; injectée dans l'augmented d'Oliver (« MARC'S CONTENT
+  — format THIS, do not rewrite ») avec préservation exacte des marqueurs `[STAT TO VERIFY]` ; métadonnée
+  `used_marc_content`. Fallback propre (note « Marc's content would sharpen it ») quand Marc n'a pas encore
+  produit sur ce thème. Prompt oliver.md §4 re-formé + re-seed. +1 test (Task Marc réelle → Oliver la
+  récupère + préserve les marqueurs ; thème sans contenu → fallback). **253 tests verts.** ⚠️ Vérif =
+  test déterministe (le drawer chat headless était intermittent aujourd'hui) ; chemin chat→LLM = même
+  base.py déjà confirmé live (Inès/Maya). ⚠️ Le contenu n'est persisté que par le flux CHAT (`respond`),
+  PAS par le bouton workspace `/generate` (`generate_one_shot` ne persiste pas). Pas encore commité.
 - 2026-08-10 (3) — **Moteur marketing câblé : Iris → Marc → Oliver sur une colonne vertébrale de
   thèmes partagée (demande Betty « continue » ; même trou que Maya→Inès avant câblage).** Constat : la
   chaîne marketing était un RÉCIT, pas un flux — Iris scorait des thèmes dans le vide, Marc/Oliver

@@ -96,3 +96,34 @@ def test_oliver_adds_audience_for_campaign_theme(client):
         out = oliver._dispatch_command("/carousel HCP engagement in the digital age")
         assert "TARGET AUDIENCE (campaign theme)" in out["augmented_message"]
         assert "Medical Affairs" in out["augmented_message"]
+
+
+def test_oliver_formats_marcs_stored_content(client):
+    """Marc → Oliver hand-off: Oliver pulls Marc's actual /content piece (persisted
+    as a Task) and formats THAT, instead of re-deriving from the bare theme."""
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    from app.models import Task
+    with SessionLocal() as db:
+        # Simulate Marc having produced content on the omnichannel campaign theme.
+        t = Task(agent_id="marc",
+                 title="Content — Omnichannel is a data problem, not a channel",
+                 description="/content ...", status="done",
+                 output="HOOK: channels multiply, coherence collapses. [STAT TO VERIFY] 60%...")
+        db.add(t)
+        db.commit()
+        try:
+            oliver = AGENT_CLASSES["oliver"].load(db, "oliver")
+            out = oliver._dispatch_command("/carousel omnichannel is a data problem")
+            msg = out["augmented_message"]
+            assert "MARC'S CONTENT" in msg
+            assert "channels multiply, coherence collapses" in msg   # his real text
+            assert "[STAT TO VERIFY]" in msg                          # markers preserved
+            assert out["metadata"]["used_marc_content"] is True
+            # an unrelated theme with no Marc content falls back cleanly
+            other = oliver._dispatch_command("/carousel quarterly tax filing")
+            assert other["metadata"]["used_marc_content"] is False
+            assert "MARC'S CONTENT" not in other["augmented_message"]
+        finally:
+            db.query(Task).filter(Task.id == t.id).delete()
+            db.commit()
