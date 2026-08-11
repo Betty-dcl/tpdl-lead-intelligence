@@ -88,6 +88,52 @@ def test_apollo_fetch_degrades_on_http_error(monkeypatch):
     assert apollo.fetch_contacts("Acme") == []           # never crashes the caller
 
 
+def test_julie_draft_anchors_on_intelligence_summary(client):
+    """The constitution says every message anchors on Hugo's 3-phrase Intelligence
+    Summary — /draft must feed it, not just the raw signal."""
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    from app.models import Company
+    with SessionLocal() as db:
+        c = (db.query(Company)
+             .filter(Company.icp_flag.is_(False),
+                     Company.intelligence_summary.isnot(None))
+             .first())
+        if c is None:
+            pytest.skip("no company with an intelligence summary")
+        julie = AGENT_CLASSES["julie"].load(db, "julie")
+        msg = julie._dispatch_command(f"/draft {c.name}")["augmented_message"]
+        assert "INTELLIGENCE SUMMARY" in msg
+        assert c.intelligence_summary.strip()[:40] in msg     # the real summary text is fed
+
+
+def test_julie_linkedin_is_company_aware(client):
+    """/linkedin <company> pulls the real trigger + Intelligence Summary from the
+    scored universe (LinkedIn is the primary channel); free text still works."""
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    from app.models import Company
+    with SessionLocal() as db:
+        c = (db.query(Company)
+             .filter(Company.icp_flag.is_(False),
+                     Company.s1_category.isnot(None))
+             .first())
+        if c is None:
+            pytest.skip("no scored company with a signal")
+        julie = AGENT_CLASSES["julie"].load(db, "julie")
+        out = julie._dispatch_command(f"/linkedin {c.name}")
+        assert out["metadata"]["company"] == c.name              # resolved to the company
+        assert out["task_title"] == f"LinkedIn — {c.name}"
+        msg = out["augmented_message"]
+        assert "TRIGGER (Hugo's strongest signal)" in msg
+        assert "INTELLIGENCE SUMMARY" in msg
+        assert "PLAYBOOK" in msg                                  # still obeys the playbook
+        # ad-hoc free text (not a company) keeps the old behaviour
+        adhoc = julie._dispatch_command("/linkedin quick hello note to a friend")
+        assert adhoc["action"] == "drafted_linkedin"
+        assert "company" not in adhoc["metadata"]
+
+
 # ── #17 Julie writes TO Inès's stored contact ──────────────────────────────
 
 def test_julie_draft_addresses_stored_contact(client):

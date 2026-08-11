@@ -68,8 +68,8 @@ The vocabulary is part of the brand (from the brand DNA). Prefer TPDL's language
 
 - **`/sectors`** — the configured sectors and whether each angle is defined (✅) or still a placeholder (⏳). Explain each sector drives a tailored angle and the ⏳ ones await TPDL positioning.
 - **`/segment [sector]`** — the current angle + proof points for a sector. If it's a placeholder, say so and ask TPDL for the positioning (who we helped, what outcome, what proof).
-- **`/draft [company]`** — a segmented, signal-anchored outbound **email** (subject + ~120–150-word body, first line cites the signal, brand voice, light CTA, signed "TPDL"). If the sector angle is a placeholder, write the strong generic-but-sector-aware version and flag what would sharpen it. *(`/generate [company]` is the workspace-button alias.)*
-- **`/linkedin [contact + trigger]`** — a LinkedIn DM in Andrés's voice per the playbook. Missing trigger or contact details, or an out-of-scope contact → **ask before drafting**.
+- **`/draft [company]`** — a segmented, signal-anchored outbound **email** (subject + ~120–150-word body, first line cites the signal, brand voice, light CTA, signed "TPDL"). You are handed the company's **Intelligence Summary** (Hugo's 3-phrase read: situation / signal status / TPDL timing) — anchor the message on it, per the constitution. If the sector angle is a placeholder, write the strong generic-but-sector-aware version and flag what would sharpen it. *(`/generate [company]` is the workspace-button alias.)*
+- **`/linkedin [company | contact + trigger]`** — a LinkedIn DM in Andrés's voice per the playbook. **If you name a scored company** (e.g. `/linkedin Cantabria Labs`), the trigger is pulled automatically from its real signal + Intelligence Summary and the recipient from Inès's stored contact — you don't ask for a trigger. For an **ad-hoc contact** not in the universe, pass the contact + trigger as free text; if the trigger or contact is missing, or the contact is out of scope → **ask before drafting**.
 
 # 8. Hard rules
 

@@ -19,6 +19,24 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-08-10 (5) — **Julie câblée sur les vraies données (demande Betty « reprends la mémoire, améliore
+  encore un agent »).** Fil rouge de la session = câbler chaque agent sur la donnée réelle, pas du texte
+  libre. Julie était déjà bien câblée sur `/draft` (signal + angle secteur + contact d'Inès + langue),
+  mais 2 trous SANS dépendance de contenu : (1) `/draft` n'injectait PAS l'**Intelligence Summary** (les
+  3 phrases de Hugo) — or la constitution dit que chaque message s'ancre dessus ; (2) `/linkedin` n'était
+  PAS société-aware (docstring disait `[company]`, le code traitait tout en texte libre → aucun signal réel
+  tiré) alors que LinkedIn = canal PRIORITAIRE (Premium 5, lunch, voix Andrés). **Fait** : (1) `/draft`
+  injecte `company.intelligence_summary` comme ancre. (2) nouveau `_resolve_company_in_text()` → `/linkedin
+  Cantabria Labs [+ trigger libre]` résout la société (nom entier, sous-chaîne, ou plus longue société
+  contenue dans le texte), tire signal + Intelligence Summary + contact primaire d'Inès + `detect_country`
+  (règles Espagne→espagnol+in-person / CH→anglais+in-person du playbook), garde le reste comme contexte
+  opérateur ; **fallback texte-libre préservé** pour un contact ad-hoc hors univers. Prompt julie.md §7
+  re-formé (`/draft` ancre summary, `/linkedin [company | contact+trigger]`) + re-seed. +2 tests. **255
+  tests verts.** Vérifié DISPATCH (Cantabria Labs : /draft ancre le summary ; /linkedin résout ES + signal
+  départ CEO avril 2026 + « new CEO just appointed » capturé). ⚠️ Vérif = déterministe (drawer chat headless
+  intermittent) ; chemin chat→LLM = base.py déjà confirmé live (Inès/Maya). Reste content-bloqué (indépendant
+  du câblage) : chiffres clients Andrés + prompt messaging Nathalie + contacts réels (Apollo débranché).
+  Pas encore commité au moment de l'écriture.
 - 2026-08-10 (4) — **Maillon Marc → Oliver câblé : Oliver formate le VRAI contenu de Marc (suite
   « continue » Betty).** Constat : après avoir câblé Iris→Marc sur la colonne vertébrale (log (3)), il
   restait le copier-coller Marc→Oliver — Oliver re-dérivait le contenu depuis le thème nu. Levier : le
@@ -1026,14 +1044,19 @@
 
 ## Dernière session
 - Date : 2026-08-10
-- Fait : **Inès améliorée (brief scraper exploitable + classifieur ES/FR durci) puis Maya REFONDUE**
-  (voir logs 2026-08-10 (1) et (2) en haut). Réponses aux vraies questions de Betty : le « 90 » sur la
-  page Sales = rang, pas total (135 = 90 in-scope affichées + 45 hors-ICP masquées) ; Maya ABSENTE de la
-  table de dépense = 0 appel LLM ≠ inutile ; verdict Maya = garder + resserrer (scoreur vs analyste de
-  portefeuille, `/top`+`/recurring` dépréciés, `/summary` flagship). **243 tests verts**, vérifié LIVE.
-  ⚠️ Serveur preview sans `--reload` → redémarrer pour charger le code. RESTE : 2 commits (Inès / Maya) +
-  décider quel agent avancer ensuite (Julie content-bloquée sur chiffres clients Andrés + contacts réels ;
-  Iris/Marc/Oliver avançables sans contenu neuf — moteur marketing = candidat naturel).
+- Fait : **grosse session « câbler chaque agent sur la vraie donnée » — 5 agents améliorés + 5 commits.**
+  (1) **Inès** — brief scraper exploitable (tie-back §3c, Med-Affairs séparé, config Sales Nav) +
+  classifieur ES/FR durci [commit 71ac97d]. (2) **Maya** REFONDUE — scoreur vs analyste de portefeuille,
+  `/summary` flagship, `/top`+`/recurring` dépréciés [3214b7b]. (3) **Moteur marketing câblé** —
+  colonne vertébrale campagne partagée `campaign_themes.py`, Iris→Marc [e0d057c] puis Marc→Oliver
+  (Oliver formate le vrai contenu de Marc) [dcf2027]. (4) **Julie** câblée sur la vraie donnée — `/draft`
+  ancre l'Intelligence Summary, `/linkedin` devient société-aware [à committer]. Voir logs (1)-(5) en haut.
+  **255 tests verts.** ⚠️ Le drawer chat headless était intermittent aujourd'hui → vérifs surtout
+  déterministes ; chemin chat→LLM confirmé live tôt dans la session (Inès `/contacts`, Maya `/summary`).
+  ⚠️ Serveur preview sans `--reload` → redémarrer pour charger un changement de code.
+  RESTE : committer Julie ; les 8 agents de chat sont maintenant tous câblés sur la donnée réelle — la
+  suite du travail est du CONTENU (chiffres clients Andrés, prompt messaging Nathalie, contacts Apollo/Kaspr),
+  plus du câblage. Idées : passe qualité live quand le navigateur coopère ; push GitHub.
 - Date : 2026-08-03
 - Fait : **passe qualité données** (Betty « comment améliorer la plateforme » → axe #4 choisi). Audit
   Vera réel d'abord (notes périmées : Unknown 273→5, 0 doublon, 0 loc manquante, poubelle déjà nettoyée).

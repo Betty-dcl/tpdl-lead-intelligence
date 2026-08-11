@@ -14,6 +14,7 @@ Slash commands:
 Sector angles are populated with TPDL's real (anonymised) positioning (see
 app/tools/sectors.py); brand voice + the real company signal ground every draft.
 """
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -23,6 +24,7 @@ from app.database import SessionLocal
 from app.models import Company, Contact
 from app.tools import sectors as sector_tool
 from app.tools.memory import get_brand_dna_block, get_brand_voice_block
+from app.tools.radars import detect_country
 
 JULIE_ID: str = AgentID.JULIE.value
 
@@ -48,6 +50,30 @@ def _find_company(name: str) -> Optional[Company]:
             if c.name.lower() == name_low or name_low in c.name.lower():
                 return c
     return None
+
+
+def _resolve_company_in_text(text: str) -> tuple[Optional[Company], str]:
+    """Resolve a company from a /linkedin argument → (company, extra_context).
+
+    Tries the whole string first (a clean company name or a substring of one),
+    then the longest known company name that appears inside the text — so
+    `/linkedin Cantabria Labs new CEO` still anchors on Cantabria and keeps
+    'new CEO' as extra operator context. Returns (None, text) when nothing
+    resolves, so ad-hoc free-text outreach still works."""
+    c = _find_company(text)
+    if c:
+        return c, ""
+    low = text.lower()
+    best: Optional[Company] = None
+    with SessionLocal() as db:
+        for row in db.query(Company).all():
+            nl = row.name.lower()
+            if len(nl) >= 5 and nl in low and (best is None or len(row.name) > len(best.name)):
+                best = row
+    if best:
+        extra = re.sub(re.escape(best.name), "", text, flags=re.I).strip(" ,.-—:")
+        return best, extra
+    return None, text
 
 
 def _strongest_signal(c: Company) -> Optional[dict]:
@@ -152,6 +178,54 @@ class JulieAgent(BaseAgent):
                     ),
                     "action": "drafted_linkedin", "task_title": "/linkedin (need details)",
                 }
+
+            # Company-aware: if the argument resolves to a scored company, the trigger
+            # comes from its real signal + intelligence summary and the recipient from
+            # Inès's stored contact — no need to make the operator hand-type any of it
+            # (LinkedIn is TPDL's primary channel). Free-text ad-hoc outreach still works.
+            company, extra = _resolve_company_in_text(operator_input)
+            if company is not None:
+                sig = _strongest_signal(company)
+                sig_str = (f"{sig['category']} — {sig['what_happened']} "
+                           f"(TPDL relevance: {sig['tpdl_relevance']})"
+                           if sig else "no evidenced signal — keep it light, curiosity-led")
+                contact = _primary_contact(company.name)
+                contact_line = (
+                    f"{contact.full_name} · {contact.title or '—'} · seniority "
+                    f"{contact.seniority or '—'} · language {contact.language or 'en'}"
+                    if contact else
+                    "no contact pulled yet (Apollo not connected) — address the likely "
+                    "decision-maker for this signal generically"
+                )
+                country = detect_country(company.location)
+                isum = (company.intelligence_summary or "").strip() or "(no intelligence summary stored)"
+                extra_line = f"\nExtra operator context: {extra}" if extra else ""
+                augmented = (
+                    f"Draft a LinkedIn message strictly following the Andres Burdett outreach "
+                    f"system prompt below. This is anchored on a REAL scored company, so the "
+                    f"trigger comes from its evidenced signal — do NOT ask the operator for one.\n\n"
+                    f"COMPANY: {company.name} · {company.sector_bucket or '—'} · "
+                    f"{company.location or '—'}{f' · country={country}' if country else ''}\n"
+                    f"CONTACT: {contact_line}\n"
+                    f"TRIGGER (Hugo's strongest signal): {sig_str}\n"
+                    f"INTELLIGENCE SUMMARY (Hugo's 3-phrase read — anchor on this):\n{isum}"
+                    f"{extra_line}\n\n"
+                    f"Apply every playbook rule: Andres's voice (no dashes anywhere, ≤90 words, "
+                    f"peer-to-peer), the location rules (Spain→Spanish + in-person lunch/coffee; "
+                    f"Switzerland→English + in-person; else standard LinkedIn), trigger framing from "
+                    f"the signal above, the expertise-anchor close, the two-line sign-off, and the "
+                    f"exact OUTPUT FORMAT. Still run the scope check: if the company looks out of "
+                    f"scope (CDMO/manufacturer/wrong division) flag it. Never invent a client or result.\n\n"
+                    f"{get_brand_dna_block()}\n\n=== PLAYBOOK ===\n{playbook}"
+                )
+                return {
+                    "augmented_message": augmented,
+                    "action": "drafted_linkedin",
+                    "task_title": f"LinkedIn — {company.name}",
+                    "metadata": {"channel": "linkedin", "company": company.name,
+                                 "recipient": contact.full_name if contact else None},
+                }
+
             augmented = (
                 f"Draft a LinkedIn message strictly following the Andres Burdett outreach system "
                 f"prompt below. Apply every rule: his voice (no dashes anywhere, ≤90 words, peer-to-"
@@ -209,12 +283,15 @@ class JulieAgent(BaseAgent):
                 recipient_line = ("RECIPIENT: no contact pulled yet (Apollo not connected) — "
                                   "address the likely decision-maker for this signal generically.")
                 lang_note = "Write in English."
+            isum = (c.intelligence_summary or "").strip() or "(no intelligence summary stored)"
             augmented = (
                 f"The user ran `/draft {c.name}`. Write ONE outreach message.\n\n"
                 f"COMPANY: {c.name} · sector: {c.sector_bucket or '—'} · {c.location or '—'} · "
                 f"score {c.assessed_score}\n"
                 f"{recipient_line}\n"
                 f"STRONGEST SIGNAL: {sig_str}\n"
+                f"INTELLIGENCE SUMMARY (Hugo's 3-phrase read — anchor the message on this, per the "
+                f"constitution: situation / signal status / TPDL timing):\n{isum}\n"
                 f"SECTOR ANGLE ({c.sector_bucket or 'n/a'}): {cfg['angle']}\n\n"
                 f"{get_brand_dna_block()}\n\n"
                 f"{get_brand_voice_block()}\n\n"
