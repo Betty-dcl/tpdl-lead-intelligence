@@ -19,6 +19,17 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-08-10 (6) — **Maya `/generate` porte enfin sa signature : la TRAJECTOIRE par société (demande
+  Betty « continue à améliorer un agent, ou Maya ? »).** Après la refonte des commandes (log (2)), il
+  restait un trou spécifique Maya : `/generate <company>` (brief de positionnement, bouton workspace)
+  montrait rang / bande / pairs sectoriels / nb signaux mais PAS le mouvement dans le temps — or le
+  mouvement EST ce qui distingue Maya de Hugo (Hugo score un point ; Maya lit la direction). **Fait** :
+  nouveau `_company_trajectory(db, name)` (déterministe, RunSnapshot, collapse batches → 1 point/run,
+  ordre CHRONOLOGIQUE) → ligne « Movement across N runs: 25/05 7.0 → 17/07 8.5 (↑ rising, +1.5) » injectée
+  dans le brief `/generate` + consigne « pondère la trajectoire autant que le score absolu ». Fallback
+  propre (« first appearance this run » / « no snapshot yet »). +1 test. **256 tests verts.** Vérifié
+  DISPATCH réel : Cantabria 7.0→8.5 (+1.5), Ferrer 6.0→8.0 (+2.0), Roche 7.0→8.0 — tous « rising,
+  prioritise ». Pas encore commité au moment de l'écriture.
 - 2026-08-10 (5) — **Julie câblée sur les vraies données (demande Betty « reprends la mémoire, améliore
   encore un agent »).** Fil rouge de la session = câbler chaque agent sur la donnée réelle, pas du texte
   libre. Julie était déjà bien câblée sur `/draft` (signal + angle secteur + contact d'Inès + langue),

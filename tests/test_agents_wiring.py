@@ -241,6 +241,33 @@ def test_maya_top_and_recurring_are_deprecated_redirects(client):
         assert "Recurring page" in rec["augmented_message"] and "/summary" in rec["augmented_message"]
 
 
+def test_maya_generate_shows_company_trajectory(client):
+    """Maya's per-company positioning brief must carry the company's cross-run
+    trajectory (her signature lens), not just today's rank."""
+    from app.agents import AGENT_CLASSES
+    from app.database import SessionLocal
+    from app.models import Company, RunSnapshot
+    with SessionLocal() as db:
+        db.add(Company(name="Zzy Traj Co", sector_bucket="Pharma",
+                       assessed_score=8.5, icp_flag=False, coverage="2 of 6"))
+        for run, day, score in (("trajA", 25, 6.0), ("trajB", 26, 8.5)):
+            db.add(RunSnapshot(import_run_id=run, company_name="Zzy Traj Co",
+                               assessed_score=score, coverage="2 of 6",
+                               outreach_eligible=(score >= 8), signals_found=2,
+                               run_date=datetime(2026, 5, day)))
+        db.commit()
+        try:
+            maya = AGENT_CLASSES["maya"].load(db, "maya")
+            msg = maya._dispatch_command("/generate Zzy Traj Co")["augmented_message"]
+            assert "Movement across 2 runs" in msg
+            assert "6.0" in msg and "8.5" in msg and "rising" in msg   # chronological rise
+            assert "0.2→" not in msg
+        finally:
+            db.query(RunSnapshot).filter(RunSnapshot.company_name == "Zzy Traj Co").delete()
+            db.query(Company).filter(Company.name == "Zzy Traj Co").delete()
+            db.commit()
+
+
 def test_maya_summary_is_the_run_executive_read(client):
     """/summary is Maya's flagship: eligible headline + top scores + movement."""
     from app.agents import AGENT_CLASSES

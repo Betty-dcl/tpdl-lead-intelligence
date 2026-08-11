@@ -97,6 +97,42 @@ def _fmt_trajectory(rows, arrow) -> str:
     ) or "  (none)"
 
 
+def _company_trajectory(db, name: str) -> str:
+    """Maya's signature lens for ONE company: its CHRONOLOGICAL score path across
+    runs, as a one-line movement read. A positioning brief should say whether the
+    company is rising, falling or new — not just where it ranks today. Returns a
+    ready-to-inject line (deterministic; collapses batches to one point per run)."""
+    from app.models import RunSnapshot
+    snaps = (db.query(RunSnapshot)
+             .filter(RunSnapshot.company_name == name)
+             .order_by(RunSnapshot.run_date, RunSnapshot.id).all())
+    if not snaps:
+        return "Movement: no run-history snapshot yet (activates from the second imported run)."
+    per_run: dict = {}
+    order: list = []
+    for s in snaps:
+        rid = s.import_run_id
+        if rid not in per_run:
+            per_run[rid] = {"date": s.run_date, "score": s.assessed_score or 0}
+            order.append(rid)
+        else:
+            per_run[rid]["score"] = max(per_run[rid]["score"], s.assessed_score or 0)
+
+    def _lbl(dt) -> str:
+        return dt.date().isoformat() if dt else "?"
+
+    path = [(per_run[r]["date"], per_run[r]["score"]) for r in order]
+    if len(path) < 2:
+        return (f"Movement: first appearance this run ({_lbl(path[0][0])} · "
+                f"{path[0][1]}) — no prior history to compare.")
+    first, last = path[0][1], path[-1][1]
+    delta = last - first
+    arrow = "↑ rising" if delta > 0 else "↓ falling" if delta < 0 else "→ flat"
+    chain = " → ".join(f"{_lbl(d)} {sc}" for d, sc in path)
+    return (f"Movement across {len(path)} runs: {chain}  ({arrow}, {delta:+.1f} since first "
+            f"appearance) — Maya's key lens: {'heating up, prioritise' if delta > 0 else 'cooling, say whether to keep monitoring or deprioritise' if delta < 0 else 'stable'}.")
+
+
 class MayaAgent(BaseAgent):
     def _dispatch_command(self, user_message: str) -> Optional[dict]:
         text = user_message.strip()
@@ -146,6 +182,7 @@ class MayaAgent(BaseAgent):
                     db.query(func.count(Signal.id))
                     .filter(Signal.company_name == c.name).scalar() or 0
                 )
+                trajectory = _company_trajectory(db, c.name)
             band = ("8+ Eligible" if c.assessed_score >= 8 else
                     "5-7 Monitor" if c.assessed_score >= 5 else
                     "1-4 Weak" if c.assessed_score >= 1 else "0 No signal")
@@ -165,11 +202,13 @@ class MayaAgent(BaseAgent):
                 f"Outreach Eligible: {c.outreach_eligible}\n"
                 f"{position_line}\n"
                 f"Sector peers in scope ({c.sector_bucket or '—'}): {sector_peers}\n"
-                f"Evidenced signals: {sig_count}\n\n"
+                f"Evidenced signals: {sig_count}\n"
+                f"{trajectory}\n\n"
                 f"As Maya, give the shortlist verdict in a few tight lines: where this company "
-                f"sits in the current universe, whether to PRIORITISE / MONITOR / DEPRIORITISE "
-                f"and why, and what the next pipeline step is (Inès for contacts if prioritised). "
-                f"Reason only from the data above — never invent."
+                f"sits in the current universe, its TRAJECTORY (rising/falling/new — your key "
+                f"lens, weight it as heavily as the absolute score), whether to PRIORITISE / "
+                f"MONITOR / DEPRIORITISE and why, and the next pipeline step (Inès for contacts "
+                f"if prioritised). Reason only from the data above — never invent."
             )
             return {
                 "augmented_message": augmented,
