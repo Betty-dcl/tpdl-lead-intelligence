@@ -98,6 +98,23 @@ def test_oliver_adds_audience_for_campaign_theme(client):
         assert "Medical Affairs" in out["augmented_message"]
 
 
+def test_marketing_pipeline_endpoint_assembles_three_stages(client):
+    """The /api/marketing/pipeline demo assembles Iris → Marc → Oliver for one
+    campaign theme, deterministically (no LLM), mirroring the Sales demo."""
+    r = client.get("/api/marketing/pipeline?theme=omnichannel").json()
+    assert [p["key"] for p in r["picker"]] == [t.key for t in CAMPAIGN_THEMES]
+    assert r["theme"]["key"] == "omnichannel-data"
+    # Iris names the business principle; Marc starts from the SAME one
+    assert r["iris"]["business_principle"] == r["marc"]["start_from"]
+    assert len(r["marc"]["doctrine"]) == 7
+    # Oliver knows the audience + which formats render to a file
+    assert r["oliver"]["audience"] == r["theme"]["audience"]
+    files = {f["type"]: f["file"] for f in r["oliver"]["formats"]}
+    assert files["a4"] == "PDF" and files["ppt"] == "PPTX" and files["carousel"] is None
+    # default (no theme) falls back to the first theme
+    assert client.get("/api/marketing/pipeline").json()["theme"]["key"] == CAMPAIGN_THEMES[0].key
+
+
 def test_oliver_formats_marcs_stored_content(client):
     """Marc → Oliver hand-off: Oliver pulls Marc's actual /content piece (persisted
     as a Task) and formats THAT, instead of re-deriving from the bare theme."""

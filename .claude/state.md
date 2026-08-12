@@ -19,6 +19,19 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-08-10 (8) — **Démo pipeline MARKETING sur « How it works » (demande Betty « continue à améliorer
+  la plateforme »).** Pendant de la démo sales du 03/08 : rend visible le câblage Iris→Marc→Oliver de
+  cette session. **Fait** : (1) endpoint `GET /api/marketing/pipeline?theme=` (`app/routers/marketing.py`)
+  qui assemble les 3 étapes pour UN thème de campagne, **déterministe, 0 LLM** (réutilise `campaign_themes.py`
+  + `oliver.find_marc_content`) : Iris (thème + principe métier prouvé + audience) → Marc (start-from le
+  principe, doctrine 7 étapes, mots interdits, marqueur [STAT TO VERIFY]) → Oliver (audience + 5 formats
+  dont a4→PDF/ppt→PPTX en fichier + drapeau « contenu Marc prêt »). Picker = les 5 thèmes de Nathalie.
+  (2) Section AJOUTÉE dans `how_it_works.html` (« See the marketing engine work a theme ») : sélecteur +
+  3 cartes en flux, JS vanilla inline (réutilise les classes CSS de la démo sales, 0 CSS neuf). **Vérifié
+  live** (serveur QA :8010, 0 erreur console) : picker 5 thèmes, 3 cartes Iris/Marc/Oliver, réagit au
+  changement (omnichannel → principe « Hidden Cost of Fragmentation » + audience Ferrer/ISDIN ; HCP →
+  Enterprise Architecture + Medical Affairs). +1 test. **257 verts.** Complète (ne double PAS) la démo sales.
+  Pas encore commité au moment de l'écriture.
 - 2026-08-10 (7) — **Audit des 3 agents non revus (Hugo, Vera, Alex) + fix des obsolescences de routage
   (demande Betty « vérifie chaque agent »).** Verdict : **Hugo** (moteur : /scan, /company brief intégral +
   fraîcheur, /stats, /candidates, /rerun honnête) et **Vera** (audit d'intégrité déterministe univers +

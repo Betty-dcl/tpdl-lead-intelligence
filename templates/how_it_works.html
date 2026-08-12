@@ -112,6 +112,26 @@
       until then Inès shows the exact persona set and search she'd hand to the scraper.</p>
   </section>
 
+  <!-- ============ MARKETING CHAIN DEMO ============ -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold mb-1">See the marketing engine work a theme</h2>
+    <p class="text-ink-2 text-sm mb-4">The second engine turns market signal into TPDL's voice — three agents in turn,
+      each <strong>reading the previous one's output</strong>. Pick a campaign theme and watch it flow.</p>
+
+    <div class="flex flex-wrap items-center gap-2 mb-5">
+      <label for="mktPick" class="text-xs text-ink-3">Campaign theme</label>
+      <select id="mktPick" class="chain-select" aria-label="Pick a campaign theme"></select>
+    </div>
+
+    <div id="mktFlow" class="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-6">
+      <div class="text-sm text-ink-3">Loading the campaign themes…</div>
+    </div>
+    <p class="text-[11px] text-ink-3 mt-4 max-w-2xl">Assembled from the shared campaign-theme spine — the five themes
+      Nathalie defined for the Market Intel campaign. Iris surfaces &amp; scores, Marc grounds each piece in the
+      business principle it proves (never a technology), Oliver formats it for the audience — using Marc's real
+      content once he's written it.</p>
+  </section>
+
   <!-- ============ THE FORMULA ============ -->
   <section class="mb-12">
     <h2 class="text-xl font-semibold mb-2">How a score is built</h2>
@@ -263,6 +283,69 @@
           pick.innerHTML = d.picker.map(p => `<option value="${esc(p.name)}">${esc(p.name)} — ${esc(p.score)}</option>`).join("");
         }
         if (d.company) pick.value = d.company;
+        render(d);
+      })
+      .catch(() => { flow.innerHTML = '<div class="text-sm text-ink-3">Could not load the chain.</div>'; });
+  }
+
+  pick.addEventListener("change", () => load(pick.value));
+  load();
+})();
+</script>
+
+<script>
+(function () {
+  const esc = s => (s == null ? "" : String(s).replace(/[&<>"]/g, c =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c])));
+  const pick = document.getElementById("mktPick");
+  const flow = document.getElementById("mktFlow");
+  if (!pick || !flow) return;
+
+  const card = (role, name, body) =>
+    `<div class="chain-card"><div class="chain-head">
+       <div class="chain-role">${esc(role)}</div><div class="chain-name">${esc(name)}</div>
+     </div><div class="chain-body">${body}</div></div>`;
+
+  function render(d) {
+    const t = d.theme || {};
+    const iris = card("1 · Research & score", "Iris",
+      `<div><span class="k">theme</span><br><strong>${esc(t.title)}</strong></div>
+       <div style="margin-top:.5rem"><span class="k">proves</span> ${esc(t.business_principle)}</div>
+       <div style="margin-top:.4rem"><span class="k">audience</span>
+         <div style="color:var(--tpdl-text-faint);margin-top:.15rem">${esc(t.audience)}</div></div>
+       <div style="margin-top:.5rem"><span class="chain-chip chip-green">content-worthy → Marc</span></div>`);
+
+    const m = d.marc || {};
+    const steps = (m.doctrine || []).map((s, i) => `<span class="role-chip">${i + 1}. ${esc(s)}</span>`).join("");
+    const marc = card("2 · Write", "Marc",
+      `<div><span class="k">start from</span><br><strong>${esc(m.start_from)}</strong>
+         <span style="color:var(--tpdl-text-faint)">(never a technology)</span></div>
+       <div style="margin-top:.5rem"><span class="k">reframe</span>
+         <div style="color:var(--tpdl-text-faint);margin-top:.15rem">${esc(m.reframe)}</div></div>
+       <div style="margin-top:.5rem"><span class="k">7-part doctrine</span>
+         <div style="margin-top:.2rem">${steps}</div></div>
+       <div style="margin-top:.5rem"><span class="chain-chip chip-grey">unverified → ${esc(m.unverified_marker)}</span></div>`);
+
+    const o = d.oliver || {};
+    const fmts = (o.formats || []).map(f =>
+      `<span class="role-chip">${esc(f.label)}${f.file ? " · " + esc(f.file) : ""}</span>`).join("");
+    const oliver = card("3 · Format", "Oliver",
+      `<div><span class="k">for</span>
+         <div style="color:var(--tpdl-text-faint);margin-top:.15rem">${esc(o.audience)}</div></div>
+       <div style="margin-top:.5rem"><span class="k">formats</span><div style="margin-top:.2rem">${fmts}</div></div>
+       <div style="margin-top:.5rem"><span class="chain-chip ${o.marc_content_ready ? "chip-green" : "chip-grey"}">${o.marc_content_ready ? "formatting Marc's content" : "awaiting Marc's content"}</span></div>`);
+
+    flow.innerHTML = iris + marc + oliver;
+  }
+
+  function load(theme) {
+    fetch("/api/marketing/pipeline" + (theme ? "?theme=" + encodeURIComponent(theme) : ""))
+      .then(r => r.json())
+      .then(d => {
+        if (!pick.options.length && d.picker) {
+          pick.innerHTML = d.picker.map(p => `<option value="${esc(p.key)}">${esc(p.title)}</option>`).join("");
+        }
+        if (d.theme) pick.value = d.theme.key;
         render(d);
       })
       .catch(() => { flow.innerHTML = '<div class="text-sm text-ink-3">Could not load the chain.</div>'; });

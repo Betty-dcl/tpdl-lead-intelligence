@@ -12,6 +12,82 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marketing", tags=["marketing"])
 
 
+# The 7-part editorial doctrine every Marc piece follows (brand-editorial.md §3).
+_DOCTRINE_STEPS = (
+    "Business Principle", "The Pattern", "The Misdiagnosis",
+    "The Principle (TPDL view + root cause)", "Evidence",
+    "Executive Implications", "Practical Takeaway",
+)
+_BANNED_WORDS = (
+    "digital transformation", "AI-first", "best-in-class",
+    "cutting-edge", "next-generation platform", "omnichannel maturity",
+)
+# Oliver's formats and whether each renders to a downloadable file.
+_OLIVER_FORMATS = (
+    {"type": "a4", "label": "A4 article", "file": "PDF"},
+    {"type": "ppt", "label": "PowerPoint deck", "file": "PPTX"},
+    {"type": "carousel", "label": "LinkedIn carousel", "file": None},
+    {"type": "website", "label": "Website article", "file": None},
+    {"type": "newsletter", "label": "Email newsletter (70/10/20)", "file": None},
+)
+
+
+@router.get("/pipeline")
+def marketing_pipeline(theme: Optional[str] = None, db: Session = Depends(get_db)) -> dict:
+    """Live view of the Marketing chain on ONE campaign theme: Iris → Marc → Oliver.
+
+    Deterministic, no LLM call: each stage's real contribution is assembled from
+    the shared campaign-theme spine (app/tools/campaign_themes.py). The picker is
+    Nathalie's five Market Intel themes; the default is the first. This makes the
+    Iris → Marc → Oliver wiring visible the same way /api/intel/pipeline does for
+    Sales — each stage consumes the previous stage's output as the agents do."""
+    from app.agents.oliver import find_marc_content
+    from app.tools.campaign_themes import CAMPAIGN_THEMES, find_theme
+
+    picker = [{"key": t.key, "title": t.title} for t in CAMPAIGN_THEMES]
+
+    target = None
+    if theme:
+        target = find_theme(theme) or next(
+            (t for t in CAMPAIGN_THEMES if t.key == theme.strip().lower()), None)
+    if target is None:
+        target = CAMPAIGN_THEMES[0]
+
+    marc_content = find_marc_content(db, target.title)
+
+    return {
+        "picker": picker,
+        "theme": {
+            "key": target.key, "title": target.title, "audience": target.audience,
+            "business_principle": target.business_principle,
+            "angle": target.angle, "reframe": target.reframe,
+        },
+        # Iris: surfaces the theme, names the business principle it proves, scores
+        # it content-worthy for the ICP audience, hands the freshest to Marc.
+        "iris": {
+            "business_principle": target.business_principle,
+            "audience": target.audience,
+            "content_worthy": "relevance × timeliness × differentiation — maps to a TPDL business principle",
+            "hands_to": "Marc",
+        },
+        # Marc: grounds the piece in that principle, follows the 7-part doctrine,
+        # never starts from a technology, marks unconfirmed numbers.
+        "marc": {
+            "start_from": target.business_principle,
+            "reframe": target.reframe,
+            "doctrine": list(_DOCTRINE_STEPS),
+            "banned_words": list(_BANNED_WORDS),
+            "unverified_marker": "[STAT TO VERIFY]",
+        },
+        # Oliver: formats Marc's real content (when it exists) for that audience.
+        "oliver": {
+            "audience": target.audience,
+            "formats": list(_OLIVER_FORMATS),
+            "marc_content_ready": bool(marc_content),
+        },
+    }
+
+
 # ---- Carousel Studio schemas -------------------------------------------------
 
 class CarouselGenerateRequest(BaseModel):
