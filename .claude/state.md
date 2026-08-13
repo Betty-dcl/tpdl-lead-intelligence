@@ -19,6 +19,39 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-08-13 — **9e source de recherche pour Hugo : scan social/vidéo via les CLI d'agent-reach
+  (demande Betty « ajoute-lui le skill agent reach pour scraper YouTube/Twitter/LinkedIn/Insta/
+  Reddit »).** Clarifié d'abord : `agent-reach` (skill Claude installé chez Betty) n'est pas
+  appelable par Hugo (agent de chat qui tourne via l'API Anthropic pure) — mais ses CLI sous-
+  jacentes (`opencli`, `yt-dlp`, `mcporter`) SONT de vrais binaires sur PATH, appelables en
+  subprocess depuis `pipeline/`, cohérent avec le fait que les runs live tournent déjà depuis le
+  Terminal de Betty (pas depuis une session Claude Code). **Testé en direct sur Cantabria Labs**
+  avant d'écrire le code : Twitter/Reddit marchent (session Chrome de Betty) ; **LinkedIn jobs**
+  (`opencli linkedin search --company`, ne consomme PAS le quota people-search) marche en
+  principe mais échoue actuellement chez Betty (« Text not found: Jobs » — mismatch de langue UI,
+  pas un bug du code) ; **Instagram** marche via le compte dédié **giraffe.agent** connecté en
+  session ; **YouTube** (yt-dlp) trouve du contenu réel pertinent (interview du CEO Susana
+  Rodríguez Navarro) mais dégrade en bruit générique pour les petites boîtes sans présence vidéo.
+  **Fait** : nouveau `pipeline/social_research.py` (5 fonctions, une par plateforme, fail-open —
+  jamais de crash si une plateforme est hors ligne/pas loguée) + câblé dans `research.gather()`
+  comme **9e source opt-in** (`cfg.social_scan_enabled`, flag CLI `--social-scan`, env
+  `SOCIAL_SCAN_ENABLED`) — désactivé par défaut, car c'est de l'automatisation navigateur (lent,
+  soumis aux rate-limits de chaque plateforme), donc dimensionné pour un shortlist/`--lunch`/
+  `--names`, jamais l'univers entier (note ajoutée dans `--estimate`). **Bug trouvé et corrigé en
+  testant en direct** : le filtre anti-bruit (exiger le nom littéral de la société dans le texte)
+  rejetait le VRAI compte Instagram officiel car son handle n'a pas d'espace
+  (`cantabrialabs_esp` ne contient pas « cantabria labs ») → nouveau `_account_matches()`
+  (normalisé, insensible à la ponctuation) dédié à la résolution de compte, gardé séparé du
+  filtre de contenu `_mentions()` (littéral, volontairement strict pour ne pas polluer
+  l'extraction). Alimente le MÊME pipeline extraction (Sonnet 5) → scoring (Opus 4.8) — rien
+  n'interprète dans ce module, comme toutes les autres sources. Prompt `hugo.md` + docstring
+  `hugo.py` mis à jour (9 sources, caveat LinkedIn cassé côté UI, rendement B2B quasi nul attendu
+  sur Twitter/Insta/Reddit — c'est normal, pas un bug). +14 tests
+  (`tests/test_social_research.py`, CLI moqué). **271 tests verts.** Vérifié en LIVE (pas en
+  dry-run) contre Cantabria Labs : les 5 fonctions tournent réellement et renvoient de vrais
+  docs. ⚠️ Session bloquée en cours de route par un **disque plein** (89 Mo libres sur 228 Go) —
+  nettoyé (40 Go libérés, sessions sandbox `local-agent-mode-sessions`/`vm_bundles` de Claude
+  Desktop, vieilles et disposables). Pas encore commité au moment de l'écriture.
 - 2026-08-10 (8) — **Démo pipeline MARKETING sur « How it works » (demande Betty « continue à améliorer
   la plateforme »).** Pendant de la démo sales du 03/08 : rend visible le câblage Iris→Marc→Oliver de
   cette session. **Fait** : (1) endpoint `GET /api/marketing/pipeline?theme=` (`app/routers/marketing.py`)
@@ -1079,7 +1112,13 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
-- Date : 2026-08-13
+- Date : 2026-08-13 (2)
+- Fait : **9e source Hugo — scan social/vidéo via agent-reach (voir log détaillé en haut).**
+  `pipeline/social_research.py` (Twitter/Reddit/LinkedIn jobs/Instagram/YouTube, opt-in
+  `--social-scan`), câblé dans `research.gather()`, testé en LIVE sur Cantabria Labs, bug de
+  matching Instagram trouvé+corrigé en cours de route, hugo.md re-formé + re-seedé. +14 tests,
+  **271 verts**. Nettoyage disque (89 Mo→40 Go libres). Pas encore commité.
+- Date : 2026-08-13 (1)
 - Fait : **maintenance repo + mémoire (demande Betty « mets tout à jour » avant de basculer sur Claude
   terminal).** (1) VÉRIFIÉ : le travail du 08-10 est **bien commité** — Julie (`efe0d0d`), démo marketing
   How-it-works (`07e0565`), fix routage Hugo/Alex (`2c3a244`) sont tous dans l'historique ⇒ la note

@@ -1,8 +1,10 @@
 """Hugo — Deep Research & Scoring (operator of the TPDL Lead Intelligence Pipeline).
 
 Hugo owns the scored company universe produced by the Lead Intelligence
-Pipeline (8 research sources → Sonnet 5 verbatim extraction → Opus 4.8
-interpretation → scored CSV, ingested into the `companies` table). The engine
+Pipeline (9 research sources, incl. an opt-in social/video scan via
+agent-reach's CLIs — `pipeline/social_research.py` — → Sonnet 5 verbatim
+extraction → Opus 4.8 interpretation → scored CSV, ingested into the
+`companies` table). The engine
 is rebuilt in `pipeline/` and proven live (first real runs 2026-07-17); live
 runs spend money and are launched deliberately from the CLI, never from chat.
 The universe mixes vintages (May baseline + per-run refreshes) — every command

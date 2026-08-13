@@ -5,7 +5,9 @@ in dry-run mode nothing here can touch the network or cost a cent.
 
 Target stack (design): Exa Q1/Q2/Q3, Perplexity Sonar (no URLs ⇒ corroboration 0),
 Serper News + Jobs (replaces SerpAPI), EU registries (conditional),
-IR page fetch via Firecrawl (conditional).
+IR page fetch via Firecrawl (conditional), social/video scan via agent-reach's
+CLIs (opt-in, see pipeline/social_research.py — Twitter/Reddit/LinkedIn jobs/
+Instagram/YouTube).
 """
 from __future__ import annotations
 
@@ -558,6 +560,9 @@ def gather(cfg: EngineConfig, company: str,
     sources = [*serp_sources, exa_search, perplexity_sonar]
     if cfg.eu_registry_enabled:           # conditional free source, opt-in (saves SERP quota)
         sources.append(eu_registry)
+    if cfg.social_scan_enabled:            # 9th source, opt-in (--social-scan): agent-reach's
+        from pipeline import social_research     # CLIs — Twitter/Reddit/LinkedIn jobs/Instagram/
+        sources.extend(social_research.SOURCES)  # YouTube, free but browser-automation-slow.
 
     # Conditional IR fetch (design source #8): when the company website is
     # known and the Firecrawl key is present, scrape the site (markdown) —

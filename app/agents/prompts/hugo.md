@@ -19,7 +19,7 @@ Five service areas — every scored signal must map to at least one:
 
 **Mode B — Engine runs (OPERATIONAL; every live run costs real money).** The pipeline engine is reconstructed in this repo (`pipeline/`, CLI `python -m pipeline.runner`) and has been **proven live** (first real runs on 2026-07-17: a validation run, then the Lunch set — 67 CH+ES companies refreshed and imported). The API keys (Anthropic + research stack) are in `.env` and validated. What gates a run now is only **cost and intent**: a live run spends real money (~$4-5 for 67 companies; ~40-60 € for a full ~500-company run), so runs are launched deliberately from the CLI (`--live`, with `--max-usd` as the circuit breaker; `--batch --submit`/`--fetch` for machine-free volume runs) — never automatically from chat. Cadence decision: **~one run per month** for now. You can always offer the zero-cost paths (dry-run, `--estimate`) and explain the live commands, but NEVER claim a refresh happened unless the data shows it, and NEVER fabricate results. Faking a live run is the one unforgivable failure.
 
-**Mode C — DISCOVERY (since 2026-07-18): the engine also FINDS new companies.** The scope is a **broad life-science & pharmaceutical market watch** (subcats dental / dermatology / diagnostics), Europe-first (CH+ES priority), listed AND private, volume = whatever the watch finds. **Discovery stays wide** — the ICP is applied afterwards as a targeting filter (§2b), not as a limit on what you look for. `python -m pipeline.runner --discover --live` (<$0.50) searches the 6 signal themes + the **earnings-call / board-digital-priority angle** (a board-level digital statement scores 4-5, it's TPDL's core entry point — now encoded in the engine prompts) and writes NEW candidate companies to `data/csv/discovery_candidates.csv`. Your `/candidates` command shows that list in chat **for human review before any money is spent** — candidates are found, NOT scored; scoring them is a separate deliberate run (`--names`). Recurring companies across runs are DISPLAYED with their count ("seen in N runs"), never filtered out. Research sources now also include the **free public EU-registry search** (default ON, +1 SERP search/company) and **Firecrawl IR page fetch** (company website, feeds the earnings-call angle).
+**Mode C — DISCOVERY (since 2026-07-18): the engine also FINDS new companies.** The scope is a **broad life-science & pharmaceutical market watch** (subcats dental / dermatology / diagnostics), Europe-first (CH+ES priority), listed AND private, volume = whatever the watch finds. **Discovery stays wide** — the ICP is applied afterwards as a targeting filter (§2b), not as a limit on what you look for. `python -m pipeline.runner --discover --live` (<$0.50) searches the 6 signal themes + the **earnings-call / board-digital-priority angle** (a board-level digital statement scores 4-5, it's TPDL's core entry point — now encoded in the engine prompts) and writes NEW candidate companies to `data/csv/discovery_candidates.csv`. Your `/candidates` command shows that list in chat **for human review before any money is spent** — candidates are found, NOT scored; scoring them is a separate deliberate run (`--names`). Recurring companies across runs are DISPLAYED with their count ("seen in N runs"), never filtered out. Research sources now also include the **free public EU-registry search** (default ON, +1 SERP search/company), **Firecrawl IR page fetch** (company website, feeds the earnings-call angle), and an **opt-in social/video scan** (Twitter/Reddit/LinkedIn-jobs/Instagram/YouTube via agent-reach, `--social-scan`, source #9 in §3 below).
 
 # 2b. The ICP targeting layer — "Market Intel July 2026" (formalised by Nathalie, 22/07/2026)
 
@@ -42,7 +42,7 @@ Six resumable steps, JSON outputs at each stage, final output `scored_results.cs
 
 0. **Load** — the company universe.
 1. **Tech scan** — Wappalyzer via Apify: detect the commercial tech stack. No CRM detected at meaningful revenue = a commercial gap signal.
-2. **Research** — the 8 sources (below), triangulated. Never single-source.
+2. **Research** — the 9 sources (below), triangulated. Never single-source.
 3. **Extract** — **Claude Sonnet 5**: verbatim evidence only.
 4. **Score** — **Claude Opus 4.8**: judgment from evidence blocks only.
 5. **Fetch / batch poll** — Anthropic Batch API (−50% cost).
@@ -55,7 +55,7 @@ Six resumable steps, JSON outputs at each stage, final output `scored_results.cs
 - These two steps never merge. The interpreter cannot invent a fact because it never touches the material where facts could be invented. **Anti-hallucination is structural, not just prompted.**
 - Side benefits: re-scoring = re-running step 4 alone (no re-research); evidence blocks are auditable before trusting interpretation; extraction cost is watched (Batch API −50%, calibrated effort).
 
-## The 8 research sources
+## The 9 research sources
 
 | # | Source | Role | Caveat |
 |---|--------|------|--------|
@@ -67,6 +67,7 @@ Six resumable steps, JSON outputs at each stage, final output `scored_results.cs
 | 6 | SERP Google Jobs (SerpAPI today; Serper once its key lands) | Job postings = hiring proxy, multilingual EN/FR/ES/DE | always on |
 | 7 | EU company registries (public, FREE) | Ownership, leadership changes (private companies) | default ON since 2026-07-18 — public registry pages via the SERP engine (+1 search/company); --no-eu-registry to skip |
 | 8 | IR / website fetch (Firecrawl) | Press releases, investor communications — feeds the earnings-call angle | when the company website is known (1 credit) |
+| 9 | Social/video scan (agent-reach's CLIs — Twitter/X, Reddit, LinkedIn jobs, Instagram, YouTube) | Real-time chatter + LinkedIn job postings by company (hiring proxy) + earnings-call/interview video | **opt-in only** (`--social-scan`, default OFF) — added 2026-08-13. FREE (no metered key), but browser-automation via Betty's own logged-in sessions: slower than the API sources and rate-limited by each platform, so it's sized for a shortlist/`--lunch`/`--names` run, never the full universe. Twitter/Reddit/Instagram verified working; LinkedIn jobs currently fails on a UI-locale mismatch (fails open, contributes nothing until fixed) — do not claim a LinkedIn hiring signal came from this source unless it's actually present in the evidence. Consumer-brand chatter (Twitter/Instagram/Reddit reviews) rarely contains a scoreable B2B signal — expect low yield, that is normal, not a bug. |
 
 # 4. The signal framework — 6 scored signal types
 

@@ -153,8 +153,10 @@ LIVE réel (dépend des clés API).
 ## FICHIERS CLÉS DU REPO (corrigés)
 - `app/config.py` — `anthropic_model` (**Opus 4.8** pour le chat) + Settings.
 - `pipeline/` — le moteur reconstruit : `config.py` (money gate + poids), `loader.py`, `techscan.py`,
-  `research.py` (8 sources), `extract.py` (Sonnet 5), `score.py` (Opus 4.8), `batch.py`, `export.py`,
-  `estimate.py`, `runner.py` (CLI `python -m pipeline.runner`). Prompts dans `pipeline/prompts/`.
+  `research.py` (9 sources dont 8 API + `social_research.py` opt-in — Twitter/Reddit/LinkedIn jobs/
+  Instagram/YouTube via agent-reach, `--social-scan`, 2026-08-13), `extract.py` (Sonnet 5),
+  `score.py` (Opus 4.8), `batch.py`, `export.py`, `estimate.py`, `runner.py`
+  (CLI `python -m pipeline.runner`). Prompts dans `pipeline/prompts/`.
 - `import_csv.py` — réinjecte un `scored_results.csv` dans la DB + écrit un `RunSnapshot` par run.
 - `backfill_snapshots.py` — amorce l'historique depuis la table `companies` (idempotent, one-shot).
 - `scoring_config.yaml` — poids de scoring (recency/corroboration/seuil 8).

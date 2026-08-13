@@ -296,6 +296,12 @@ def main() -> None:
     parser.add_argument("--no-eu-registry", action="store_true",
                         help="Disable the free public EU-registry source for this run "
                              "(default ON; saves 1 SERP search/company when quota is tight)")
+    parser.add_argument("--social-scan", action="store_true",
+                        help="9th source (opt-in, default OFF): Twitter/Reddit/LinkedIn-jobs/"
+                             "Instagram/YouTube via agent-reach's CLIs (OpenCLI + yt-dlp, "
+                             "Betty's own logged-in browser session). Free, but browser-"
+                             "automation-slow and rate-limited by each platform — size runs "
+                             "accordingly (shortlist/--lunch/--names, not the full universe).")
     parser.add_argument("--rescan-tech", action="store_true",
                         help="Force a fresh Apify tech scan even when the DB already "
                              "holds a tech-stack summary (default: reuse the stored "
@@ -337,7 +343,8 @@ def main() -> None:
         print(f"Selected companies ({len(companies)}): "
               + ", ".join(c.name for c in companies[:8])
               + ("…" if len(companies) > 8 else ""))
-        print(est_mod.render(est, est_mod.serp_quota_check(est)))
+        print(est_mod.render(est, est_mod.serp_quota_check(est),
+                             social_scan=args.social_scan))
         return
 
     # ── resume: drop companies already scored in the output file ──
@@ -358,6 +365,8 @@ def main() -> None:
         cfg.enrich_revenue = True
     if getattr(args, "enrich_location", False):
         cfg.enrich_location = True
+    if getattr(args, "social_scan", False):
+        cfg.social_scan_enabled = True
     mode = "LIVE (spending enabled)" if cfg.live else "DRY-RUN (zero cost)"
     logger.info("Engine mode: %s · extraction=%s · interpretation=%s",
                 mode, cfg.extraction_model, cfg.interpretation_model)

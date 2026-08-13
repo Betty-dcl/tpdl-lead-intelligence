@@ -95,7 +95,8 @@ def serp_quota_check(est: RunEstimate) -> str | None:
             f"the monthly reset.")
 
 
-def render(est: RunEstimate, quota_line: str | None = None) -> str:
+def render(est: RunEstimate, quota_line: str | None = None,
+          social_scan: bool = False) -> str:
     lines = [
         "═══ PRE-FLIGHT ESTIMATE (nothing has been spent) ═══",
         f"Companies:            {est.companies}",
@@ -107,5 +108,12 @@ def render(est: RunEstimate, quota_line: str | None = None) -> str:
     ]
     if quota_line:
         lines.append(quota_line)
+    if social_scan:
+        lines.append(
+            "Social scan (--social-scan): ON — $0 API cost (Twitter/Reddit/LinkedIn "
+            "jobs/Instagram/YouTube via agent-reach's CLIs), but browser-automation-"
+            "slow and rate-limited by each platform. Sized for a shortlist, not the "
+            f"full universe — {est.companies} companies × 5 platforms will be slow."
+        )
     lines.append("Run for real by replacing --estimate with --live.")
     return "\n".join(lines)

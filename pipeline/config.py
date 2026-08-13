@@ -93,6 +93,11 @@ class EngineConfig:
     enrich_location: bool = False        # opt-in (--enrich-location): 1 Perplexity call/company
                                          # to fill the head-office CITY when location has none.
                                          # Fail-open (any error → location stays unchanged).
+    social_scan_enabled: bool = False    # opt-in (--social-scan): Twitter/Reddit/LinkedIn-jobs/
+                                         # Instagram/YouTube via agent-reach's CLIs (OpenCLI +
+                                         # yt-dlp) — FREE but browser-automation-slow and rate-
+                                         # limited by each platform, so size runs accordingly
+                                         # (shortlist/--lunch/--names, not the full universe).
 
     # ── scoring weights (from scoring_config.yaml) ──────────────────────
     recency: dict = field(default_factory=lambda: {
@@ -122,6 +127,8 @@ class EngineConfig:
         cfg.apify_token = os.environ.get("APIFY_TOKEN", "")
         cfg.eu_registry_enabled = os.environ.get(
             "EU_REGISTRY_ENABLED", "1").lower() not in ("0", "false", "no", "off")
+        cfg.social_scan_enabled = os.environ.get(
+            "SOCIAL_SCAN_ENABLED", "0").lower() in ("1", "true", "yes", "on")
         cfg.extraction_model = os.environ.get("EXTRACTION_MODEL", DEFAULT_EXTRACTION_MODEL)
         cfg.interpretation_model = os.environ.get(
             "INTERPRETATION_MODEL", DEFAULT_INTERPRETATION_MODEL)
