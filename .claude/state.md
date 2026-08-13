@@ -1079,20 +1079,30 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-08-13
+- Fait : **maintenance repo + mémoire (demande Betty « mets tout à jour » avant de basculer sur Claude
+  terminal).** (1) VÉRIFIÉ : le travail du 08-10 est **bien commité** — Julie (`efe0d0d`), démo marketing
+  How-it-works (`07e0565`), fix routage Hugo/Alex (`2c3a244`) sont tous dans l'historique ⇒ la note
+  « Julie pas encore commité » ci-dessous était PÉRIMÉE (corrigée). (2) Rangement : 8 vieux fichiers
+  racine (AGENTS.md, INSTRUCTIONS.md, 2 xlsx coûts, RECAP_DASHBOARD.md, build_masters_v2.py, build_static.py,
+  mockup_office.html) déplacés dans `_archive/` — obsolètes, remplacés par le système `.claude/` + le repo
+  courant ; committé (chore). (3) Push `feat/neotek-engine` → origin pour que le terminal / une autre machine
+  ait la dernière mémoire. RAPPEL mémoire : `claude` lancé depuis la racine du repo recharge CLAUDE.md +
+  les 6 imports `.claude/*.md` automatiquement — la mémoire voyage avec le dossier commité.
 - Date : 2026-08-10
-- Fait : **grosse session « câbler chaque agent sur la vraie donnée » — 5 agents améliorés + 5 commits.**
+- Fait : **grosse session « câbler chaque agent sur la vraie donnée » — 5 agents améliorés + 5 commits (TOUS commités).**
   (1) **Inès** — brief scraper exploitable (tie-back §3c, Med-Affairs séparé, config Sales Nav) +
   classifieur ES/FR durci [commit 71ac97d]. (2) **Maya** REFONDUE — scoreur vs analyste de portefeuille,
   `/summary` flagship, `/top`+`/recurring` dépréciés [3214b7b]. (3) **Moteur marketing câblé** —
   colonne vertébrale campagne partagée `campaign_themes.py`, Iris→Marc [e0d057c] puis Marc→Oliver
   (Oliver formate le vrai contenu de Marc) [dcf2027]. (4) **Julie** câblée sur la vraie donnée — `/draft`
-  ancre l'Intelligence Summary, `/linkedin` devient société-aware [à committer]. Voir logs (1)-(5) en haut.
+  ancre l'Intelligence Summary, `/linkedin` devient société-aware [commit efe0d0d]. Voir logs (1)-(5) en haut.
   **255 tests verts.** ⚠️ Le drawer chat headless était intermittent aujourd'hui → vérifs surtout
   déterministes ; chemin chat→LLM confirmé live tôt dans la session (Inès `/contacts`, Maya `/summary`).
   ⚠️ Serveur preview sans `--reload` → redémarrer pour charger un changement de code.
-  RESTE : committer Julie ; les 8 agents de chat sont maintenant tous câblés sur la donnée réelle — la
+  RESTE : les 8 agents de chat sont maintenant tous câblés sur la donnée réelle — la
   suite du travail est du CONTENU (chiffres clients Andrés, prompt messaging Nathalie, contacts Apollo/Kaspr),
-  plus du câblage. Idées : passe qualité live quand le navigateur coopère ; push GitHub.
+  plus du câblage. Idées : passe qualité live quand le navigateur coopère.
 - Date : 2026-08-03
 - Fait : **passe qualité données** (Betty « comment améliorer la plateforme » → axe #4 choisi). Audit
   Vera réel d'abord (notes périmées : Unknown 273→5, 0 doublon, 0 loc manquante, poubelle déjà nettoyée).
