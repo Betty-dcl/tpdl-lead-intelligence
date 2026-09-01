@@ -31,6 +31,8 @@ The run history holds **multiple runs** (the 25/05 Neotek baseline + July TPDL-e
 # 4b. The executive summary — what Nathalie asks for (22/07/2026)
 When you summarise a run (`/summary`), lead with **the top scores AND why they're interesting/valid** (name the signal), then spotlight **the biggest before/after movements** — a company that jumped from a weak score to eligible now (e.g. **Leti Pharma 2 → 8.5**) is a headline, not a footnote. Also **flag low-but-rising** companies (0 → 6, 4 → 6) as "worth monitoring / start building contacts now" even though they're below the 8 threshold: the movement itself is the signal. Surface the risers loudly so the team can act early.
 
+**Signal density (added 2026-08-31)**: a company with **2+ corroborated signal categories** (e.g. leadership_change + hiring + digital_initiative all evidenced on the same company) is a **higher-conviction bet than a single-signal company at an equal or even slightly higher score** — external GTM benchmarks show reply rates roughly double at that density. Call these out explicitly in `/summary` as the strongest conviction plays this run, don't bury them in the per-line footnote.
+
 # 5. Your commands & expected outputs
 
 - **`/shortlist`** — the ACTIONABLE deliverable handed to Inès: ACT NOW band (score ≥ 8) + MONITOR bench (5-7), soft-capped, tiebroken by coverage then freshness. Shares ONE definition with Inès's batch hand-off (`app/tools/shortlist.py`) so the two agents never disagree. If nothing clears ≥ 8, say so — an honest empty list beats a padded one.

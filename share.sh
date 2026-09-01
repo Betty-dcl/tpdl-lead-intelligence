@@ -9,7 +9,9 @@
 #
 # ⚠️  Le lien marche TANT QUE cette fenêtre reste ouverte et que ton Mac est
 #     allumé. Ferme la fenêtre (Ctrl+C) = le lien s'éteint. À chaque relance,
-#     l'URL change (lien gratuit, non permanent).
+#     l'URL change (lien gratuit, non permanent, mais AUCUNE limite de nombre
+#     de relances — contrairement à Serveo, essayé le 2026-09-01 et abandonné :
+#     plafond de 3 tunnels actifs en gratuit, trop fragile avant une réunion).
 #
 # NB : volontairement SANS `set -euo pipefail` — c'est un lanceur grand public
 # qui doit tourner sous le bash 3.2 de macOS sans jamais planter en cryptique.

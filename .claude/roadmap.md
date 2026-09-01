@@ -21,6 +21,37 @@ Objectif : liste claire des services à souscrire, avec coût réel re-vérifié
 Succès : tableau des abonnements décidés (payer / attendre), budget mensuel chiffré, clés créées
 pour ce qu'on active.
 
+## SHORT-LIST OUTILS EN COURS DE DISCUSSION (2026-08-31 — RIEN D'ACTIVÉ)
+> ⚠️ Règle de Betty : ne JAMAIS activer/payer un outil sans son accord explicite. Cette liste =
+> candidats évalués (audit code + recherche concurrentielle), à traiter un par un, pas en bloc.
+- **Apollo** (contacts) : connecteur DÉJÀ codé (`app/tools/apollo.py`), clé `.env` vide → à tester
+  EN PREMIER (zéro dev, juste clé/abonnement) avant de regarder Dropcontact/FullEnrich. Vérifier le
+  prix actuel + la couverture réelle sur des sociétés espagnoles/suisses de taille moyenne avant décision.
+- **Bouncer** (vérif email) : connecteur DÉJÀ codé (`app/tools/bouncer.py`), clé `.env` vide → à
+  activer (0 dev, juste clé/abonnement). Meilleur du marché sur precision (98,2 %) + posture RGPD.
+- **Apify — actor "LinkedIn Carousel Generator"** : compte Apify déjà actif (token en `.env`).
+  Transformerait le plan carrousel d'Oliver en PDF carrousel LinkedIn prêt à poster (1080×1350),
+  sans graphiste. ⚠️ Prix réel par carrousel non confirmé — à vérifier sur la fiche Apify avant décision.
+- **ClinicalTrials.gov** (API v2, essais cliniques US) : gratuit, sans clé. Nouveau signal
+  `clinical_activity` possible pour Hugo — un essai phase III lancé = signal fort non couvert par
+  les 6 signaux existants. Pas de dev fait, idée à instruire.
+- **CTIS / EMA** (essais cliniques UE) : gratuit, sans clé, mais API non officiellement documentée
+  par l'EMA (peut changer sans préavis) → prévoir un repli sur le flux RSS officiel EMA si ça casse.
+- **Dropcontact** (contacts, RGPD-first, société française mais cherche des contacts partout dans
+  le monde — pas limité à la France) : candidat SEULEMENT si Apollo s'avère insuffisant sur la
+  couverture des cibles ES/CH. Nécessite un nouveau connecteur (n'existe pas encore, contrairement
+  à Apollo/Kaspr).
+- **FullEnrich** (waterfall multi-fournisseurs de contacts, orchestre Apollo/Kaspr/Dropcontact/etc.
+  et facture seulement le succès) : à regarder seulement si le volume de contacts recherchés devient
+  important (~720 $/mois palier Pro) — pas une priorité de démarrage, et pas un concurrent direct
+  d'Apollo (compatible/complémentaire).
+- **TheirStack** (hiring + tech-stack structuré, alternative à parser du SERP) : GARDÉ EN TÊTE POUR
+  PLUS TARD, pas pour maintenant — palier gratuit (~200 requêtes/mois) probablement trop juste pour
+  un usage réel sur toute la base + nécessiterait un nouveau connecteur dans `pipeline/research.py`.
+  À reconsidérer si Serper s'avère vraiment insuffisant sur le signal hiring, ou si leur palier
+  gratuit devient plus généreux.
+- **Harmonic.ai** : ÉCARTÉ (pas de self-serve, ~25-30K$/an, hors budget/volume actuel de 620 sociétés).
+
 ## STEP 2 — FORMER CHAQUE AGENT (prompt + résultat attendu)
 Objectif : pour chacun des 8 agents, un prompt système détaillé + une définition précise du
 contenu de résultat attendu (format, champs, longueur, ton).

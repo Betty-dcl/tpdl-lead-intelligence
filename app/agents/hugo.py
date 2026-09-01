@@ -25,6 +25,7 @@ from app.agents.base import BaseAgent
 from app.config import AgentID
 from app.database import SessionLocal
 from app.models import Company
+from app.tools.signal_density import signal_categories
 
 HUGO_ID: str = AgentID.HUGO.value
 
@@ -65,7 +66,12 @@ def _signal_lines(c: Company) -> str:
             f"    TPDL relevance: {getattr(c, f's{i}_tpdl_relevance')}\n"
             f"    Sources: {urls}"
         )
-    return "\n".join(out) if out else "  (no evidenced signals)"
+    if not out:
+        return "  (no evidenced signals)"
+    cats = signal_categories(c)
+    density = (f"  ⚡ {len(cats)} signals stacked ({' + '.join(cats)}) — higher conviction "
+               f"than a single-signal company at an equal score.\n" if len(cats) >= 2 else "")
+    return density + "\n".join(out)
 
 
 class HugoAgent(BaseAgent):
@@ -225,7 +231,8 @@ class HugoAgent(BaseAgent):
                 f"brief from my pipeline using the data block below — reason ONLY from it, "
                 f"never invent dates/sources/events.\n\n{block}\n\n"
                 f"Give: (1) a 2-3 sentence read of where the commercial opening is, "
-                f"(2) the strongest evidenced signal and its TPDL relevance, "
+                f"(2) the strongest evidenced signal and its TPDL relevance — if the SIGNALS "
+                f"block shows a ⚡ stacked-signals line, name it explicitly as higher conviction, "
                 f"(3) a timing call — engage now / monitor / verify first — with why "
                 f"(a STALE score argues for 'verify first'). "
                 f"Then note this company is ready to hand to Maya for shortlisting."

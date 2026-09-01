@@ -12,6 +12,27 @@
 - Mémoire canonique = CE repo (racine + `.claude/`). L'ancienne copie dans
   `Downloads/tpdl-memory/` est SUPERSEDÉE et peut être supprimée.
 
+## ⚠️ HISTORIQUE DE CONVERSATION COMPLET (lire si on te demande "l'historique")
+- Ce dossier a été **renommé/déplacé 4 fois** depuis sa création (il s'appelait
+  `claude-code-dashboard`) : `~/Documents/claude-code-dashboard` →
+  `~/Documents/TPDL/claude-code-dashboard` → `~/Documents/Workspace Betty/TPDL/claude-code-dashboard`
+  → **ici**. Claude Code indexe l'historique par CHEMIN ABSOLU, pas par projet : chaque
+  renommage crée donc un nouveau dossier de sessions orphelin dans `~/.claude/projects/`, invisible
+  par défaut à une nouvelle session ouverte ici.
+- **Historique consolidé (33 sessions, 24/06/2026 → 21/08/2026) : `.claude/history/`**
+  (`index.md` = liste chronologique + aperçu ; `sessions/*.md` = transcript lisible par session,
+  greppable). Généré par `~/.claude/scripts/consolidate_history.py` (script réutilisable pour
+  n'importe quel projet — voir sa docstring). Si on te demande un détail d'une conversation passée,
+  **grep dans `.claude/history/`** avant de dire que tu ne l'as pas.
+- Si ce dossier est encore renommé/déplacé à l'avenir : re-lancer le script avec des mots-clés
+  (ex. `TPDL`, `Lead-Intelligence`) pour retrouver et absorber les nouvelles sessions orphelines
+  dans `~/.claude/projects/`, PUIS re-générer `.claude/history/` (idempotent, ne duplique pas).
+- Dossier de documents sources lié (PAS une session Claude Code, pas de .jsonl) :
+  `~/Documents/Workspace Betty/TPDL/Propesection automatique/` — docs Neotek (pipeline, run
+  summary), frise de prospection (FR/ES), échanges agents/automatisation. Ce sont les pièces
+  jointes qui ont nourri `operational-context.md` et `neotek-process.md` ; pas de contenu à jour
+  au-delà de ce qui est déjà digéré dans ces deux fichiers.
+
 ## ⚠️ DEUX SYSTÈMES À NE PAS CONFONDRE
 1. **Ce repo = le DASHBOARD / cockpit + agents de chat.** App FastAPI. Les agents (Hugo, Maya,
    Inès, Julie, Iris, Marc, Oliver + manager) LISENT une base d'entreprises déjà scorée (table

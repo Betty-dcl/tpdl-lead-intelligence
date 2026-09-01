@@ -58,12 +58,10 @@
     </a>
     <nav class="flex items-center gap-1 flex-wrap">
       <a href="/" class="tpdl-nav-link {% if active_page == 'office' %}is-active{% endif %}">Home</a>
-      <a href="/intel" class="tpdl-nav-link {% if active_page == 'intel' %}is-active{% endif %}">Sales</a>
-      <a href="/recurring" class="tpdl-nav-link {% if active_page == 'recurring' %}is-active{% endif %}">Recurring</a>
+      <a href="/intel" class="tpdl-nav-link {% if active_page in ['intel', 'recurring', 'runs'] %}is-active{% endif %}">Sales</a>
       <a href="/marketing" class="tpdl-nav-link {% if active_page == 'marketing' %}is-active{% endif %}">Marketing</a>
       <a href="/contacts" class="tpdl-nav-link {% if active_page == 'contacts' %}is-active{% endif %}">Contacts</a>
       <a href="/review" class="tpdl-nav-link {% if active_page == 'review' %}is-active{% endif %}">Review</a>
-      <a href="/runs" class="tpdl-nav-link {% if active_page == 'runs' %}is-active{% endif %}">Runs</a>
       <a href="/credits" class="tpdl-nav-link {% if active_page == 'credits' %}is-active{% endif %}">Usage</a>
       <a href="/how-it-works" class="tpdl-nav-link {% if active_page == 'how' %}is-active{% endif %}">How it works</a>
       {# Performance (/performance) and Data (/data) intentionally dropped from the

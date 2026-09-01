@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.config import TEMPLATES_DIR
 from app.database import get_db
 from app.models import Agent
+from app.routers.traceability import SHAREPOINT_FOLDER_URL
 
 router = APIRouter(tags=["pages"])
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -40,10 +41,13 @@ def marketing(request: Request) -> HTMLResponse:
 
 @router.get("/intel", response_class=HTMLResponse)
 def intel(request: Request) -> HTMLResponse:
+    """Sales hub — merged 2026-08-31: one page, three tabs (Sales / Recurring /
+    Runs, via ?tab=), was three separate nav entries. See /recurring and /runs
+    for the redirects that keep old links working."""
     return templates.TemplateResponse(
         request,
         "intel.html",
-        {"active_page": "intel"},
+        {"active_page": "intel", "sharepoint_url": SHAREPOINT_FOLDER_URL},
     )
 
 
@@ -103,14 +107,11 @@ def company_detail(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/recurring", response_class=HTMLResponse)
-def recurring_page(request: Request) -> HTMLResponse:
-    """Companies that keep coming back across scan dates (May / Jul 17 / Jul 23…)."""
-    return templates.TemplateResponse(
-        request,
-        "recurring.html",
-        {"active_page": "recurring"},
-    )
+@router.get("/recurring")
+def recurring_page() -> RedirectResponse:
+    """Merged into /intel (Recurring tab) on 2026-08-31 — kept as a redirect so old
+    links/bookmarks/memory notes pointing at /recurring keep working."""
+    return RedirectResponse(url="/intel?tab=recurring", status_code=302)
 
 
 @router.get("/agent/{agent_id}", response_class=HTMLResponse)

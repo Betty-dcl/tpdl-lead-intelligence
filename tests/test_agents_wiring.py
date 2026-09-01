@@ -280,6 +280,39 @@ def test_maya_summary_is_the_run_executive_read(client):
         assert "HEADLINE" in out["augmented_message"]
 
 
+def test_maya_summary_calls_out_signal_dense_companies(client):
+    """A company with 2+ corroborated signal categories gets a dedicated,
+    higher-conviction callout in /summary — not just a per-line footnote."""
+    from app.agents import AGENT_CLASSES
+    from app.agents.maya import _signal_categories
+    from app.database import SessionLocal
+    from app.models import Company
+    with SessionLocal() as db:
+        db.add(Company(
+            name="Zzy Signal Dense Co", sector_bucket="Pharma",
+            assessed_score=8.2, coverage="3 of 6", outreach_eligible=True,
+            icp_flag=False, signals_found=3,
+            s1_category="leadership_change", s2_category="hiring",
+            s3_category="digital_initiative",
+        ))
+        db.commit()
+        try:
+            maya = AGENT_CLASSES["maya"].load(db, "maya")
+            out = maya._dispatch_command("/summary")
+            msg = out["augmented_message"]
+            assert "SIGNAL-DENSE" in msg
+            assert "Zzy Signal Dense Co" in msg
+            assert "leadership_change + hiring + digital_initiative" in msg
+            assert out["metadata"]["signal_dense"] >= 1
+
+            # Helper itself: single-signal companies never counted as dense.
+            single = Company(s1_category="hiring", s2_category=None, s3_category=None)
+            assert len(_signal_categories(single)) == 1
+        finally:
+            db.query(Company).filter(Company.name == "Zzy Signal Dense Co").delete()
+            db.commit()
+
+
 # ── Oliver newsletter format (70/10/20 mix, feeds MailChimp) ────────────────
 
 def test_oliver_newsletter_is_supported(client):

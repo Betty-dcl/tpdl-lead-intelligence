@@ -8,6 +8,9 @@
   .rev-pending  { background:rgba(224,161,60,.16); color:#9a6a12; }
   .rev-approved { background:rgba(52,213,145,.16); color:#0c7a4d; }
   .rev-rejected { background:rgba(220,80,80,.14); color:#b23c3c; }
+  .urg-1 { background:rgba(220,80,80,.14); color:#b23c3c; }
+  .urg-2 { background:rgba(224,161,60,.16); color:#9a6a12; }
+  .urg-3 { background:rgba(0,0,0,.05); color:#5c5c5c; }
   .sig-row { border-left:3px solid var(--tpdl-border); padding-left:10px; }
   .seg-btn { display:inline-flex; padding:.35rem .7rem; font-size:.75rem; border-radius:9999px;
              border:1px solid var(--tpdl-border); background:white; cursor:pointer; }
@@ -45,6 +48,15 @@
       </div>
     </div>
 
+    <p class="text-xs text-ink-3 mt-3 max-w-2xl" x-show="summary.by_urgency">
+      Sorted by real urgency, not just score:
+      <span class="font-semibold" style="color:#b23c3c" x-text="(summary.by_urgency?.[1]??0) + ' to verify first'"></span>
+      (event may not be real) ·
+      <span class="font-semibold" style="color:#9a6a12" x-text="(summary.by_urgency?.[2]??0) + ' to verify soon'"></span>
+      (likely real, partially unverified) ·
+      <span x-text="(summary.by_urgency?.[3]??0) + ' low priority'"></span> (formatting/QA nits).
+    </p>
+
     <div class="flex gap-2 mt-6">
       <template x-for="f in ['pending','reviewed','all']" :key="f">
         <button class="seg-btn" :class="filter===f ? 'on':''" @click="filter=f; load()"
@@ -58,17 +70,25 @@
       <div class="tpdl-card p-8 text-center text-ink-3">Nothing here — queue clear.</div>
     </template>
 
-    <template x-for="c in items" :key="c.name">
-      <div class="tpdl-card p-5" :data-company="c.name"
-           :style="c.name === focusCompany ? 'outline:2px solid var(--tpdl-accent);outline-offset:2px' : ''">
+    <template x-for="(c, i) in items" :key="c.name">
+      <div>
+        <div x-show="tierChanged(i)" class="text-xs uppercase tracking-wider text-ink-3 mt-6 mb-2"
+             :class="i===0 ? 'mt-0' : ''" x-text="c.urgency_label"></div>
+
+        <div class="tpdl-card p-5" :data-company="c.name"
+             :style="c.name === focusCompany ? 'outline:2px solid var(--tpdl-accent);outline-offset:2px' : ''">
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div class="font-semibold text-lg" x-text="c.name"></div>
             <div class="text-xs text-ink-3" x-text="`${c.sector||'—'} · score ${c.score} · ${c.coverage||''}`"></div>
           </div>
-          <span class="rev-pill"
-                :class="c.review_status==='approved' ? 'rev-approved' : c.review_status==='rejected' ? 'rev-rejected' : 'rev-pending'"
-                x-text="c.review_status || 'pending'"></span>
+          <div class="flex items-center gap-2">
+            <span class="rev-pill" :class="'urg-'+c.urgency_tier"
+                  x-text="c.urgency_tier===1?'Verify first':c.urgency_tier===2?'Verify soon':'Low priority'"></span>
+            <span class="rev-pill"
+                  :class="c.review_status==='approved' ? 'rev-approved' : c.review_status==='rejected' ? 'rev-rejected' : 'rev-pending'"
+                  x-text="c.review_status || 'pending'"></span>
+          </div>
         </div>
 
         <div class="mt-3 text-sm bg-amber-50 border border-amber-100 rounded-md p-2.5 text-amber-900"
@@ -106,6 +126,7 @@
         </div>
         <div class="text-xs text-ink-3 mt-1" x-show="c.reviewed_at"
              x-text="`Reviewed ${(c.reviewed_at||'').slice(0,10)}${c.reviewed_note ? ' · '+c.reviewed_note : ''}`"></div>
+        </div>
       </div>
     </template>
   </section>
@@ -144,6 +165,10 @@ function reviewPage() {
       if (res.ok) await this.load();
     },
     firstUrl(urls) { return (urls || '').split(/[;\s]+/).filter(Boolean)[0] || '#'; },
+    tierChanged(i) {
+      if (i === 0) return true;
+      return this.items[i].urgency_tier !== this.items[i - 1].urgency_tier;
+    },
   };
 }
 </script>

@@ -2,6 +2,7 @@
 {% block title %}Sales — TPDL{% endblock %}
 
 {% block head %}
+<!-- Sales tab styles (was intel.html) -->
 <style>
   .filter-pill {
     display: inline-flex; align-items: center; gap: 0.4rem;
@@ -88,10 +89,83 @@
 
   .sort-arrow { font-size: 9px; margin-left: 4px; color: var(--tpdl-text-faint); }
 </style>
+
+<!-- Recurring tab styles (was recurring.html) -->
+<style>
+  [x-cloak]{ display:none !important; }
+
+  /* Matrix ------------------------------------------------------------ */
+  .rec-matrix { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .85rem; }
+  .rec-matrix th, .rec-matrix td { padding: .5rem .55rem; text-align: center; white-space: nowrap; }
+  .rec-matrix thead th {
+    position: sticky; top: 0; z-index: 3;
+    background: var(--tpdl-bg-2);
+    font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--tpdl-text-muted); font-weight: 600;
+    border-bottom: 1px solid var(--tpdl-border);
+  }
+  /* Sticky first column (company) */
+  .rec-matrix .col-company {
+    position: sticky; left: 0; z-index: 2;
+    background: #fff; text-align: left; min-width: 210px; max-width: 260px;
+    border-right: 1px solid var(--tpdl-border);
+  }
+  .rec-matrix thead .col-company { z-index: 4; background: var(--tpdl-bg-2); }
+  .rec-matrix tbody tr:hover .col-company { background: var(--tpdl-bg); }
+  .rec-matrix tbody tr:hover td { background: var(--tpdl-bg); }
+  .rec-matrix tbody td { border-bottom: 1px solid var(--tpdl-border); }
+
+  /* Score chip inside a cell */
+  .score-cell {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; padding: 3px 7px; border-radius: 6px;
+    font-weight: 700; font-size: 12px; font-variant-numeric: tabular-nums; color: #fff;
+  }
+  .score-absent { color: var(--tpdl-text-faint); font-size: 13px; }
+
+  .times-badge {
+    display: inline-flex; align-items: center; gap: .25rem;
+    padding: .15rem .5rem; border-radius: 9999px;
+    font-size: .72rem; font-weight: 700;
+    background: #ede9fe; color: #5b21b6;
+  }
+  .rec-chip {
+    display: inline-flex; align-items: center; gap: .3rem;
+    padding: .3rem .7rem; border-radius: 9999px; font-size: .75rem; font-weight: 600;
+    border: 1px solid var(--tpdl-border); background: #fff; color: var(--tpdl-text-muted);
+    cursor: pointer; transition: all .12s ease;
+  }
+  .rec-chip:hover { border-color: var(--tpdl-dark-ink); color: var(--tpdl-text); }
+</style>
+
+<!-- Runs tab styles (was traceability.html) -->
+<style>
+  .cmp-tab {
+    display: inline-flex; align-items: center;
+    padding: 0.3rem 0.7rem; font-size: 0.75rem; border-radius: 9999px;
+    border: 1px solid var(--tpdl-border); background: white;
+    color: var(--tpdl-text-muted); cursor: pointer; transition: all 0.15s ease;
+  }
+  .cmp-tab:hover { border-color: var(--tpdl-dark-ink); color: var(--tpdl-text); }
+  .cmp-tab.is-active { background: var(--tpdl-dark-ink); color: white; border-color: var(--tpdl-dark-ink); }
+</style>
+
+<style>
+  .tpdl-hub-tabbar { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+</style>
 {% endblock %}
 
 {% block content %}
+<div x-data="{ tab: (new URLSearchParams(location.search).get('tab')) || 'sales' }"
+     x-init="$watch('tab', v => { const u = new URL(location); if (v === 'sales') u.searchParams.delete('tab'); else u.searchParams.set('tab', v); history.replaceState({}, '', u); })">
 
+  <div class="tpdl-hub-tabbar" role="tablist" aria-label="Sales views">
+    <button type="button" class="cmp-tab" :class="{ 'is-active': tab === 'sales' }" @click="tab = 'sales'" role="tab" :aria-selected="tab === 'sales'">Sales</button>
+    <button type="button" class="cmp-tab" :class="{ 'is-active': tab === 'recurring' }" @click="tab = 'recurring'" role="tab" :aria-selected="tab === 'recurring'">Recurring</button>
+    <button type="button" class="cmp-tab" :class="{ 'is-active': tab === 'runs' }" @click="tab = 'runs'" role="tab" :aria-selected="tab === 'runs'">Runs</button>
+  </div>
+
+  <div x-show="tab === 'sales'" role="tabpanel">
 <div x-data="intelPage()" x-init="init()">
 
   <!-- ================================================================ -->
@@ -515,6 +589,10 @@
                   <span x-show="c.signals.length === 0" class="text-xs text-ink-3">—</span>
                 </div>
                 <div class="flex flex-wrap gap-1 items-center">
+                  <span x-show="c.assigned_to" class="tpdl-badge tpdl-badge--outline"
+                        :title="'Assigned to ' + c.assigned_to" x-text="'👤 ' + c.assigned_to"></span>
+                  <span x-show="c.workspace_status && c.workspace_status !== 'new'"
+                        class="tpdl-badge tpdl-badge--outline" x-text="c.workspace_status"></span>
                   <span x-show="c.outreach_eligible" class="tpdl-badge tpdl-badge--accent">Eligible</span>
                   <span x-show="c.icp_flag" class="tpdl-badge tpdl-badge--outline"
                         style="color: #854d0e; border-color: #fde68a;">ICP</span>
@@ -771,4 +849,552 @@
 
 <script src="/static/js/view_export.js"></script>
 <script src="/static/js/intel.js?v=19"></script>
+  </div>
+
+  <div x-show="tab === 'recurring'" role="tabpanel">
+<div x-data="recurringPage()" x-init="init()">
+
+  <div class="mb-6 flex items-center gap-2 text-sm">
+    <a href="/intel" class="text-ink-3 hover:text-ink">← Sales pipeline</a>
+    <span class="text-ink-3">/</span>
+    <span class="text-ink font-medium">Recurring</span>
+  </div>
+
+  <section class="mb-6">
+    <h1 class="text-3xl md:text-4xl font-semibold mb-2 leading-tight">
+      Companies that <span style="color:var(--tpdl-accent-ink)">keep coming back</span>
+    </h1>
+    <p class="text-ink-2 max-w-3xl text-sm">
+      Every company we've scored in more than one scan, laid out scan by scan — so you can read at a
+      glance who resurfaces, whether their score is climbing or cooling, and who returns every few months.
+    </p>
+  </section>
+
+  <template x-if="loading">
+    <div class="py-16 text-center text-ink-3">Loading…</div>
+  </template>
+
+  <template x-if="!loading && (!data || !data.count)">
+    <div class="tpdl-card p-6 text-sm text-ink-3">
+      Nothing recurring yet — a company has to appear in at least two scans. Import a second run to populate this.
+    </div>
+  </template>
+
+  <div x-show="!loading && data && data.count" x-cloak>
+
+    <!-- Controls -------------------------------------------------------- -->
+    <section class="mb-5 rounded-xl border p-4" style="background:#f5f3ff;border-color:#ddd6fe">
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
+        <span class="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full" style="background:#c4b5fd;color:#4c1d95">Recurring</span>
+        <span class="text-sm text-ink-2"><strong x-text="data.count"></strong> companies seen in 2+ scans</span>
+        <span class="text-xs text-ink-3 ml-auto">
+          across <strong x-text="data.max_runs"></strong> scan dates:
+          <span x-text="data.all_days.map(d=>d.label).join(' · ')"></span>
+        </span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- how many times seen -->
+        <button @click="pick=0" class="rec-chip"
+                :style="pick===0 ? 'background:var(--tpdl-dark-ink);color:#fff;border-color:var(--tpdl-dark-ink)' : ''">
+          All · <span x-text="data.count"></span>
+        </button>
+        <template x-for="n in countTiers" :key="n">
+          <button @click="pick = (pick===n?0:n)" class="rec-chip"
+                  :style="pick===n ? 'background:#7c3aed;color:#fff;border-color:#7c3aed' : ''"
+                  x-text="`×${n} · ${countAt(n)}`"></button>
+        </template>
+
+        <label class="rec-chip" style="cursor:pointer">
+          <input type="checkbox" x-model="inIcpOnly" class="mr-0.5"> In-ICP only
+        </label>
+
+        <!-- search -->
+        <input type="text" x-model="q" placeholder="Search company…"
+               aria-label="Search recurring companies"
+               class="rec-chip" style="min-width:160px;color:var(--tpdl-text)">
+
+        <!-- sort -->
+        <label class="inline-flex items-center gap-2 text-xs text-ink-3 ml-auto">
+          <span class="uppercase tracking-wider">Sort</span>
+          <select x-model="sort" aria-label="Sort recurring companies"
+                  class="rec-chip" style="cursor:pointer;color:var(--tpdl-text)">
+            <option value="count">Most scans</option>
+            <option value="latest">Highest latest score</option>
+            <option value="riser">Biggest riser</option>
+            <option value="fader">Biggest faller</option>
+          </select>
+        </label>
+
+        <!-- download the current view (filters + sort applied) -->
+        <div class="inline-flex items-center gap-1.5">
+          <button @click="exportCsv()" class="rec-chip" style="cursor:pointer"
+                  title="Full-depth CSV of the shown companies — summary, each signal + source links, score trajectory (for Excel)">⬇ CSV</button>
+          <button @click="exportPdfList()" class="rec-chip" style="cursor:pointer"
+                  title="PDF — LIST: a one-page table of the shown companies">⬇ PDF list</button>
+          <button @click="exportPdfDetail()" class="rec-chip" style="cursor:pointer"
+                  title="PDF — DETAIL: one full brief per shown company (score, curve, summary, clickable sources)">⬇ PDF detail</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Legend ---------------------------------------------------------- -->
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3 text-xs text-ink-3">
+      <span class="flex items-center gap-1.5"><span class="score-cell" style="background:#059669">8.0</span> outreach-eligible (≥8)</span>
+      <span class="flex items-center gap-1.5"><span class="score-cell" style="background:#0284c7">6.0</span> monitor (5–7)</span>
+      <span class="flex items-center gap-1.5"><span class="score-cell" style="background:#94a3b8">3.0</span> weak (&lt;5)</span>
+      <span class="flex items-center gap-1.5"><span class="score-absent">—</span> not in that scan</span>
+      <span class="ml-auto">Each column is a scan date, oldest → newest. Click a name for the full detail.</span>
+    </div>
+
+    <!-- Matrix ---------------------------------------------------------- -->
+    <div class="tpdl-card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="rec-matrix">
+          <thead>
+            <tr>
+              <th class="col-company">Company</th>
+              <th>Seen</th>
+              <template x-for="d in data.all_days" :key="d.day">
+                <th><span x-text="d.label"></span></th>
+              </template>
+              <th>Since first</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(c, i) in filtered" :key="c.company">
+              <tr>
+                <td class="col-company">
+                  <a :href="`/intel/company?c=${encodeURIComponent(c.company)}`"
+                     class="font-semibold text-ink hover:underline" x-text="c.company"></a>
+                  <span x-show="c.out_of_icp" class="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full align-middle"
+                        style="background:#fee2e2;color:#991b1b">out of ICP</span>
+                  <div class="text-[11px] text-ink-3 mt-0.5 truncate" x-show="c.location" x-text="c.location"></div>
+                </td>
+                <td><span class="times-badge">×<span x-text="c.count"></span></span></td>
+                <template x-for="d in data.all_days" :key="d.day">
+                  <td>
+                    <template x-if="scoreOn(c, d.day) !== null">
+                      <span class="score-cell" :style="`background:${scoreColor(scoreOn(c,d.day))}`"
+                            x-text="scoreOn(c, d.day).toFixed(1)"></span>
+                    </template>
+                    <template x-if="scoreOn(c, d.day) === null">
+                      <span class="score-absent">—</span>
+                    </template>
+                  </td>
+                </template>
+                <td>
+                  <span x-show="c.delta_first_last === 0" class="text-ink-3">±0</span>
+                  <span x-show="c.delta_first_last !== 0" class="font-semibold"
+                        :style="c.delta_first_last>0 ? 'color:#059669' : 'color:#dc2626'"
+                        x-text="`${c.delta_first_last>0?'▲ +':'▼ '}${Math.abs(c.delta_first_last).toFixed(1)}`"></span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="text-xs text-ink-3 mt-4">
+      <span x-text="filtered.length"></span> shown.
+      A filled cell is the score that scan; “—” means the company wasn't picked up that run.
+      “Since first” is the change from the first scan it appeared in to the most recent one.
+    </p>
+  </div>
+</div>
+
+<script src="/static/js/view_export.js"></script>
+<script>
+function recurringPage() {
+  return {
+    data: null, loading: true,
+    pick: 0,            // 0 = all; 2 = seen ×2; 3 = seen ×3 …
+    inIcpOnly: false,
+    q: "",
+    sort: "count",
+    async init() {
+      try { this.data = await fetch("/api/intel/recurring").then(r => r.json()); }
+      catch (e) { this.data = { count:0, companies:[], all_days:[] }; }
+      finally { this.loading = false; }
+    },
+    get countTiers() {
+      const max = this.data?.max_runs || 2;
+      const tiers = [];
+      for (let n = 2; n <= max; n++) tiers.push(n);   // one button per exact scan count (×2, ×3…)
+      return tiers;
+    },
+    countAt(n) { return (this.data?.companies || []).filter(c => c.count === n).length; },
+    get filtered() {
+      let all = [...(this.data?.companies || [])];
+      if (this.pick) all = all.filter(c => c.count === this.pick);
+      if (this.inIcpOnly) all = all.filter(c => !c.out_of_icp);
+      const needle = this.q.trim().toLowerCase();
+      if (needle) all = all.filter(c => c.company.toLowerCase().includes(needle));
+      const cmp = {
+        count:  (a, b) => b.count - a.count || b.latest_score - a.latest_score,
+        latest: (a, b) => b.latest_score - a.latest_score || b.count - a.count,
+        riser:  (a, b) => b.delta_first_last - a.delta_first_last,
+        fader:  (a, b) => a.delta_first_last - b.delta_first_last,
+      }[this.sort] || ((a, b) => b.count - a.count);
+      return all.sort(cmp);
+    },
+    scoreOn(c, day) {
+      const r = (c.runs || []).find(x => x.day === day);
+      return r ? r.score : null;
+    },
+    scoreColor(s) {
+      if (s >= 8) return "#059669";      // outreach-eligible
+      if (s >= 5) return "#0284c7";      // monitor band
+      return "#94a3b8";                  // low / weak
+    },
+    // ── download the CURRENT view (filters + sort applied) ────────────────────
+    _sortLabel() {
+      return ({count:"Most scans", latest:"Highest latest score",
+               riser:"Biggest riser", fader:"Biggest faller"})[this.sort] || this.sort;
+    },
+    _viewColumns() {
+      const days = (this.data?.all_days || []).map(d => d.label);
+      return ["Company", "Location", "Seen", ...days, "Since first", "ICP"];
+    },
+    _viewRows() {
+      const days = (this.data?.all_days || []).map(d => d.day);
+      return this.filtered.map(c => {
+        const scores = days.map(day => {
+          const s = this.scoreOn(c, day);
+          return (s === null || s === undefined) ? "—" : s.toFixed(1);
+        });
+        const d = c.delta_first_last;
+        const delta = d > 0 ? `+${d.toFixed(1)}` : d < 0 ? d.toFixed(1) : "0";
+        return [c.company, c.location || "", `×${c.count}`, ...scores, delta,
+                c.out_of_icp ? "out" : "in"];
+      });
+    },
+    _viewSubtitle() {
+      const parts = [`sort: ${this._sortLabel()}`, `${this.filtered.length} shown`];
+      if (this.pick) parts.push(`seen ×${this.pick}`);
+      if (this.inIcpOnly) parts.push("in-ICP only");
+      if (this.q.trim()) parts.push(`search: "${this.q.trim()}"`);
+      return "Recurring · " + parts.join(" · ");
+    },
+    // Rich exports: post the shown companies (in order) → full-depth CSV
+    // (summary, signals + source links, trajectory) and a detailed PDF (one brief
+    // per company: score + curve, summary, clickable sources).
+    _shownNames() { return this.filtered.map(c => c.company); },
+    exportCsv() {
+      tpdlPostDownload("/api/intel/export_rich.csv", {
+        names: this._shownNames(), filename: "tpdl_recurring.csv",
+        title: "Companies that keep coming back", subtitle: this._viewSubtitle(),
+      });
+    },
+    // PDF — LIST: a one-page table of the shown companies (the matrix snapshot).
+    exportPdfList() {
+      const days = (this.data?.all_days || []).length;
+      const widths = [30, 28, 10, ...Array(days).fill(11), 13, 9];
+      tpdlDownloadViewPdf({
+        title: "Companies that keep coming back", subtitle: this._viewSubtitle(),
+        columns: this._viewColumns(), rows: this._viewRows(), widths,
+        filename: "tpdl_recurring_list.pdf",
+      });
+    },
+    // PDF — DETAIL: one full brief per shown company (score, curve, summary, links).
+    exportPdfDetail() {
+      tpdlPostDownload("/api/intel/view_briefs.pdf", {
+        names: this._shownNames(), filename: "tpdl_recurring_briefs.pdf",
+        title: this._viewSubtitle(), subtitle: this._viewSubtitle(),
+      });
+    },
+  };
+}
+</script>
+  </div>
+
+  <div x-show="tab === 'runs'" role="tabpanel">
+<div class="max-w-5xl mx-auto px-4 md:px-8 py-8" x-data="traceability()" x-init="load()">
+
+  <p class="text-xs font-mono uppercase tracking-widest text-ink-3 mb-2">Run history</p>
+  <h1 class="text-3xl md:text-4xl font-semibold font-display tracking-tight mb-2">
+    Traceability
+  </h1>
+  <p class="text-ink-2 mb-4 max-w-2xl">
+    Every run of <strong>TPDL's own engine</strong> — what Hugo scored and what
+    Maya read of it, each with a one-line recap and a CSV download. Read straight
+    from the append-only run snapshots. The <strong>run-to-run</strong> trajectory
+    below compares TPDL-engine runs only (like-for-like); the card just underneath
+    shows how the latest run moved <strong>vs. the original Neotek May reference</strong>.
+  </p>
+
+  <!-- Since the Neotek May reference (cross-engine movement) -->
+  <div class="rounded-xl border border-line bg-white overflow-hidden mb-6" x-show="neo" x-cloak>
+    <div class="px-5 py-4 border-b border-line" style="background: var(--tpdl-accent-soft)">
+      <p class="text-lg font-semibold">Since the Neotek May run</p>
+      <p class="text-xs text-ink-3">
+        Latest run <span x-text="neo?.run_date"></span> vs the original Neotek reference (2026-05-25)
+      </p>
+    </div>
+    <div class="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+      <div><p class="text-2xl font-semibold" x-text="neo?.neotek.reappeared"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">reappeared</p></div>
+      <div><p class="text-2xl font-semibold" style="color:#0a3a26" x-text="neo?.neotek.risers"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">rising</p></div>
+      <div><p class="text-2xl font-semibold" style="color:#7f1d1d" x-text="neo?.neotek.faders"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">fading</p></div>
+      <div><p class="text-2xl font-semibold text-ink-3" x-text="neo?.neotek.stable"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">stable</p></div>
+    </div>
+    <div class="px-5 pb-4 text-sm text-ink-2 flex flex-wrap gap-x-6 gap-y-1">
+      <span x-show="neo?.neotek.top_riser">Top riser
+        <strong x-text="neo?.neotek.top_riser?.name"></strong>
+        (<span x-text="'+' + neo?.neotek.top_riser?.delta.toFixed(1)"></span>)</span>
+      <span x-show="neo?.neotek.top_fader">Top fader
+        <strong x-text="neo?.neotek.top_fader?.name"></strong>
+        (<span x-text="neo?.neotek.top_fader?.delta.toFixed(1)"></span>)</span>
+    </div>
+    <p class="px-5 pb-4 text-[11px] text-ink-3">
+      ⚠ Cross-engine: May = original Neotek, July = TPDL's rebuilt engine. A delta reflects both a real
+      change in signal and the engine change — read it as “where each company stands now vs. where Neotek left it”.
+      Per-company detail & the two-point curve live on each <a href="/intel" class="underline">Sales</a> company page.
+    </p>
+  </div>
+
+  <!-- Compare ANY two runs — pick a baseline and a later run -->
+  <div class="rounded-xl border border-line bg-white overflow-hidden mb-6" x-show="cmpRuns.length >= 2" x-cloak>
+    <div class="px-5 py-4 border-b border-line">
+      <p class="text-lg font-semibold">📊 Compare two runs</p>
+      <p class="text-xs text-ink-3 mb-3">Pick a baseline and a later run — like a bank statement between two dates.</p>
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="text-xs text-ink-3"><div class="mb-1">From (baseline)</div>
+          <select x-model="cmpFrom" @change="runCompare()"
+                  class="px-3 py-1.5 text-sm border border-line rounded-md text-ink bg-white min-w-[200px]">
+            <template x-for="r in cmpRuns" :key="r.run_id">
+              <option :value="r.run_id" x-text="`${r.label} · ${r.companies} co.`"></option>
+            </template>
+          </select></label>
+        <span class="text-ink-3 pb-2">→</span>
+        <label class="text-xs text-ink-3"><div class="mb-1">To (later run)</div>
+          <select x-model="cmpTo" @change="runCompare()"
+                  class="px-3 py-1.5 text-sm border border-line rounded-md text-ink bg-white min-w-[200px]">
+            <template x-for="r in cmpRuns" :key="r.run_id">
+              <option :value="r.run_id" x-text="`${r.label} · ${r.companies} co.`"></option>
+            </template>
+          </select></label>
+      </div>
+      <!-- Mode: two endpoints, or fold in every run between (each company tracked first→last) -->
+      <div class="flex flex-wrap items-center gap-2 mt-3">
+        <span class="text-[11px] uppercase tracking-wider text-ink-3">Compare</span>
+        <button @click="setCmpSpan('two')"
+                :class="cmpSpan==='two' ? 'cmp-tab is-active' : 'cmp-tab'"
+                title="Just the two runs you picked — endpoint to endpoint">These two runs</button>
+        <button @click="setCmpSpan('full')"
+                :class="cmpSpan==='full' ? 'cmp-tab is-active' : 'cmp-tab'"
+                title="Fold in every run between them — each company tracked first→last across the middle runs">Include runs between</button>
+        <span class="text-[11px] text-ink-3" x-show="cmpSpan==='full' && cmpSpanRuns.length">
+          spanning <strong x-text="cmpSpanRuns.length"></strong> runs:
+          <span x-text="cmpSpanRuns.map(r => r.label).join(' · ')"></span>
+        </span>
+      </div>
+    </div>
+    <div class="px-5 py-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-center" x-show="cmpSummary" x-cloak>
+      <div x-show="cmpSpan!=='full'"><p class="text-2xl font-semibold" style="color:var(--tpdl-accent-ink)" x-text="cmpSummary?.new"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">new</p></div>
+      <div><p class="text-2xl font-semibold" style="color:#0a3a26" x-text="cmpSummary?.rising"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">rising</p></div>
+      <div><p class="text-2xl font-semibold" style="color:#7f1d1d" x-text="cmpSummary?.fading"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">fading</p></div>
+      <div><p class="text-2xl font-semibold text-ink-3" x-text="cmpSummary?.stable"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3">stable</p></div>
+      <div><p class="text-2xl font-semibold text-ink" x-text="cmpSummary?.common"></p>
+           <p class="text-[11px] uppercase tracking-wide text-ink-3" x-text="cmpSpan==='full' ? 'recurring' : 'in both'"></p></div>
+    </div>
+    <div class="px-5 pb-4 text-sm text-ink-2 flex flex-wrap gap-x-6 gap-y-1" x-show="cmpSummary">
+      <span x-show="cmpSummary?.top_riser">Top riser
+        <strong x-text="cmpSummary?.top_riser?.company"></strong>
+        (<span x-text="'+' + cmpSummary?.top_riser?.delta.toFixed(1)"></span>)</span>
+      <span x-show="cmpSummary?.top_fader">Top fader
+        <strong x-text="cmpSummary?.top_fader?.company"></strong>
+        (<span x-text="cmpSummary?.top_fader?.delta.toFixed(1)"></span>)</span>
+      <span class="w-full text-[11px] text-ink-3" x-show="cmpMeta">
+        Comparing <strong x-text="cmpMeta?.from?.label"></strong> → <strong x-text="cmpMeta?.to?.label"></strong>.
+        A May↔July delta also spans an engine change (Neotek → TPDL).
+      </span>
+    </div>
+  </div>
+
+  <a :href="sharepointUrl" target="_blank" rel="noopener"
+     class="inline-flex items-center gap-2 mb-6 text-sm font-medium px-4 py-2 rounded-lg text-white"
+     style="background: var(--tpdl-accent-ink)">
+    ↗ Open the SharePoint results folder
+  </a>
+
+  <!-- legend: what each Maya-CSV column means -->
+  <details class="mb-8 rounded-lg border border-line bg-white text-sm">
+    <summary class="cursor-pointer px-4 py-2.5 font-medium select-none">
+      What the download columns mean
+    </summary>
+    <div class="px-4 pb-4 pt-1 text-ink-2 space-y-3">
+      <div>
+        <p class="font-semibold text-ink">Hugo — scores CSV</p>
+        <ul class="list-disc ml-5 space-y-0.5">
+          <li><strong>Company</strong> — the company name.</li>
+          <li><strong>Assessed Score</strong> — its 0-10 commercial score for this run
+              (signal_strength + recency + corroboration).</li>
+          <li><strong>Coverage</strong> — how many of the 6 signal types had evidence
+              (e.g. "3 of 6"). A high score with low coverage = one strong signal.</li>
+          <li><strong>Outreach Eligible</strong> — YES if score ≥ 8 (worth contacting).</li>
+          <li><strong>Signals Found</strong> — number of evidenced signals.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold text-ink">Maya — trajectory CSV</p>
+        <ul class="list-disc ml-5 space-y-0.5">
+          <li><strong>Company</strong> — the company name.</li>
+          <li><strong>Current Score</strong> — its score in this run.</li>
+          <li><strong>Trajectory</strong> — previous run → this run (e.g. "6.5→8.0"),
+              or "X (new)" on first appearance.</li>
+          <li><strong>Movement</strong> — RISING / FADING / stable / NEW.</li>
+          <li><strong>Delta</strong> — the signed change (+1.5 = gained 1.5 points).</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+
+  <template x-if="loading">
+    <p class="text-ink-3">Loading runs…</p>
+  </template>
+
+  <template x-if="!loading && runs.length === 0">
+    <div class="rounded-xl border border-line p-6 bg-white">
+      <p class="text-ink-2">No runs in history yet. Once the engine imports a run
+        (<code>python import_csv.py …</code>), it appears here.</p>
+    </div>
+  </template>
+
+  <div class="space-y-6">
+    <template x-for="run in runs" :key="run.run_id">
+      <div class="rounded-xl border border-line bg-white overflow-hidden">
+
+        <!-- header -->
+        <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-line"
+             style="background: var(--tpdl-accent-soft)">
+          <div>
+            <p class="text-lg font-semibold" x-text="run.run_date || 'unknown date'"></p>
+            <p class="text-xs text-ink-3"
+               x-text="(run.batches > 1 ? run.batches + ' import batches unified' : 'single run')"></p>
+          </div>
+          <div class="flex gap-5 text-right">
+            <div><p class="text-2xl font-semibold" x-text="run.companies"></p>
+                 <p class="text-[11px] uppercase tracking-wide text-ink-3">companies</p></div>
+            <div><p class="text-2xl font-semibold" style="color: var(--tpdl-accent-ink)"
+                    x-text="run.eligible"></p>
+                 <p class="text-[11px] uppercase tracking-wide text-ink-3">eligible ≥8</p></div>
+          </div>
+        </div>
+
+        <!-- Hugo -->
+        <div class="px-5 py-4 border-b border-line">
+          <div class="flex items-center justify-between gap-3 mb-1">
+            <span class="text-sm font-semibold">🔎 Hugo — detection &amp; scoring</span>
+            <a :href="run.hugo_csv"
+               class="text-xs font-medium px-3 py-1.5 rounded-lg border border-line hover:bg-bg transition-colors">
+              ↓ Download scores (CSV)
+            </a>
+          </div>
+          <p class="text-sm text-ink-2" x-text="run.hugo_recap"></p>
+        </div>
+
+        <!-- Maya -->
+        <div class="px-5 py-4 border-b border-line">
+          <div class="flex items-center justify-between gap-3 mb-1">
+            <span class="text-sm font-semibold">📊 Maya — analysis &amp; trajectory</span>
+            <a :href="run.maya_csv"
+               class="text-xs font-medium px-3 py-1.5 rounded-lg border border-line hover:bg-bg transition-colors">
+              ↓ Download trajectory (CSV)
+            </a>
+          </div>
+          <p class="text-sm text-ink-2" x-text="run.maya_recap"></p>
+        </div>
+
+        <!-- Hugo × Maya + export -->
+        <div class="px-5 py-3 flex flex-wrap items-center justify-between gap-3 bg-bg/40">
+          <span class="text-xs text-ink-3">Hugo &amp; Maya side by side, or bundle to a folder:</span>
+          <div class="flex gap-2">
+            <a :href="run.combined_csv"
+               class="text-xs font-medium px-3 py-1.5 rounded-lg border border-line hover:bg-white transition-colors">
+              ↓ Hugo × Maya comparison (CSV)
+            </a>
+            <button @click="exportRun(run)"
+               class="text-xs font-medium px-3 py-1.5 rounded-lg text-white"
+               style="background: var(--tpdl-accent-ink)"
+               x-text="run._exporting ? 'Exporting…' : '↓ Save all to folder'"></button>
+          </div>
+        </div>
+        <p x-show="run._exported" class="px-5 pb-3 text-xs text-ink-2"
+           x-text="run._exported"></p>
+
+      </div>
+    </template>
+  </div>
+</div>
+
+<script>
+function traceability() {
+  return {
+    runs: [], loading: true, neo: null,
+    cmpRuns: [], cmpFrom: '', cmpTo: '', cmpSummary: null, cmpMeta: null,
+    cmpSpan: 'two', cmpSpanRuns: [],
+    setCmpSpan(mode) { if (this.cmpSpan !== mode) { this.cmpSpan = mode; this.runCompare(); } },
+    sharepointUrl: {{ sharepoint_url | tojson }},
+    async load() {
+      try {
+        const r = await fetch('/api/runs');
+        const d = await r.json();
+        this.runs = d.runs || [];
+        if (d.sharepoint_url) this.sharepointUrl = d.sharepoint_url;
+      } catch (e) { this.runs = []; }
+      try {
+        const run = await fetch('/api/intel/run').then(x => x.json());
+        if (run && run.has_run && run.neotek) this.neo = run;
+      } catch (e) {}
+      // Two-run comparison picker (grouped by scan date, incl. Neotek May).
+      try {
+        const cr = await fetch('/api/intel/runs').then(x => x.json());
+        this.cmpRuns = cr.runs || [];
+        if (this.cmpRuns.length >= 2) {
+          this.cmpFrom = this.cmpRuns[0].run_id;             // oldest (May)
+          this.cmpTo = this.cmpRuns[1].run_id;               // next run — meaningful default
+          await this.runCompare();
+        }
+      } catch (e) {}
+      this.loading = false;
+    },
+    async runCompare() {
+      if (!this.cmpFrom || !this.cmpTo || this.cmpFrom === this.cmpTo) {
+        this.cmpSummary = null; this.cmpMeta = null; return;
+      }
+      try {
+        const d = await fetch(`/api/intel/compare?from_run=${encodeURIComponent(this.cmpFrom)}`
+                              + `&to_run=${encodeURIComponent(this.cmpTo)}`
+                              + `&span=${this.cmpSpan}`).then(x => x.json());
+        this.cmpSummary = d.summary || null;
+        this.cmpMeta = { from: d.from, to: d.to };
+        this.cmpSpanRuns = d.span_runs || [];
+      } catch (e) { this.cmpSummary = null; }
+    },
+    async exportRun(run) {
+      run._exporting = true; run._exported = '';
+      try {
+        const r = await fetch(`/api/runs/${run.run_id}/export`, { method: 'POST' });
+        const d = await r.json();
+        run._exported = d.ok
+          ? `✓ ${d.files} files saved to ${d.folder} — drag them into the SharePoint folder above.`
+          : `Export failed: ${d.error || 'unknown error'}`;
+      } catch (e) { run._exported = 'Export failed (network).'; }
+      run._exporting = false;
+    }
+  };
+}
+</script>
+  </div>
+
+</div>
 {% endblock %}

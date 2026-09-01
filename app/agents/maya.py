@@ -34,6 +34,7 @@ from app.config import AgentID
 from app.database import SessionLocal
 from app.models import Company, Signal
 from app.tools.shortlist import shortlist_bands
+from app.tools.signal_density import signal_categories as _signal_categories
 
 MAYA_ID: str = AgentID.MAYA.value
 
@@ -289,13 +290,30 @@ class MayaAgent(BaseAgent):
             latest_day = latest.date() if latest else "?"
 
             def _why(c) -> str:
-                sig = c.s1_category or "no lead signal"
+                cats = _signal_categories(c)
+                sig = cats[0] if cats else "no lead signal"
                 rel = f" → {c.s1_tpdl_relevance}" if c.s1_tpdl_relevance else ""
                 flag = " ⚠REVIEW" if c.review_flag else ""
+                density = (f" · {len(cats)} signals stacked ({' + '.join(cats)})"
+                           if len(cats) >= 2 else "")
                 return (f"  - {c.name} — {c.assessed_score} · {c.sector_bucket or '—'} · "
-                        f"signal: {sig}{rel}{flag}")
+                        f"signal: {sig}{rel}{flag}{density}")
 
             top_act = "\n".join(_why(c) for c in act[:8]) or "  (none clear ≥8 this run)"
+
+            # Signal-dense watchlist — companies with ≥2 corroborated signal
+            # categories on the SAME company. External GTM benchmarks (Unify)
+            # show reply rates roughly double at this density vs a single
+            # signal at an equivalent score, so it deserves its own callout
+            # rather than being buried in the per-line footnote above.
+            dense = sorted(
+                (c for c in (act + monitor) if len(_signal_categories(c)) >= 2),
+                key=lambda c: (-len(_signal_categories(c)), -c.assessed_score),
+            )[:8]
+            dense_str = "\n".join(
+                f"  - {c.name} — {c.assessed_score} · {' + '.join(_signal_categories(c))}"
+                for c in dense
+            ) or "  (none this run — no company has 2+ corroborated signal types)"
 
             # Movement section — chronological trajectory (risers/faders) + the
             # low-but-rising watch list (climbing but still under the 8 bar).
@@ -333,11 +351,16 @@ class MayaAgent(BaseAgent):
                 f"carry a ⚠ review flag (60-second human check before acting).\n\n"
                 f"TOP SCORES (act-now band, strongest first) — with their lead signal:\n"
                 f"{top_act}\n\n"
+                f"SIGNAL-DENSE (2+ corroborated signal types on the same company — weigh "
+                f"these as HIGHER conviction than a single-signal company at an equal or even "
+                f"slightly higher score, not as a tie-breaker footnote):\n{dense_str}\n\n"
                 f"{movement_block}\n\n"
                 f"As Maya, write the RUN EXECUTIVE SUMMARY the way Nathalie asks: lead with "
                 f"the top scores AND why they're interesting/valid (name the signal), then "
                 f"spotlight the biggest before/after movers — a company that jumped from a "
-                f"weak score to eligible is a headline, not a footnote. Call out the low-but-"
+                f"weak score to eligible is a headline, not a footnote. Call out the signal-"
+                f"dense companies explicitly as the strongest conviction bets this run, even "
+                f"if a single-signal company scores marginally higher. Call out the low-but-"
                 f"rising names as 'worth monitoring / start building contacts now' even below "
                 f"8: the movement itself is the signal. Keep review flags visible. Reason only "
                 f"from the data above — never invent a number or a trajectory."
@@ -348,7 +371,8 @@ class MayaAgent(BaseAgent):
                 "task_title": f"Run summary — {len(act)} eligible",
                 "metadata": {"eligible": len(act), "monitor": len(monitor),
                              "runs": move["runs"], "risers": len(move["risers"]),
-                             "faders": len(move["faders"]), "new": len(move["new"])},
+                             "faders": len(move["faders"]), "new": len(move["new"]),
+                             "signal_dense": len(dense)},
             }
 
         # ── /trends ──────────────────────────────────────────────────────

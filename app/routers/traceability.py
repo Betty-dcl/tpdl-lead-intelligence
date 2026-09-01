@@ -9,7 +9,7 @@ import csv
 import io
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from starlette.requests import Request
@@ -132,11 +132,11 @@ def _maya_recap(db: Session, runs: list[dict], run: dict) -> str:
 # Page + JSON
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.get("/runs", response_class=HTMLResponse)
-def runs_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "traceability.html",
-                                      {"active_page": "runs",
-                                       "sharepoint_url": SHAREPOINT_FOLDER_URL})
+@router.get("/runs")
+def runs_page() -> RedirectResponse:
+    """Merged into /intel (Runs tab) on 2026-08-31 — kept as a redirect so old
+    links/bookmarks/memory notes pointing at /runs keep working."""
+    return RedirectResponse(url="/intel?tab=runs", status_code=302)
 
 
 def _scores_for(db: Session, day: str) -> dict[str, float]:

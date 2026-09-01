@@ -82,7 +82,32 @@ def _signal_block(c: Company, i: int) -> Optional[dict]:
     }
 
 
-def _serialize_company(c: Company, baseline: Optional[dict[str, float]] = None) -> dict:
+def _workspace_map(db: Session, names: list[str]) -> dict[str, dict]:
+    """Bulk claim + status lookup for a list of company names — one query each,
+    not N+1, so listing hundreds of companies stays cheap. Sparse by design:
+    most companies have no row (unclaimed, status 'new') until a human acts."""
+    from app.models import CompanyAssignment, CompanyStatus, User
+
+    if not names:
+        return {}
+    out: dict[str, dict] = {}
+    statuses = (db.query(CompanyStatus)
+                .filter(CompanyStatus.company_name.in_(names)).all())
+    for s in statuses:
+        out.setdefault(s.company_name, {})["status"] = s.status
+    assigns = (db.query(CompanyAssignment, User)
+               .join(User, User.id == CompanyAssignment.user_id)
+               .filter(CompanyAssignment.company_name.in_(names)).all())
+    for a, u in assigns:
+        out.setdefault(a.company_name, {})["assigned_to"] = u.display_name
+    return out
+
+
+def _serialize_company(
+    c: Company,
+    baseline: Optional[dict[str, float]] = None,
+    workspace_map: Optional[dict[str, dict]] = None,
+) -> dict:
     signals = [b for b in (_signal_block(c, i) for i in (1, 2, 3)) if b]
     not_evidenced = [
         s.strip() for s in (c.signals_not_evidenced or "").split(";") if s.strip()
@@ -103,6 +128,7 @@ def _serialize_company(c: Company, baseline: Optional[dict[str, float]] = None) 
         if refreshed:
             delta = round((c.assessed_score or 0.0) - neotek, 1)
             reappeared = True
+    ws = (workspace_map or {}).get(c.name) or {}
     return {
         "name":          c.name,
         "sector":        c.sector,
@@ -131,6 +157,10 @@ def _serialize_company(c: Company, baseline: Optional[dict[str, float]] = None) 
         "delta":              delta,
         "reappeared":         reappeared,
         "vintage":            vintage,   # "refreshed" (re-scored) | "neotek_may"
+        # Team workspace — who's on it, what stage it's at. Absent (None) means
+        # "unclaimed / no status set yet", not an error.
+        "assigned_to":        ws.get("assigned_to"),
+        "workspace_status":   ws.get("status"),
     }
 
 
@@ -173,7 +203,8 @@ def list_companies(
 
     rows = q.order_by(Company.assessed_score.desc()).limit(min(limit, 2000)).all()
     baseline = _neotek_baseline(db)
-    return [_serialize_company(r, baseline) for r in rows]
+    workspace_map = _workspace_map(db, [r.name for r in rows])
+    return [_serialize_company(r, baseline, workspace_map) for r in rows]
 
 
 @router.get("/companies/{name}")

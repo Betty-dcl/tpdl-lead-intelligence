@@ -60,6 +60,9 @@
             <h1 class="text-3xl font-semibold" x-text="c?.name"></h1>
             <span class="tpdl-badge tpdl-badge--outline" x-text="c?.sector_bucket"></span>
             <span x-show="c?.outreach_eligible" class="tpdl-badge tpdl-badge--accent">Outreach eligible</span>
+            <span x-show="stackedSignals.length >= 2" class="tpdl-badge tpdl-badge--dark"
+                  :title="stackedSignals.join(' + ')"
+                  x-text="`⚡ ${stackedSignals.length} signals stacked`"></span>
             <span x-show="c?.review_flag" class="tpdl-badge tpdl-badge--outline"
                   style="color:#7f1d1d;border-color:#fecaca;">⚑ Review</span>
           </div>
@@ -101,6 +104,64 @@
               No prior point yet, so the curve starts here.</div>
           </div>
         </template>
+      </div>
+    </section>
+
+    <!-- ============ TEAM WORKSPACE ============ -->
+    <section class="tpdl-card p-6 mb-8" x-show="workspace">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div class="text-xs uppercase tracking-wider text-ink-3">Team workspace</div>
+        <span class="text-[11px] text-ink-3">Who's on this, the outreach status, notes for the team</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Assignment -->
+        <div>
+          <div class="text-xs text-ink-3 mb-1">Assigned to</div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="tpdl-badge tpdl-badge--outline"
+                  x-text="workspace?.assignment?.user ? workspace.assignment.user.display_name : 'Unclaimed'"></span>
+            <button x-show="!workspace?.assignment?.user" @click="claim()"
+                    class="tpdl-btn tpdl-btn--outline text-xs">Claim this company</button>
+            <button x-show="workspace?.assignment?.user?.id === myId" @click="release()"
+                    class="tpdl-btn tpdl-btn--ghost text-xs">Release</button>
+          </div>
+        </div>
+
+        <!-- Outreach status -->
+        <div>
+          <label class="text-xs text-ink-3 mb-1 block" for="outreach-status">Outreach status</label>
+          <select id="outreach-status" aria-label="Outreach status"
+                  class="tpdl-btn tpdl-btn--outline text-xs" style="width:100%;text-align:left"
+                  :value="workspace?.status?.value || 'new'" @change="setStatus($event.target.value)">
+            <template x-for="s in STATUS_OPTIONS" :key="s.value">
+              <option :value="s.value" x-text="s.label"></option>
+            </template>
+          </select>
+          <div class="text-[11px] text-ink-3 mt-1" x-show="workspace?.status?.updated_by">
+            last set by <span x-text="workspace?.status?.updated_by?.display_name"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes / comments -->
+      <div class="mt-5">
+        <div class="text-xs text-ink-3 mb-2">Notes</div>
+        <div class="space-y-2 mb-3" x-show="workspace?.comments?.length">
+          <template x-for="cm in (workspace?.comments || [])" :key="cm.id">
+            <div class="text-xs p-2 rounded bg-bg border border-line-2">
+              <span class="font-semibold" x-text="cm.author.display_name"></span>
+              <span class="text-ink-3"> — <span x-text="new Date(cm.created_at).toLocaleDateString()"></span></span>
+              <div class="text-ink-2 mt-0.5" x-text="cm.content"></div>
+            </div>
+          </template>
+        </div>
+        <div class="flex gap-2">
+          <input type="text" x-model="commentDraft" @keydown.enter="postComment()"
+                 placeholder="Add a note for the team…" aria-label="Add a note"
+                 class="flex-1 text-xs border border-line-2 rounded px-3 py-2 bg-bg">
+          <button @click="postComment()" class="tpdl-btn tpdl-btn--dark text-xs">Post</button>
+        </div>
       </div>
     </section>
 
@@ -304,6 +365,15 @@
 const SIGNAL_COLORS = { leadership_change:"#6366f1", hiring:"#10B981", ma_expansion:"#8B5CF6", pe_event:"#0EA5E9", digital_initiative:"#f97316", org_restructuring:"#d946ef" };
 const SIGNAL_LABELS = { leadership_change:"Leadership change", hiring:"Hiring", ma_expansion:"M&A / Expansion", pe_event:"PE event", digital_initiative:"Digital initiative", org_restructuring:"Org restructuring" };
 const CONF_STYLE = { high:{bg:"#dcf7e7",color:"#0a3a26"}, medium:{bg:"#fef3c7",color:"#854d0e"}, low:{bg:"#f3f3ef",color:"#5c5c5c"} };
+const STATUS_OPTIONS = [
+  {value:"new", label:"New"},
+  {value:"in_review", label:"In review"},
+  {value:"outreach_drafted", label:"Outreach drafted"},
+  {value:"sent", label:"Sent"},
+  {value:"replied", label:"Replied"},
+  {value:"won", label:"Won"},
+  {value:"lost", label:"Lost"},
+];
 
 function parseTechStack(s) {
   const out = { crm:"—", marketing_automation:"—", analytics:"—", advertising:"—" };
@@ -322,26 +392,64 @@ function parseTechStack(s) {
 
 function companyDetail() {
   return {
-    name: "", c: null, traj: null, loading: true, error: null, chart: null,
-    parseTechStack,
+    name: "", c: null, traj: null, workspace: null, commentDraft: "",
+    loading: true, error: null, chart: null,
+    parseTechStack, STATUS_OPTIONS,
 
     async init() {
       const params = new URLSearchParams(location.search);
       this.name = params.get("c") || "";
       if (!this.name) { this.error = "No company specified."; this.loading = false; return; }
       try {
-        const [c, traj] = await Promise.all([
+        const [c, traj, workspace] = await Promise.all([
           fetch(`/api/intel/companies/${encodeURIComponent(this.name)}`).then(r => { if(!r.ok) throw new Error(`Company not found (HTTP ${r.status})`); return r.json(); }),
           fetch(`/api/intel/companies/${encodeURIComponent(this.name)}/trajectory`).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`/api/companies/${encodeURIComponent(this.name)}/workspace`).then(r => r.ok ? r.json() : null).catch(() => null),
         ]);
-        this.c = c; this.traj = traj;
+        this.c = c; this.traj = traj; this.workspace = workspace;
         document.title = `${c.name} — TPDL`;
         this.$nextTick(() => this.renderChart());
       } catch (e) { this.error = e.message; }
       finally { this.loading = false; }
     },
 
+    get myId() { return Alpine.store("me")?.user?.id ?? null; },
+
+    async refreshWorkspace() {
+      this.workspace = await fetch(`/api/companies/${encodeURIComponent(this.name)}/workspace`)
+        .then(r => r.ok ? r.json() : null).catch(() => null);
+    },
+    async claim() {
+      const r = await fetch(`/api/companies/${encodeURIComponent(this.name)}/claim`, { method: "POST" });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); alert(e.detail || "Could not claim this company."); return; }
+      await this.refreshWorkspace();
+    },
+    async release() {
+      await fetch(`/api/companies/${encodeURIComponent(this.name)}/release`, { method: "POST" });
+      await this.refreshWorkspace();
+    },
+    async setStatus(value) {
+      const r = await fetch(`/api/companies/${encodeURIComponent(this.name)}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: value }),
+      });
+      if (!r.ok) alert("Could not update the outreach status.");
+      await this.refreshWorkspace();
+    },
+    async postComment() {
+      const text = this.commentDraft.trim();
+      if (!text) return;
+      const r = await fetch(`/api/companies/${encodeURIComponent(this.name)}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: text }),
+      });
+      if (r.ok) { this.commentDraft = ""; await this.refreshWorkspace(); }
+    },
+
     get runDay() { return this.c?.run_date ? this.c.run_date.slice(0,10) : "unknown"; },
+    get stackedSignals() { return (this.c?.signals || []).map(s => s.category); },
     get isFresh() { return this.runDay === "2026-07-17"; },  // latest run day
 
     fmt(v) { return (v == null) ? "—" : Number(v).toFixed(1); },

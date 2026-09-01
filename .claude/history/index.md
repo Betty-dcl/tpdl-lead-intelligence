@@ -1,0 +1,73 @@
+# Historique consolidé — index
+
+33 sessions indexées. Régénérer avec :
+```
+python3 /Users/bettydeclety/.claude/scripts/consolidate_history.py --keywords ... --out '/Users/bettydeclety/Documents/Workspace Betty/ia & claude & obsidian/TPDL/TPDL Lead Intelligence/.claude/history'
+```
+
+- **2026-06-24** [`2026-06-24__8b6d25c1.md`](sessions/2026-06-24__8b6d25c1.md) — je veux creer entre 5 et 10 agents sur obsidian pour gerer tt la trazaiblité du taff tu penses que avec artefacts ce sera plus facile de les
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/8b6d25c1-09b2-4a80-b31b-c0fdc5422e6e.jsonl`
+- **2026-07-09** [`2026-07-09__89529f6a.md`](sessions/2026-07-09__89529f6a.md) — Tu travailles sur le projet TPDL Lead Intelligence Pipeline. La mémoire persistante est dans CLAUDE.md à la racine, qui importe .claude/neot
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/89529f6a-65f3-4fc2-bd88-2c2b1031065f.jsonl`
+- **2026-07-14** [`2026-07-14__127b88a4.md`](sessions/2026-07-14__127b88a4.md) — comment connecter claude code a telegram por pouvoir manage claude depuis 'lapp tel
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/127b88a4-1f18-4df5-b69f-3ed56de07e17.jsonl`
+- **2026-07-14** [`2026-07-14__b51fb357.md`](sessions/2026-07-14__b51fb357.md) — lis la memoire de la dernier conv, avec le tpld agents pipilein 
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/b51fb357-853e-482f-b8c8-d18b7d0664a2.jsonl`
+- **2026-07-15** [`2026-07-15__98479ef8.md`](sessions/2026-07-15__98479ef8.md) — reprends continuation de al dernier conv de tpdl lead intellgeince et api integration
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/98479ef8-fdaf-458d-b0b3-56ad7e007656.jsonl`
+- **2026-07-16** [`2026-07-16__967a3ecf.md`](sessions/2026-07-16__967a3ecf.md) — on reprends la sessions de tpdl lead intellgence ici
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/967a3ecf-48ca-4dea-9f3d-04593fa2383c.jsonl`
+- **2026-07-17** [`2026-07-17__2f42bea3.md`](sessions/2026-07-17__2f42bea3.md) — @"/Users/bettydeclety/Downloads/TPDL_agent_pilot-20260716_125029-Meeting_Recording.docx" on conitnue sur le projet tpdl lead intellgence
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/2f42bea3-ff59-41c3-9b9f-61ab3e24ffdb.jsonl`
+- **2026-07-20** [`2026-07-20__fd12d98a.md`](sessions/2026-07-20__fd12d98a.md) — reprends la conv de intellgience tpdl lead 
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/fd12d98a-265a-44d6-8c63-b04dc2ad71df.jsonl`
+- **2026-07-21** [`2026-07-21__883f88aa.md`](sessions/2026-07-21__883f88aa.md) — commence a creer le hmmtl l'appliaction avec python, tu as besoind e quoi ?
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/883f88aa-0abb-48fe-9eb6-e41a97424753.jsonl`
+- **2026-07-21** [`2026-07-21__67be0e97.md`](sessions/2026-07-21__67be0e97.md) — on reprend le projet tpdl lead intelligence 
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/67be0e97-b035-4d90-91f4-4e40adce9c10.jsonl`
+- **2026-07-22** [`2026-07-22__e3e7b5b9.md`](sessions/2026-07-22__e3e7b5b9.md) — En 1-3 phrases a mettre en explciation de mon travail sur linkedin, tu expliquerai comment tout ce projet, ce code, ces agents, cette paltfo
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/e3e7b5b9-4000-4b68-9cd8-bfea897d3ece.jsonl`
+- **2026-07-22** [`2026-07-22__124a957f.md`](sessions/2026-07-22__124a957f.md) — on reprend le projet tpdl  sur la plateforme , catgeorie review J’ai l’impression que ya des signaux qui ont confidence high mais qui sont q
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/124a957f-41e1-49ae-b4ac-5ea9ccf970f2.jsonl`
+- **2026-07-23** [`2026-07-23__668e92a8.md`](sessions/2026-07-23__668e92a8.md) — @"/Users/bettydeclety/Downloads/a poser/Content Themes for TPDL  Audience.docx" @"/Users/bettydeclety/Downloads/a poser/TPDL_ICP_Targeting_B
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/668e92a8-3541-41c4-aca7-bf5688d6dffb.jsonl`
+- **2026-07-26** [`2026-07-26__398bfa94.md`](sessions/2026-07-26__398bfa94.md) — La plateforme est bien, j'ai quelques changements à faire. Donc déjà en fait, j'aimerais qu'on aille sur la page sales. On est un week-end d
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/398bfa94-e653-4b71-a5d8-495871256c44.jsonl`
+- **2026-07-29** [`2026-07-29__bbd89cc9.md`](sessions/2026-07-29__bbd89cc9.md) — on continues sur tpdl lead, j'ai telecgarge le run du 23 juillet mais je navais pas les revenus, maintenant tu oex faire que le csv quon tel
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/bbd89cc9-9678-4fd2-afa9-56b3399c1d4c.jsonl`
+- **2026-08-03** [`2026-08-03__12af06e4.md`](sessions/2026-08-03__12af06e4.md) — reponse alfredo ; 
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/12af06e4-47e5-42df-9273-c92ea429e667.jsonl`
+- **2026-08-03** [`2026-08-03__31bcb374.md`](sessions/2026-08-03__31bcb374.md) — comment améliorer le patfeorme ? tu conseilles quoi d'autre ?
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/31bcb374-dc15-4601-84aa-bc807ba7d180.jsonl`
+- **2026-08-06** [`2026-08-06__a1d5a83e.md`](sessions/2026-08-06__a1d5a83e.md) — tu oeux faire recerhcehe web d'ici ?
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/a1d5a83e-79ea-4c19-848c-7c795e75779a.jsonl`
+- **2026-08-06** [`2026-08-06__9af29176.md`](sessions/2026-08-06__9af29176.md) — @"/Users/bettydeclety/Downloads/filesd.zip" @"/Users/bettydeclety/Downloads/Estudio_Demanda_Encaje_Regulatorio_MPR_v1.docx" @"/Users/bettyde
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/9af29176-4dfe-4f63-84f1-28faec0feffa.jsonl`
+- **2026-08-06** [`2026-08-06__9ed99aeb.md`](sessions/2026-08-06__9ed99aeb.md) — @"/Users/bettydeclety/Downloads/filesd.zip" @"/Users/bettydeclety/Downloads/Estudio_Demanda_Encaje_Regulatorio_MPR_v1.docx" @"/Users/bettyde
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/9ed99aeb-e5ad-4acd-bf55-f86f93e37b20.jsonl`
+- **2026-08-10** [`2026-08-10__1a9f58b3.md`](sessions/2026-08-10__1a9f58b3.md) — on continue avec le projet lead agents plateforme, tu penses que tu purrais ameliroer ines ?
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/1a9f58b3-8eb9-4db2-9a80-ae7b77d88b36.jsonl`
+- **2026-08-12** [`2026-08-12__71d90c5c.md`](sessions/2026-08-12__71d90c5c.md) — quel est ce dossier ? déchiffre
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/71d90c5c-df63-4977-b76c-36db0507af2e.jsonl`
+- **2026-08-12** [`2026-08-12__a55c0cf4.md`](sessions/2026-08-12__a55c0cf4.md) — dechiffre ce dossier, ajoutes le skill a notre base de donnée skills
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/a55c0cf4-6b37-460f-ae9d-9196638c5e02.jsonl`
+- **2026-08-12** [`2026-08-12__a827c142.md`](sessions/2026-08-12__a827c142.md) — je veux activre l'agent roots qui analyse tt internet, je peux le faire ici ouc 'est meux sur claude ia ?
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/a827c142-97e5-404c-bf5c-996ebb371c23.jsonl`
+- **2026-08-12** [`2026-08-12__76b9ca1e.md`](sessions/2026-08-12__76b9ca1e.md) — fait mli une mini fich pour apprendre a utiliser claude code sur terminal avec les langages cd, ls, pxd, cat ect 
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/76b9ca1e-a9c0-4c9d-819e-518d31c340c0.jsonl`
+- **2026-08-12** [`2026-08-12__f24e5375.md`](sessions/2026-08-12__f24e5375.md) — passe terminal
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/f24e5375-83e0-4f56-be83-2295982dc144.jsonl`
+- **2026-08-12** [`2026-08-12__42d81eba.md`](sessions/2026-08-12__42d81eba.md) — termianlla oui
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-TPDL-claude-code-dashboard/42d81eba-c7a1-4f07-84d0-0bd75d185733.jsonl`
+- **2026-08-12** [`2026-08-12__026d7014.md`](sessions/2026-08-12__026d7014.md) — trouve une solution, trouve une solution pour que ça arrête de me faire ça dès que tu veux mettre dans le workplace, enfin le passer par le 
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-claude-code-dashboard/026d7014-448e-493b-bf67-73945e903aa0.jsonl`
+- **2026-08-12** [`2026-08-12__71691790.md`](sessions/2026-08-12__71691790.md) — c quoi cette difference de folder ? je pense que ya un vrai pb, ce sont plusieurs projets ? c 1 projet  ? ca va pas, la ya que 1 projet clau
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-Workspace-Betty-TPDL-claude-code-dashboard/71691790-1538-45c6-b0fd-5112ad511a80.jsonl`
+- **2026-08-12** [`2026-08-12__96309d34.md`](sessions/2026-08-12__96309d34.md) — tu penses que ce serait bien d'integrer l'agent root a hugo ? sans l'abimer ?
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-Workspace-Betty-ia---claude---obsidian-TPDL-TPDL-Lead-Intelligence/96309d34-0f84-483e-bc1a-1589b89fe875.jsonl`
+- **2026-08-13** [`2026-08-13__08d19ef0.md`](sessions/2026-08-13__08d19ef0.md) — si je veux tt envoyer sur claude terminal comment fire pour lui donner la mémoire de notre porjet ?
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-Workspace-Betty-ia---claude---obsidian-TPDL-TPDL-Lead-Intelligence/08d19ef0-f3af-4c4e-b743-022141bee24a.jsonl`
+- **2026-08-20** [`2026-08-20__494c33f8.md`](sessions/2026-08-20__494c33f8.md) — donnes moi lien la plateforme acces a liendonnes moi lien la plateforme acces a lien
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-Workspace-Betty-ia---claude---obsidian-TPDL-TPDL-Lead-Intelligence/494c33f8-c728-4801-8160-b30f874d308b.jsonl`
+- **2026-08-21** [`2026-08-21__d651869b.md`](sessions/2026-08-21__d651869b.md) — comment faire pour partager un lien qui dure plusieurs jours ? ou pour actvier un lien a partager depsuis mon telephone ? avec un ordi etitn
+  - source: `/Users/bettydeclety/.claude/projects/-Users-bettydeclety-Documents-Workspace-Betty-ia---claude---obsidian-TPDL-TPDL-Lead-Intelligence/d651869b-7b65-4a93-aabe-a8b727e07490.jsonl`

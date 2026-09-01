@@ -56,6 +56,33 @@ def test_unknown_page_is_404(client):
     assert r.headers["content-type"].startswith("application/json")
 
 
+# ── Sales hub merge (2026-08-31): /intel, /recurring, /runs are one page ──────
+# Sales/Recurring/Runs used to be 3 separate nav entries; they're now one page
+# (/intel) with a ?tab= switch. /recurring and /runs redirect so old
+# links/bookmarks/memory notes keep working.
+
+def test_recurring_redirects_to_intel_tab(client):
+    r = client.get("/recurring", follow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers["location"] == "/intel?tab=recurring"
+
+
+def test_runs_redirects_to_intel_tab(client):
+    r = client.get("/runs", follow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers["location"] == "/intel?tab=runs"
+
+
+def test_intel_page_carries_all_three_tabs(client):
+    body = client.get("/intel").text
+    # All three original Alpine components must render on the merged page —
+    # nothing was dropped, just given a tab instead of its own nav entry/route.
+    assert "intelPage()" in body
+    assert "recurringPage()" in body
+    assert "traceability()" in body
+    assert 'class="tpdl-hub-tabbar"' in body
+
+
 # ── Agents ────────────────────────────────────────────────────────────────────
 
 def test_agent_roster(client):
@@ -361,6 +388,52 @@ def test_contacts_radars(client):
     assert {"switzerland", "spain", "counts", "latest_run"} <= set(data)
     for entry in data["switzerland"] + data["spain"]:
         assert {"delta", "reappeared", "fresh", "run_date"} <= set(entry)
+
+
+def test_companies_list_carries_workspace_state(client, a_company):
+    """Team workspace (claim/status) surfaces on the LIST endpoint via a bulk
+    lookup (_workspace_map) — not just the single-company/detail endpoints —
+    so the Sales table can show it without an N+1 request per row."""
+    from app.models import CompanyAssignment, CompanyStatus, User
+
+    with SessionLocal() as db:
+        user = db.query(User).first()
+        assert user is not None, "no seeded user to assign — run seed.py"
+        user_id, user_display_name = user.id, user.display_name
+        db.merge(CompanyAssignment(company_name=a_company, user_id=user_id))
+        db.merge(CompanyStatus(company_name=a_company, status="sent", updated_by_user_id=user_id))
+        db.commit()
+    try:
+        rows = client.get("/api/intel/companies?limit=2000").json()
+        row = next(r for r in rows if r["name"] == a_company)
+        assert row["assigned_to"] == user_display_name
+        assert row["workspace_status"] == "sent"
+        # An untouched company must report None, not crash or default to "sent".
+        other = next(r for r in rows if r["name"] != a_company)
+        assert other["assigned_to"] is None
+        assert other["workspace_status"] is None
+    finally:
+        with SessionLocal() as db:
+            db.query(CompanyAssignment).filter(CompanyAssignment.company_name == a_company).delete()
+            db.query(CompanyStatus).filter(CompanyStatus.company_name == a_company).delete()
+            db.commit()
+
+
+def test_contacts_scraper_brief_csv(client):
+    """The scraper-ready brief download — usable without Apollo/Kaspr, since
+    sourcing is done by the agency, not an API. One row per ACT NOW company."""
+    r = client.get("/api/contacts/scraper_brief.csv")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    # A shared ICP legend precedes the per-company table, so the real header
+    # row isn't line 1/2 like the plain exports — find it by content instead.
+    header = next(line for line in r.text.splitlines() if line.startswith("Company;"))
+    for col in ("Company", "Score", "Lead signal", "Priority roles",
+                "Sales Nav geography", "Tie-back checklist"):
+        assert col in header
+    # Shared ICP legend written once above the table, not per row.
+    assert "Medical Affairs" in r.text
+    assert "No invented people" in r.text
 
 
 def test_newsletter_editions_seeded(client):
