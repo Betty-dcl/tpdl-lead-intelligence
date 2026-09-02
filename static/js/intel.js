@@ -168,13 +168,16 @@ function intelPage() {
       this.$nextTick(() => this.renderMap());
     },
 
-    // Ring colour = movement (only meaningful once a run comparison — the
-    // frise — is active); fill colour always = absolute score band. Reuses
-    // the EXACT same vocabulary/colours as the table's left-border accent
-    // (reappearedBorder) so the map and the table never disagree on what
-    // "new"/"rose"/"fell" mean or look like.
+    // Ring colour = movement, but ONLY once a run comparison (the frise) is
+    // explicitly picked — otherwise every pin gets a plain white ring, full
+    // stop. (Unlike the table's reappearedBorder, which falls back to "vs
+    // May" by default: on a map with 600 dots that fallback made almost
+    // every pin ring blue — "new vs May" is true for most of the database —
+    // which read as unexplained noise, not a signal.) Fill colour is always
+    // the absolute score band (scoreClass), independent of this.
     mapRingColor(c) {
-      const v = this.periodOn ? this.periodDelta(c) : this.mayDelta(c);
+      if (!this.periodOn) return "#fff";
+      const v = this.periodDelta(c);
       if (v === "new") return "#6366f1";
       if (typeof v === "number") {
         if (v > 0) return "#34D591";
