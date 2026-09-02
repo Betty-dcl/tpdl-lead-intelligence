@@ -168,10 +168,29 @@ function intelPage() {
       this.$nextTick(() => this.renderMap());
     },
 
+    // Ring colour = movement (only meaningful once a run comparison — the
+    // frise — is active); fill colour always = absolute score band. Reuses
+    // the EXACT same vocabulary/colours as the table's left-border accent
+    // (reappearedBorder) so the map and the table never disagree on what
+    // "new"/"rose"/"fell" mean or look like.
+    mapRingColor(c) {
+      const v = this.periodOn ? this.periodDelta(c) : this.mayDelta(c);
+      if (v === "new") return "#6366f1";
+      if (typeof v === "number") {
+        if (v > 0) return "#34D591";
+        if (v < 0) return "#ef4444";
+      }
+      return "#fff";
+    },
+
     renderMap() {
       if (!window.L) { console.error("Leaflet not loaded yet"); return; }
       if (!this._leafletMap) {
-        this._leafletMap = L.map("companyMap").setView([30, 10], 2);
+        // Land directly on Europe/CH/ES (the core market) — never auto-fit
+        // to the full world spread of pins, which would zoom out past the
+        // point of being useful. The user can pan/zoom from here themselves;
+        // that manual view is preserved across filter changes below.
+        this._leafletMap = L.map("companyMap").setView([48, 12], 4);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: "&copy; OpenStreetMap contributors",
           maxZoom: 18,
@@ -181,11 +200,12 @@ function intelPage() {
       this._leafletMarkers.clearLayers();
       const rows = this.displayedCompanies;
       const pts = rows.filter(c => c.lat != null && c.lng != null);
-      const bounds = [];
       pts.forEach(c => {
         const cls = this.scoreClass(c.assessed_score);
+        const ring = this.mapRingColor(c);
         const marker = L.circleMarker([c.lat, c.lng], {
-          radius: 7, weight: 1.5, color: "#fff", fillColor: cls.bg, fillOpacity: 0.9,
+          radius: 7, weight: ring === "#fff" ? 1.5 : 3, color: ring,
+          fillColor: cls.bg, fillOpacity: 0.9,
         });
         marker.bindPopup(
           `<div class="map-pin-popup"><b>${c.name}</b>` +
@@ -194,13 +214,12 @@ function intelPage() {
           `<a href="/intel/company?c=${encodeURIComponent(c.name)}">Open detail →</a></div>`
         );
         marker.addTo(this._leafletMarkers);
-        bounds.push([c.lat, c.lng]);
       });
       this.mapStats = { mapped: pts.length, unmapped: rows.length - pts.length, total: rows.length };
-      if (bounds.length) this._leafletMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 6 });
       // The container may have been display:none (still on the "Table" view)
       // when the map was first created — Leaflet then measures 0x0. Fix it
-      // up once the tab is actually visible.
+      // up once the tab is actually visible. No re-centring here on purpose
+      // (see setView above) — filter changes only redraw the pins in place.
       setTimeout(() => this._leafletMap && this._leafletMap.invalidateSize(), 50);
     },
 

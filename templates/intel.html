@@ -183,7 +183,7 @@
   <!-- ================================================================ -->
   <!-- HEADER + PIPELINE STATS                                          -->
   <!-- ================================================================ -->
-  <section class="mb-12">
+  <section class="mb-6">
     <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-3">Market Watch · Scored companies</p>
     <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-2xl leading-tight">
       The Lead Intelligence Pipeline
@@ -201,7 +201,7 @@
     <!-- LATEST RUN COCKPIT — engine health / audit trail, not a weekly     -->
     <!-- action item. Collapsed by default (Betty, 2026-09-02).            -->
     <!-- ================================================================ -->
-    <details class="mt-8 rounded-xl border" style="border-color:var(--tpdl-border)"
+    <details class="mt-4 rounded-xl border" style="border-color:var(--tpdl-border)"
              x-show="run && run.has_run" x-cloak>
       <summary class="cursor-pointer select-none px-5 py-3 text-sm font-medium text-ink-2 flex items-center gap-2">
         <span>⚙ Engine health — latest run</span>
@@ -304,7 +304,7 @@
     </details>
 
     <!-- Team activity feed strip -->
-    <div class="mt-6 mb-2" x-show="activity.length > 0" x-cloak>
+    <div class="mt-4 mb-2" x-show="activity.length > 0" x-cloak>
       <div class="text-xs uppercase tracking-wider text-ink-3 mb-2">Recent team activity</div>
       <div class="flex gap-2 overflow-x-auto pb-2">
         <template x-for="a in activity.slice(0, 8)" :key="a.id">
@@ -515,8 +515,36 @@
     </div>
 
     <!-- ============ Map view — same filters as the table ============ -->
-    <div x-show="viewMode === 'map'" x-cloak class="mb-6">
+    <div x-show="viewMode === 'map'" x-cloak class="mb-6 relative">
       <div id="companyMap"></div>
+      <!-- Legend — fill = absolute score band (always); ring = movement,
+           shown only once a run comparison (the frise above) is active, same
+           colours as the table's left-border accent (reappearedBorder). -->
+      <div class="tpdl-card absolute bottom-3 left-3 px-3 py-2.5 text-xs"
+           style="z-index:1000;background:rgba(255,255,255,0.95)">
+        <p class="text-[10px] uppercase tracking-wider text-ink-3 mb-1.5">Score</p>
+        <div class="flex flex-col gap-1 mb-2">
+          <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#34D591"></span>Act now · ≥8</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#fef3c7"></span>Monitor · 5–7</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#fee2e2"></span>Weak · 1–4</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#f3f3ef;border:1px solid #ddd"></span>No signal · 0</span>
+        </div>
+        <template x-if="periodOn">
+          <div class="pt-2 border-t" style="border-color:var(--tpdl-border)">
+            <p class="text-[10px] uppercase tracking-wider text-ink-3 mb-1.5">
+              Movement · <span x-text="runLabelFor(period.from)"></span> → <span x-text="runLabelFor(period.to)"></span>
+            </p>
+            <div class="flex flex-col gap-1">
+              <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#fff;border:3px solid #6366f1"></span>New this run</span>
+              <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#fff;border:3px solid #34D591"></span>Rose</span>
+              <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#fff;border:3px solid #ef4444"></span>Fell</span>
+            </div>
+          </div>
+        </template>
+        <p class="text-[10px] text-ink-3 mt-2 pt-2 border-t" style="border-color:var(--tpdl-border)" x-show="!periodOn">
+          Pick two runs above ("Compare runs") to also ring new/rising/falling companies.
+        </p>
+      </div>
     </div>
 
     <!-- ============ TOP-N picker ============ -->
