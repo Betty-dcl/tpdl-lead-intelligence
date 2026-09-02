@@ -4,12 +4,29 @@
 {% block head %}
 <!-- Map view (Table/Map toggle, "Scored companies" tab) — Leaflet + free OSM
      tiles, no API key. Pins come from app/tools/geocode.py (static lookup,
-     zero cost) attached server-side to each company's lat/lng. -->
+     zero cost) attached server-side to each company's lat/lng.
+     Marker clustering (leaflet.markercluster): the static city lookup gives
+     several companies the EXACT same coordinates (e.g. Ferrer/ISDIN both
+     "Barcelona") and at Europe zoom nearby capitals also sit a few pixels
+     apart — without clustering those pins silently stack and look like one
+     dot (Betty, 2026-09-02: "pourquoi il n'y a qu'1 point Act now en
+     Europe?" — there were actually 23). Clustering groups them into a
+     count bubble that expands on click/zoom. -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <script defer src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <style>
   #companyMap { height: 560px; border-radius: var(--tpdl-radius-lg); z-index: 0; }
   .map-pin-popup b { display: block; margin-bottom: 2px; }
+  /* Cluster bubbles tinted to match the brand accent instead of Leaflet's default yellow/orange. */
+  .marker-cluster-small  { background-color: rgba(52,213,145,0.35); }
+  .marker-cluster-small  div { background-color: rgba(52,213,145,0.65); color: #0a3a26; }
+  .marker-cluster-medium { background-color: rgba(254,243,199,0.55); }
+  .marker-cluster-medium div { background-color: rgba(254,243,199,0.85); color: #854d0e; }
+  .marker-cluster-large  { background-color: rgba(9,71,82,0.35); }
+  .marker-cluster-large  div { background-color: rgba(9,71,82,0.75); color: #fff; }
 </style>
 
 <!-- Sales tab styles (was intel.html) -->
@@ -185,17 +202,9 @@
   <!-- ================================================================ -->
   <section class="mb-3">
     <p class="text-xs uppercase tracking-[0.2em] text-ink-3 mb-2">Market Watch · Scored companies</p>
-    <h1 class="text-3xl md:text-4xl font-semibold mb-3 max-w-2xl leading-tight">
+    <h1 class="text-3xl md:text-4xl font-semibold max-w-2xl leading-tight">
       The Lead Intelligence Pipeline
     </h1>
-    <p class="text-ink-2 max-w-2xl">
-      Life-sciences companies (pharma, medtech, dental, diagnostics) scored across
-      6 commercial signal categories, every finding traceable to a source URL.
-      The <strong>Δ</strong> compares a company's new score to its previous one
-      whenever it's already in our database. We act on scores <strong>≥ 8</strong> —
-      but the Δ surfaces the risers: a company resurfacing and climbing toward 8 is
-      an early good sign, worth watching even before it clears the bar.
-    </p>
 
     <!-- ================================================================ -->
     <!-- LATEST RUN COCKPIT — engine health / audit trail, not a weekly     -->
@@ -302,26 +311,6 @@
       </div>
       </div>
     </details>
-
-    <!-- Team activity feed strip -->
-    <div class="mt-3 mb-1" x-show="activity.length > 0" x-cloak>
-      <div class="text-xs uppercase tracking-wider text-ink-3 mb-1">Recent team activity</div>
-      <div class="flex gap-2 overflow-x-auto pb-2">
-        <template x-for="a in activity.slice(0, 8)" :key="a.id">
-          <div class="flex items-center gap-2 bg-white border border-line rounded-full px-3 py-1.5 text-xs shrink-0">
-            <span class="font-medium" x-text="a.user.display_name"></span>
-            <span class="text-ink-3" x-text="actionVerb(a.action)"></span>
-            <span class="font-medium truncate max-w-[140px]" x-text="a.target_company"></span>
-            <template x-if="a.action === 'status_changed'">
-              <span class="text-ink-3 text-[10px]">
-                (→ <span x-text="statusLabel(a.metadata.to_status)"></span>)
-              </span>
-            </template>
-            <span class="text-ink-3 text-[10px]" x-text="relativeTime(a.created_at)"></span>
-          </div>
-        </template>
-      </div>
-    </div>
 
   </section>
 
@@ -464,28 +453,15 @@
         Include ICP-flagged
       </button>
 
-      <!-- Standalone Run picker — only when NO frise is active (else they'd conflict) -->
-      <label class="inline-flex items-center gap-2 text-xs text-ink-3" x-show="!periodOn">
-        <span class="uppercase tracking-wider">Run</span>
-        <select x-model="filters.vintage" aria-label="Filter by run"
-                class="filter-select px-3 py-1.5 text-sm border border-line rounded-md text-ink">
-          <option value="" x-text="`All runs (${companies.length})`"></option>
-          <template x-for="r in runOptions" :key="r.day">
-            <option :value="r.label" x-text="`${r.label} (${r.count})`"></option>
-          </template>
-        </select>
-      </label>
-
-      <!-- When a frise is active it drives the run — show it locked so the two never disagree -->
+      <!-- Run filtering lives in ONE place — the "Compare runs" frise above
+           (pick From→To to narrow to a run, with the richer delta/new/rose/
+           fell view). No second, simpler picker here anymore (Betty,
+           2026-09-02: it was a repeat of the same thing). -->
       <span class="inline-flex items-center gap-2 text-xs" x-show="periodOn" x-cloak>
         <span class="uppercase tracking-wider text-ink-3">Run</span>
         <span class="filter-pill is-active" style="cursor:default">
           <span x-text="runLabelFor(period.to)"></span> · from the comparison above
         </span>
-      </span>
-
-      <span class="ml-auto text-xs text-ink-3" x-show="!periodOn">
-        Pick a run to see only the companies scored that day. Each row's badge shows its scan date.
       </span>
       <span class="ml-auto text-xs text-ink-3" x-show="periodOn" x-cloak>
         The comparison above is driving the view (showing the <span x-text="runLabelFor(period.to)"></span> run).
@@ -550,7 +526,7 @@
     <!-- ============ TOP-N picker ============ -->
     <div class="flex flex-wrap items-center gap-2 mb-3" x-show="viewMode === 'table'">
       <span class="text-xs uppercase tracking-wider text-ink-3 mr-1">Show</span>
-      <template x-for="n in [10, 15, 20, 35, 50, 200]" :key="n">
+      <template x-for="n in [15, 50]" :key="n">
         <button @click="setTopN(n)"
                 :class="topN === n ? 'filter-pill is-active' : 'filter-pill'"
                 x-text="'Top ' + n"></button>

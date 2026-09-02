@@ -101,7 +101,6 @@ function intelPage() {
       geo_region: "",
       outreach_eligible: false,
       review_flag: false,
-      vintage: "",          // "" all · exact scan label ("May 25" / "Jul 23"…)
     },
     showICP: false,
     topN: 0,                 // 0 = show all; otherwise 10/20/35/50/200
@@ -198,7 +197,15 @@ function intelPage() {
           attribution: "&copy; OpenStreetMap contributors",
           maxZoom: 18,
         }).addTo(this._leafletMap);
-        this._leafletMarkers = L.layerGroup().addTo(this._leafletMap);
+        // Cluster overlapping/nearby pins into a count bubble — several
+        // companies share the exact same static-lookup coordinates (e.g.
+        // Ferrer/ISDIN both "Barcelona"), which otherwise silently stack
+        // into what looks like a single dot. Falls back to a plain layer
+        // group if the plugin failed to load (still correct, just unclustered).
+        this._leafletMarkers = (typeof L.markerClusterGroup === "function")
+          ? L.markerClusterGroup({ maxClusterRadius: 45, spiderfyOnMaxZoom: true })
+          : L.layerGroup();
+        this._leafletMarkers.addTo(this._leafletMap);
       }
       this._leafletMarkers.clearLayers();
       const rows = this.displayedCompanies;
@@ -292,11 +299,6 @@ function intelPage() {
       const eligibleOK = (c) => !f.outreach_eligible || c.outreach_eligible;
       const reviewOK   = (c) => !f.review_flag       || c.review_flag;
       const icpOK      = (c) => this.showICP || !c.icp_flag;
-      // Run filter matches the EXACT scan (run_label: "May 25" / "Jul 17" / "Jul 23").
-      // While a frise period is active the frise IS the run selector, so the
-      // standalone Run filter is ignored (and hidden in the UI) to avoid two
-      // conflicting run controls.
-      const vintageOK  = (c) => this.periodOn || !f.vintage || c.run_label === f.vintage;
       // With a frise selected, narrow to the "To" run, and (optionally) only the
       // companies that are new in that run vs the "From" run.
       const periodOK   = (c) => {
@@ -315,7 +317,7 @@ function intelPage() {
       };
       const rows = this.companies.filter(c =>
         sectorOK(c) && signalOK(c) && geoOK(c) && eligibleOK(c) &&
-        reviewOK(c) && icpOK(c) && vintageOK(c) && periodOK(c));
+        reviewOK(c) && icpOK(c) && periodOK(c));
       const dir = this.sortDesc ? -1 : 1;
       const key = this.sortKey;
       const val = (c) => {
@@ -383,7 +385,6 @@ function intelPage() {
       if (f.outreach_eligible) parts.push("eligible only");
       if (f.review_flag) parts.push("review-flagged");
       if (this.periodOn) parts.push(`${this.runLabelFor(this.period.from)} → ${this.runLabelFor(this.period.to)}`);
-      else if (f.vintage) parts.push(f.vintage);
       return "Companies · " + parts.join(" · ");
     },
     // Rich exports: post the shown companies (in order) → full-depth CSV (summary,
@@ -426,8 +427,7 @@ function intelPage() {
 
     resetFilters() {
       this.filters = { sector_bucket: "", signal_type: "", geo_region: "",
-                       outreach_eligible: false, review_flag: false,
-                       vintage: "" };
+                       outreach_eligible: false, review_flag: false };
       this.showICP = false;
       this.topN = 0;
       this.clearPeriod();
@@ -451,18 +451,6 @@ function intelPage() {
       return c.run_label || (this.isFresh(c) ? "latest run" : "older run");
     },
     get freshCount() { return this.companies.filter(c => this.isFresh(c)).length; },
-
-    // Distinct scan dates present, newest first, with a count — drives the Run
-    // filter dropdown dynamically (grows on its own as new runs are imported).
-    get runOptions() {
-      const by = {};
-      for (const c of this.companies) {
-        const label = c.run_label, day = this._day(c.run_date);
-        if (!label || !day) continue;
-        (by[day] ||= { day, label, count: 0 }).count++;
-      }
-      return Object.values(by).sort((a, b) => b.day.localeCompare(a.day));
-    },
 
     // Accurate one-line descriptor of what the latest run contained, instead of
     // a hardcoded "CH + ES Lunch set" that goes stale run to run.
