@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Company, RunSnapshot
+from app.tools.geocode import geocode_location
 from app.tools.icp import market_tier
 from app.tools.radars import geo_region
 
@@ -129,6 +130,7 @@ def _serialize_company(
             delta = round((c.assessed_score or 0.0) - neotek, 1)
             reappeared = True
     ws = (workspace_map or {}).get(c.name) or {}
+    coords = geocode_location(c.location)   # (lat, lng) or None — see app/tools/geocode.py
     return {
         "name":          c.name,
         "sector":        c.sector,
@@ -137,6 +139,8 @@ def _serialize_company(
         "location":      c.location,
         "geo_region":    geo_region(c.location),
         "market_tier":   market_tier(c.location),   # core (CH/ES/ME/Europe) | world
+        "lat":           coords[0] if coords else None,
+        "lng":           coords[1] if coords else None,
         "revenue":       c.revenue,
         "assessed_score":     c.assessed_score,
         "coverage":           c.coverage,

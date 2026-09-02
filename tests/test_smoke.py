@@ -149,6 +149,9 @@ def test_intel_company_detail(client, a_company):
     assert r.status_code == 200
     body = r.json()
     assert body["name"] == a_company
+    # Map view (2026-09-02): lat/lng always present (null when unrecognized —
+    # never fabricated), never both missing outright.
+    assert "lat" in body and "lng" in body
     # Neotek-movement fields are always present (may be null if never in Neotek)
     assert {"neotek_score", "delta", "reappeared"} <= set(body)
     # Per-signal score derivation is exposed

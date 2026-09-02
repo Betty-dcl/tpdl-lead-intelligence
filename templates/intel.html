@@ -2,6 +2,16 @@
 {% block title %}Market Watch — TPDL{% endblock %}
 
 {% block head %}
+<!-- Map view (Table/Map toggle, "Scored companies" tab) — Leaflet + free OSM
+     tiles, no API key. Pins come from app/tools/geocode.py (static lookup,
+     zero cost) attached server-side to each company's lat/lng. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<script defer src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  #companyMap { height: 560px; border-radius: var(--tpdl-radius-lg); z-index: 0; }
+  .map-pin-popup b { display: block; margin-bottom: 2px; }
+</style>
+
 <!-- Sales tab styles (was intel.html) -->
 <style>
   .filter-pill {
@@ -187,61 +197,11 @@
       an early good sign, worth watching even before it clears the bar.
     </p>
 
-    <!-- This week's review batch — 70/30 Europe/world curation (Nathalie's
-         personal weekly reading list; independent of Maya's /shortlist).
-         Comes FIRST: it answers "what do I read this week", the cockpit below
-         answers "is the engine healthy" — the latter is audit info, not a
-         weekly action item (Betty, 2026-09-02). -->
-    <div class="tpdl-card--dark rounded-xl p-6 mt-8"
-         style="background:var(--tpdl-dark);color:var(--tpdl-text-on-dark)">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <div>
-          <div class="text-[11px] uppercase tracking-[0.2em] mb-1" style="color:var(--tpdl-accent)">
-            This week's review batch · 70/30 Europe/world
-          </div>
-          <p class="text-sm opacity-80" x-show="weeklyMeta">
-            <span x-text="weeklyMeta?.n"></span> companies —
-            <strong x-text="weeklyMeta?.core"></strong> Europe/core ·
-            <strong x-text="weeklyMeta?.world"></strong> world.
-          </p>
-        </div>
-        <label class="inline-flex items-center gap-2 text-xs">
-          <span style="opacity:.7">Companies</span>
-          <input type="number" min="1" max="50" x-model.number="weeklyN"
-                 @change="loadWeeklyBatch()"
-                 class="w-16 rounded px-2 py-1 text-ink bg-white text-xs" />
-        </label>
-      </div>
-      <div x-show="weeklyLoading" class="text-xs" style="opacity:.6">Loading…</div>
-      <template x-if="!weeklyLoading && weeklyMeta">
-        <div class="divide-y" style="border-color:rgba(255,255,255,0.12)">
-          <template x-for="c in weeklyBatch" :key="c.name">
-            <a :href="`/intel/company?c=${encodeURIComponent(c.name)}`"
-               class="flex items-center gap-3 py-2 text-sm hover:opacity-80 min-w-0"
-               style="border-color:rgba(255,255,255,0.12)">
-              <span class="text-xs shrink-0" :title="c.market_tier === 'core' ? 'Europe/core' : 'World'"
-                    x-text="c.market_tier === 'core' ? '🇪🇺' : '🌍'"></span>
-              <span class="score-pill shrink-0"
-                    :style="`background:${scoreClass(c.assessed_score).bg};color:${scoreClass(c.assessed_score).color}`"
-                    x-text="c.assessed_score.toFixed(1)"></span>
-              <span class="font-medium shrink-0 truncate" style="max-width:180px" x-text="c.name"></span>
-              <template x-if="c.signals && c.signals.length">
-                <span class="text-[11px] uppercase tracking-wide shrink-0" style="opacity:.7"
-                      x-text="signalLabel(c.signals[0].category)"></span>
-              </template>
-              <span class="text-xs truncate flex-1 min-w-0" style="opacity:.65"
-                    x-text="(c.intelligence_summary || 'No signal detail yet.').split(/(?<=[.!?])\s/)[0]"></span>
-            </a>
-          </template>
-        </div>
-      </template>
-    </div>
-
     <!-- ================================================================ -->
     <!-- LATEST RUN COCKPIT — engine health / audit trail, not a weekly     -->
     <!-- action item. Collapsed by default (Betty, 2026-09-02).            -->
     <!-- ================================================================ -->
-    <details class="mt-4 rounded-xl border" style="border-color:var(--tpdl-border)"
+    <details class="mt-8 rounded-xl border" style="border-color:var(--tpdl-border)"
              x-show="run && run.has_run" x-cloak>
       <summary class="cursor-pointer select-none px-5 py-3 text-sm font-medium text-ink-2 flex items-center gap-2">
         <span>⚙ Engine health — latest run</span>
@@ -542,10 +502,27 @@
       <span class="ml-auto">Click a company name to open its full detail →</span>
     </div>
 
+    <!-- ============ Table / Map toggle ============ -->
+    <div class="flex items-center gap-2 mb-3">
+      <button type="button" @click="viewMode = 'table'"
+              :class="viewMode === 'table' ? 'filter-pill is-active' : 'filter-pill'">☰ Table</button>
+      <button type="button" @click="showMap()"
+              :class="viewMode === 'map' ? 'filter-pill is-active' : 'filter-pill'">📍 Map</button>
+      <span class="text-xs text-ink-3" x-show="viewMode === 'map' && mapStats">
+        <span x-text="mapStats?.mapped"></span> of <span x-text="mapStats?.total"></span> shown companies placed on the map
+        (<span x-text="mapStats?.unmapped"></span> without a recognized city/country)
+      </span>
+    </div>
+
+    <!-- ============ Map view — same filters as the table ============ -->
+    <div x-show="viewMode === 'map'" x-cloak class="mb-6">
+      <div id="companyMap"></div>
+    </div>
+
     <!-- ============ TOP-N picker ============ -->
-    <div class="flex flex-wrap items-center gap-2 mb-3">
+    <div class="flex flex-wrap items-center gap-2 mb-3" x-show="viewMode === 'table'">
       <span class="text-xs uppercase tracking-wider text-ink-3 mr-1">Show</span>
-      <template x-for="n in [10, 20, 35, 50, 200]" :key="n">
+      <template x-for="n in [10, 15, 20, 35, 50, 200]" :key="n">
         <button @click="setTopN(n)"
                 :class="topN === n ? 'filter-pill is-active' : 'filter-pill'"
                 x-text="'Top ' + n"></button>
@@ -569,7 +546,7 @@
     </div>
 
     <!-- Grid-based "table" -->
-    <div class="tpdl-card overflow-hidden">
+    <div class="tpdl-card overflow-hidden" x-show="viewMode === 'table'">
       <div class="overflow-x-auto">
         <div class="grid-head" style="min-width: 1290px;">
           <div class="rank-num">#</div>
@@ -908,7 +885,7 @@
 </div>
 
 <script src="/static/js/view_export.js"></script>
-<script src="/static/js/intel.js?v=20"></script>
+<script src="/static/js/intel.js?v=21"></script>
   </div>
 
   <div x-show="tab === 'recurring'" role="tabpanel">

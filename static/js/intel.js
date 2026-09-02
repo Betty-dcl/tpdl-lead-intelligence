@@ -121,13 +121,14 @@ function intelPage() {
     loading: true,
     error: null,
 
-    // Nathalie's weekly review batch — 70/30 Europe/world curation (2026-09-01
-    // meeting recap). Deliberately isolated from filteredCompanies/topN/period
-    // above: its own endpoint, its own small state, never touches the big table.
-    weeklyBatch: [],
-    weeklyN: 10,
-    weeklyMeta: null,
-    weeklyLoading: false,
+    // Table/Map toggle (2026-09-02, Betty: "carte géographique... un point
+    // pour chaque boîte"). Map obeys the SAME filters/sort/Top-N as the table
+    // (displayedCompanies) — no separate endpoint, pins come from lat/lng
+    // already attached to each company by app/tools/geocode.py.
+    viewMode: "table",
+    mapStats: null,
+    _leafletMap: null,
+    _leafletMarkers: null,
 
     async init() {
       this.loading = true;
@@ -151,24 +152,56 @@ function intelPage() {
       } finally {
         this.loading = false;
       }
-      this.loadWeeklyBatch();   // independent, non-blocking
+      // Keep the map in sync with every filter/sort/Top-N/period change,
+      // without wiring a change-handler onto each individual control.
+      this.$watch(
+        () => JSON.stringify(this.filters) + "|" + this.topN + "|" + this.showICP + "|" +
+              JSON.stringify(this.period) + "|" + this.sortKey + "|" + this.sortDesc,
+        () => { if (this.viewMode === "map") this.renderMap(); }
+      );
     },
 
-    /* ---- Weekly review batch (70/30 Europe/world) ---- */
+    /* ---- Map view (Table/Map toggle) ---- */
 
-    async loadWeeklyBatch() {
-      this.weeklyLoading = true;
-      try {
-        const d = await fetch(`/api/intel/weekly-review?n=${this.weeklyN}`).then(r => r.json());
-        this.weeklyBatch = d.companies || [];
-        this.weeklyMeta = { core: d.core_count, world: d.world_count, n: d.n_returned };
-      } catch (e) {
-        console.error("weekly review batch load failed:", e);
-        this.weeklyBatch = [];
-        this.weeklyMeta = null;
-      } finally {
-        this.weeklyLoading = false;
+    showMap() {
+      this.viewMode = "map";
+      this.$nextTick(() => this.renderMap());
+    },
+
+    renderMap() {
+      if (!window.L) { console.error("Leaflet not loaded yet"); return; }
+      if (!this._leafletMap) {
+        this._leafletMap = L.map("companyMap").setView([30, 10], 2);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors",
+          maxZoom: 18,
+        }).addTo(this._leafletMap);
+        this._leafletMarkers = L.layerGroup().addTo(this._leafletMap);
       }
+      this._leafletMarkers.clearLayers();
+      const rows = this.displayedCompanies;
+      const pts = rows.filter(c => c.lat != null && c.lng != null);
+      const bounds = [];
+      pts.forEach(c => {
+        const cls = this.scoreClass(c.assessed_score);
+        const marker = L.circleMarker([c.lat, c.lng], {
+          radius: 7, weight: 1.5, color: "#fff", fillColor: cls.bg, fillOpacity: 0.9,
+        });
+        marker.bindPopup(
+          `<div class="map-pin-popup"><b>${c.name}</b>` +
+          `Score ${c.assessed_score.toFixed(1)} · ${c.sector_bucket || "—"}<br>` +
+          `${c.location || "—"}<br>` +
+          `<a href="/intel/company?c=${encodeURIComponent(c.name)}">Open detail →</a></div>`
+        );
+        marker.addTo(this._leafletMarkers);
+        bounds.push([c.lat, c.lng]);
+      });
+      this.mapStats = { mapped: pts.length, unmapped: rows.length - pts.length, total: rows.length };
+      if (bounds.length) this._leafletMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 6 });
+      // The container may have been display:none (still on the "Table" view)
+      // when the map was first created — Leaflet then measures 0x0. Fix it
+      // up once the tab is actually visible.
+      setTimeout(() => this._leafletMap && this._leafletMap.invalidateSize(), 50);
     },
 
     /* ---- Frise: bank-statement style run period picker ---- */

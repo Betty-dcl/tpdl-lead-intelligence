@@ -19,6 +19,40 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-09-02 (7) — **UI Scored companies : carte « weekly review batch » retirée (Betty : « c'est
+  une de tes initiatives, jsp » — trop d'ambiguïté produit) + Top 15 ajouté au tableau + carte
+  géographique (un pin par société) ajoutée.**
+  **Décisions Betty (ce tour)** : (1) retirer la carte 70/30 dédiée, s'appuyer sur le tableau
+  principal (déjà trié par score) + le sélecteur Top-N existant — plus simple, change naturellement
+  chaque semaine avec les scores, sans algorithme séparé ; (2) **ne pas confondre avec la veille
+  "top 10-15 méga-caps"** (chantier 2, onglet séparé "Mega-cap watch", sociétés non scorées) — les
+  deux restent des concepts bien distincts, dans des onglets différents ; (3) carte géo avec **un
+  pin par société** (pas juste une carte de régions colorées), sans dépense de géocodage live.
+  **Fait** :
+  - Carte "This week's review batch" **retirée** de `templates/intel.html` + état/méthode
+    `weeklyBatch`/`loadWeeklyBatch()` retirés de `intel.js` (code mort). **Endpoint
+    `GET /api/intel/weekly-review` et `app/tools/curation.py` CONSERVÉS** (pas cassés, pas
+    supprimés) — le module reste réutilisable pour le futur 70/30 du chantier 4 (mouvements
+    exécutifs), juste plus affiché sur cette page.
+  - **`[10, 15, 20, 35, 50, 200]`** — "15" ajouté au sélecteur Top-N existant du tableau (déjà trié
+    par score par défaut) : répond directement à "choisir les top 15 de la semaine" sans nouveau code.
+  - **Carte géographique** (nouveau) : `app/tools/geocode.py` — table statique ville/pays → (lat,
+    lng) (~150 villes hub pharma/life-science + capitales du monde, zéro appel réseau, zéro coût,
+    zéro nouvelle dépendance) + repli sur la capitale du pays si la ville n'est pas reconnue.
+    `geocode_location()` ajouté à `_serialize_company()` (`app/routers/intel.py`) → chaque société
+    porte déjà `lat`/`lng` (ou `null` si non reconnue — jamais de position inventée) dans la même
+    charge utile que le tableau. **Couverture réelle vérifiée : 569/621 sociétés (92 %)**.
+    Frontend : bascule **Table / Map** juste au-dessus du tableau (`templates/intel.html`), carte
+    Leaflet + tuiles OpenStreetMap gratuites (CDN jsdelivr, comme Alpine.js déjà chargé de la même
+    façon) — **la carte respecte EXACTEMENT les mêmes filtres/tri/Top-N que le tableau**
+    (`displayedCompanies`, pas un jeu de données séparé) via un `$watch` sur l'empreinte des
+    filtres. Pin coloré par bande de score (réutilise `scoreClass()` déjà utilisé partout ailleurs),
+    popup au clic (nom, score, secteur, localisation, lien vers la fiche société).
+  +6 tests (`tests/test_geocode.py`) + 1 assertion étendue (`lat`/`lng` toujours présents, même
+  `null`, jamais fabriqués). **339 tests verts.** Vérifié en LIVE contre le serveur dev
+  (`--reload`) : page 200, marqueurs `companyMap`/`leaflet`/`showMap` présents, couverture géocodage
+  92 % confirmée sur les vraies données. ⚠️ Pas de capture d'écran navigateur (toujours pas d'outil
+  Chromium disponible) — vérifié par HTML/JSON réels + logs serveur.
 - 2026-09-02 (6) — **UI : page « Sales » renommée « Market Watch » + 2 nouveaux onglets (Veille
   méga-caps, Mouvements de personnes) pour rendre visibles les chantiers 2 et 4 du recap du 01/09
   (jusque-là CLI/chat only, décision Betty « je veux voir le dashboard, simplifie-le, 3 phases,
@@ -1362,6 +1396,14 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-09-02 (7)
+- Fait : **carte "weekly review batch" retirée (jugée pas assez utile/claire par Betty), Top 15
+  ajouté au tableau, carte géographique avec un pin par société ajoutée** (détail complet dans le
+  log 2026-09-02 (7) en haut). `app/tools/geocode.py` (statique, gratuit, 92 % de couverture
+  réelle), bascule Table/Map qui respecte exactement les mêmes filtres que le tableau. +6 tests,
+  **339 tests verts**. Vérifié en live (couverture géocodage confirmée sur les vraies données).
+- Prochaine étape : demander à Betty si le rendu visuel de la carte (Leaflet) lui convient (pas de
+  capture d'écran possible ici) ; sinon, reprendre le chantier 4 (Slice 2 : `/moves draft` sur Julie).
 - Date : 2026-09-02 (6)
 - Fait : **UI Market Watch — page « Sales » renommée + 2 nouveaux onglets (Mega-cap watch, People
   moves) pour rendre visibles les chantiers 2 et 4** (détail complet dans le log 2026-09-02 (6) en
