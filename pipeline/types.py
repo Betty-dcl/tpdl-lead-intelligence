@@ -77,6 +77,24 @@ class RecapItem:
 
 
 @dataclass
+class ExecMoveCandidate:
+    """One verbatim-locked executive-move fact (chantier 4/4, pipeline/
+    exec_moves.py). Person-centric, not category-tagged — distinct from
+    EvidenceItem/RecapItem on purpose (a different shape for a different
+    problem: WHO moved WHERE, not a signal about a company)."""
+    person_name: str
+    new_title: str
+    new_company: str
+    quote: str                     # MUST appear verbatim in its source doc
+    source: str                    # source name (from RawDoc.source)
+    url: str | None                # from RawDoc.url
+    previous_company: str | None = None
+    previous_title: str | None = None
+    move_date: date | None = None  # as stated in source; often month-precision only
+    location: str | None = None
+
+
+@dataclass
 class EvidenceBlock:
     """Everything the interpreter is allowed to know about a company.
 

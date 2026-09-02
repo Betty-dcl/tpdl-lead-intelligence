@@ -19,6 +19,48 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-09-02 (5) — **Chantier 4/4 SLICE 1 livrée : découverte + extraction verbatim-lockée +
+  file de revue `/moves` sur Inès (approve/dismiss/approved).** Suite directe de la Slice 0
+  (modèle + classificateur, log ci-dessous), le même jour, sur demande explicite de Betty de
+  pousser plus loin — aucun blocage réel, juste le choix initial de s'arrêter à la Slice 0.
+  ⚠️ **Aucun run live exécuté** (consigne Betty « ne rerun rien ») : tout ce qui suit est vérifié
+  par pytest, mocks et gates `require_live()`/`EngineOffline` — zéro appel réseau réel, zéro euro
+  dépensé.
+  **Fait** : (a) nouveau `pipeline/exec_moves.py` — découverte **industrie-large, PAS par société**
+  (une poignée de requêtes Serper News couvrent tout le secteur pharma/life-science/biotech/medtech,
+  remplace ce qui serait 620 appels par société — exactement le calibre demandé par Nathalie
+  "chaque semaine 10 personnes") : `press_release_query()` (requête par défaut, pure/testable),
+  `discover_moves()` (plafond dur `MAX_QUERIES=10`, fail-open par requête). Extraction
+  verbatim-lockée avec son PROPRE prompt (`pipeline/prompts/exec_moves_sonnet.md`) et sa propre QA
+  dupliquée (`verbatim_qa_moves`, jamais partagée avec `extract.verbatim_qa` — direct
+  copié-collé du principe du chantier 2 : type distinct `ExecMoveCandidate`, erreur de type dure
+  plutôt que bug silencieux). **Aucun mode dry-run/mock** pour l'extraction (contrairement au
+  chantier 2) — même choix que `pipeline/discovery.py` : une personne/société plausible mais
+  fabriquée est un pire échec ici qu'un signal manqué, donc `--live` obligatoire, testé par
+  monkeypatch du client Anthropic (comme `test_discovery_extracts_names_and_themes`). **Aucun appel
+  Opus** : un mouvement est un fait, pas une opinion scorée — le filtre séniorité/fonction est du
+  code déterministe (`app/tools/exec_titles.py`, déjà livré Slice 0), pas un 2e appel LLM.
+  `store_moves()` = le vrai filtre ICP de cette fonctionnalité (titre hors C-suite/-1/-2 → jeté
+  avant persistance, jamais stocké) + dédup par `compute_dedup_key()` (normalisé, insensible
+  accents/casse) + résolution opportuniste vers une `Company` déjà scorée (pour que la curation
+  70/30 du chantier 3 s'applique gratuitement via `market_tier()`). Nouveau petit point d'entrée
+  CLI **séparé** de `pipeline/runner.py` (`python pipeline/exec_moves.py --live`) — industrie-large,
+  pas par société, donc pas le même contrat que le flag surface du runner.
+  (b) **`/moves` sur Inès** (`app/agents/ines.py`, décision d'attribution déjà actée le 01/09 :
+  Inès héberge la file, Julie rédigera plus tard) : `/moves review` (file `status=new`, tri par
+  découverte récente, plafond 20), `/moves approve <id>` / `/moves dismiss <id>` (transition d'état
+  déterministe, `dismiss` pose `dismissed_at` = horloge RGPD des 90 jours), `/moves approved`
+  (prêts pour un envoi humain). Chaque retour rappelle explicitement que l'envoi LinkedIn reste
+  **100% humain, jamais automatisé** (décision Betty, 2026-09-02).
+  +19 tests (`tests/test_exec_moves.py` 14 + `tests/test_moves_command.py` 5), tous mockés/DB
+  locale avec nettoyage (aucune pollution de `data/app.db` — vérifié après coup : 0 ligne de test
+  restante). **331 tests verts.**
+  **RESTE (slices suivantes, déjà conçues)** : Slice 2 — `/moves draft <id>` sur Julie (réutilise
+  `andres_linkedin.md`, fige `connection_sent_at`/`connection_message`, calcule `follow_up_date`
+  via `exec_titles.compute_follow_up_date`) ; Slice 3 — `/moves followup` (requête sur
+  `follow_up_date`). **Le chantier 4 n'a maintenant plus que la rédaction/relance à construire** —
+  découverte, filtre, stockage et revue humaine sont en place. Premier run LIVE réel = décision
+  Betty à prendre séparément (coût + confirmation RGPD finale avec Andrés/Nathalie avant).
 - 2026-09-02 (4) — **Chantier 4/4 du recap réunion Nathalie : tracker mouvements exécutifs —
   SLICE 0 livrée (modèle de données + classificateur seniorité seulement, pas encore la
   découverte/extraction ni les commandes `/moves`).** Le plus gros des 4 chantiers ; découpé en
@@ -1273,6 +1315,15 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-09-02 (5)
+- Fait : **chantier 4/4 Slice 1 : découverte/extraction industrie-large (`pipeline/exec_moves.py`)
+  + file de revue `/moves` sur Inès** (détail complet dans le log 2026-09-02 (5) en haut). Aucun
+  run live exécuté (consigne Betty) — tout vérifié par tests mockés. +19 tests, **331 tests
+  verts**, 0 pollution DB (vérifié après coup). Reste : Slice 2 (`/moves draft` sur Julie) et
+  Slice 3 (`/moves followup`) — le chantier 4 n'a plus que la rédaction/relance à construire.
+- Prochaine étape : Slice 2 — `/moves draft <id>` sur Julie (réutilise `andres_linkedin.md`). Un
+  vrai run LIVE de `pipeline/exec_moves.py` reste une décision séparée de Betty (coût + RGPD à
+  confirmer avec Andrés/Nathalie avant).
 - Date : 2026-09-02 (4)
 - Fait : **chantier 4/4 du recap réunion Nathalie : tracker mouvements exécutifs — Slice 0 livrée**
   (`app/models.py::ExecutiveMove` + `app/tools/exec_titles.py`, détail complet dans le log

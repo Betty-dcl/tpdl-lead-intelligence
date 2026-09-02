@@ -9,10 +9,17 @@ Slash commands:
   - /radars             → Lunch Campaign (CH/Spain) & Language (ES) candidates.
   - /premium            → the Premium 5 hand-picked for Andrés (a real human).
   - /generate [company] → alias of /contacts (used by the workspace "Generate brief" button).
+  - /moves [review|approved|approve <id>|dismiss <id>] → executive-moves review
+    queue (chantier 4/4, 2026-09-01 recap). Inès HOSTS this queue (decision Betty,
+    2026-09-01) — the actual message drafting is Julie's (`/moves draft`, not built
+    yet). Data comes from `pipeline/exec_moves.py` (Terminal-only, industry-wide
+    discovery, NOT per-company like her other commands). LinkedIn sending is ALWAYS
+    100% human — never automated from here.
 
 Contacts data needs APOLLO_API_KEY. Until it's set, Inès still runs the radars
 on the companies' own locations (real data) and explains what she'd fetch.
 """
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import func
@@ -327,5 +334,99 @@ class InesAgent(BaseAgent):
                 "augmented_message": augmented, "action": "premium_selection",
                 "task_title": "Premium 5", "metadata": {"count": len(prem)},
             }
+
+        # ── /moves [review | approved | approve <id> | dismiss <id>] ───────
+        if low.startswith("/moves"):
+            from app.models import ExecutiveMove
+            from app.tools.exec_titles import RETENTION_DAYS_DISMISSED
+
+            parts = text.split(maxsplit=2)
+            sub = parts[1].lower() if len(parts) > 1 else "review"
+
+            def _move_line(m: ExecutiveMove) -> str:
+                role = f", {m.role_function}" if m.role_function and m.role_function != "other" else ""
+                return (f"- #{m.id} {m.person_name} → {m.new_title} @ {m.new_company} "
+                        f"({m.seniority_tier}{role})")
+
+            if sub in ("approve", "dismiss"):
+                target_status = "approved" if sub == "approve" else "dismissed"
+                move_id_raw = parts[2].strip() if len(parts) > 2 else ""
+                if not move_id_raw.isdigit():
+                    return {
+                        "augmented_message": f"The user ran `/moves {sub}` without a valid id. As "
+                                             f"Inès, ask which move id (see `/moves review`) — never guess.",
+                        "action": "exec_move_review", "task_title": f"/moves {sub} (no id)",
+                    }
+                move_id = int(move_id_raw)
+                with SessionLocal() as db:
+                    m = db.get(ExecutiveMove, move_id)
+                    if m is None:
+                        augmented = (f"No executive move with id {move_id}. As Inès, say it wasn't "
+                                    f"found — check `/moves review` for the current queue.")
+                    elif m.status != "new" and sub == "approve":
+                        augmented = (f"Move #{move_id} ({m.person_name} → {m.new_title} @ "
+                                    f"{m.new_company}) is already '{m.status}', not 'new'. As Inès, "
+                                    f"confirm no change was made.")
+                    else:
+                        m.status = target_status
+                        if sub == "dismiss":
+                            m.dismissed_at = datetime.now(timezone.utc)  # GDPR retention clock
+                        db.commit()
+                        if sub == "approve":
+                            augmented = (
+                                f"Approved move #{move_id}: {m.person_name} → {m.new_title} @ "
+                                f"{m.new_company}. As Inès, confirm; next step is Julie drafting an "
+                                f"acknowledge-only LinkedIn message (`andres_linkedin.md` playbook), "
+                                f"then a HUMAN sends the connection request — never automated."
+                            )
+                        else:
+                            augmented = (
+                                f"Dismissed move #{move_id}: {m.person_name} → {m.new_title} @ "
+                                f"{m.new_company}. As Inès, confirm; this row auto-purges after "
+                                f"{RETENTION_DAYS_DISMISSED} days (GDPR retention policy)."
+                            )
+                return {"augmented_message": augmented, "action": "exec_move_review",
+                        "task_title": f"Move {sub} #{move_id}"}
+
+            # /moves approved — approved, not yet connected (ready for a human to send)
+            if sub == "approved":
+                with SessionLocal() as db:
+                    rows = (db.query(ExecutiveMove).filter(ExecutiveMove.status == "approved")
+                            .order_by(ExecutiveMove.id.desc()).limit(20).all())
+                if rows:
+                    lines = "\n".join(_move_line(m) for m in rows)
+                    augmented = (
+                        f"The user ran `/moves approved`. {len(rows)} approved move(s), ready for a "
+                        f"human to send the LinkedIn connection request (never automated):\n{lines}\n\n"
+                        f"As Inès, list them; remind the user the actual send is 100% manual."
+                    )
+                else:
+                    augmented = ("The user ran `/moves approved`. Nothing approved yet — see "
+                                "`/moves review` and `/moves approve <id>`. As Inès, say so plainly.")
+                return {"augmented_message": augmented, "action": "exec_move_review",
+                        "task_title": "Moves approved", "metadata": {"count": len(rows)}}
+
+            # /moves [review] — the default: moves awaiting a human decision
+            with SessionLocal() as db:
+                rows = (db.query(ExecutiveMove).filter(ExecutiveMove.status == "new")
+                        .order_by(ExecutiveMove.discovered_at.desc()).limit(20).all())
+            if rows:
+                lines = "\n".join(_move_line(m) for m in rows)
+                augmented = (
+                    f"The user ran `/moves review`. {len(rows)} executive move(s) awaiting review "
+                    f"(from `pipeline/exec_moves.py`, run manually from the Terminal):\n{lines}\n\n"
+                    f"As Inès, summarise who moved where, flag anything that looks thin (no date, "
+                    f"vague company name — never invent detail on a candidate not shown here), and "
+                    f"tell the user they can `/moves approve <id>` or `/moves dismiss <id>`."
+                )
+            else:
+                augmented = (
+                    "The user ran `/moves review`. No moves awaiting review right now — either the "
+                    "weekly discovery pass hasn't been run (`python pipeline/exec_moves.py --live`, "
+                    "Terminal only) or everything already got triaged. As Inès, explain this plainly, "
+                    "never invent a move."
+                )
+            return {"augmented_message": augmented, "action": "exec_move_review",
+                    "task_title": "Moves review", "metadata": {"count": len(rows)}}
 
         return None
