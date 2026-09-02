@@ -8,6 +8,8 @@
         python -m pipeline.runner --top 100 --live --batch
     RESUME a crashed run (skips companies already in --out):
         python -m pipeline.runner --top 100 --live --resume
+    RECAP a fixed mega-cap watch-list (verbatim facts only, never scored):
+        python -m pipeline.runner --recap --names "Pfizer;Sanofi;Merck" --live
 
 Output: a scored_results-compatible CSV (default data/csv/engine_run.csv),
 re-importable via `python import_csv.py <path>`. In sequential mode the CSV is
@@ -161,6 +163,31 @@ def run_company(cfg: EngineConfig, name: str, sector: str | None = None,
                      scored, not_evidenced, summary)
 
 
+def _run_recap(cfg: EngineConfig, companies) -> None:
+    """Mega-cap trend-watch (chantier 2/4, 2026-09-01 recap): verbatim facts
+    only, filed by category. NEVER calls score.interpret_and_score() — no
+    Opus call, no assessed_score, no CompanyResult for this mode."""
+    from app.database import SessionLocal
+    from pipeline import recap
+
+    run_date = datetime.now(timezone.utc)
+    company_items: list[tuple[str, list]] = []
+    with SessionLocal() as db:
+        for c in companies:
+            website = (c.identity or {}).get("website")
+            docs = recap.gather_recap(cfg, c.name, website=website)
+            items, violations = recap.extract_recap(cfg, c.name, docs)
+            recap.write_recap_rows(db, c.name, run_date, items)
+            company_items.append((c.name, items))
+            logger.info("[recap] %s: %d recap items from %d docs (%d QA violations dropped)",
+                        c.name, len(items), len(docs), len(violations))
+
+    out_path = Path(f"data/csv/megacap_recap_{run_date.date().isoformat()}.csv")
+    recap.export_recap_csv(company_items, run_date, out_path)
+    logger.info("Wrote %s (%d companies, %d total recap items)",
+                out_path, len(company_items), sum(len(i) for _, i in company_items))
+
+
 _BOILERPLATE_MIN = 3        # a rationale shared by this many is boilerplate
 _BOILERPLATE_SIM = 0.9      # Jaccard ≥ this ⇒ "the same rationale" (near-duplicate)
 
@@ -284,6 +311,12 @@ def main() -> None:
                         help="Skip companies already in --out (recover a crashed run)")
     parser.add_argument("--force", action="store_true",
                         help="Run even if the SerpAPI quota looks insufficient")
+    parser.add_argument("--recap", action="store_true",
+                        help="Mega-cap trend-watch: verbatim facts only (new "
+                             "products/M&A/tech platform), NEVER scored — no "
+                             "Opus call, no assessed_score. Requires --live + "
+                             "--names \"A;B;C\". Writes MegaCapRecap rows + a CSV, "
+                             "not a CompanyResult.")
     parser.add_argument("--discover", action="store_true",
                         help="Market-watch discovery: search the 6 signal themes + the "
                              "earnings-call angle across the broad life-science scope and "
@@ -331,6 +364,20 @@ def main() -> None:
     companies = _select_companies(args)
     if not companies:
         parser.error("select companies: --company / --fixture / --top N / --lunch / --names")
+
+    # ── recap mode: verbatim facts only, NEVER scored (own small flow) ──
+    if args.recap:
+        from pipeline import estimate as est_mod
+        if args.estimate:
+            print(f"Selected companies ({len(companies)}): "
+                  + ", ".join(c.name for c in companies[:8])
+                  + ("…" if len(companies) > 8 else ""))
+            print(est_mod.render_recap(est_mod.estimate_recap_run(len(companies))))
+            return
+        if not args.live:
+            parser.error("--recap requires --live (Sonnet 5 extraction, no scoring)")
+        _run_recap(EngineConfig.load(live=True), companies)
+        return
 
     # --rescan-tech: drop the stored tech-stack summary so Step 1 actually
     # scans via Apify instead of reusing the (possibly stale) DB value.

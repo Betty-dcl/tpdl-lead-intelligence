@@ -55,6 +55,27 @@ class EvidenceItem:
     category: str                  # one of SIGNAL_CATEGORIES
 
 
+# Recap-mode categories (top 10-15 mega-cap trend-watch, pipeline/recap.py).
+# Deliberately separate from SIGNAL_CATEGORIES — recap mode has no scoring
+# step and explicitly WANTS product launches (excluded from the 6 above).
+RECAP_CATEGORIES = ("new_product", "ma_activity", "tech_platform", "other")
+
+
+@dataclass
+class RecapItem:
+    """One verbatim recap fact (mega-cap trend-watch). Same verbatim-lock
+    discipline as EvidenceItem, but a distinct type on purpose: a recap item
+    must never be able to flow into verbatim_qa()/score.interpret_and_score()
+    through some future refactor (both take EvidenceItem/EvidenceBlock by
+    type — a shared type would make that a silent bug instead of a hard
+    type error)."""
+    quote: str                     # MUST appear verbatim in its source doc
+    source: str                    # source name (from RawDoc.source)
+    url: str | None                # from RawDoc.url
+    event_date: date | None        # date stated IN the quote/doc, else None
+    category: str                  # one of RECAP_CATEGORIES
+
+
 @dataclass
 class EvidenceBlock:
     """Everything the interpreter is allowed to know about a company.

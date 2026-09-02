@@ -54,6 +54,36 @@ def estimate_run(n_companies: int) -> RunEstimate:
     )
 
 
+# Recap mode (mega-cap trend-watch, pipeline/recap.py): extraction only, NEVER
+# scored — no Opus leg at all, so the cost is a fraction of the scored pipeline's.
+RECAP_EXTRACT_IN_TOK, RECAP_EXTRACT_OUT_TOK = 6_000, 1_000   # Sonnet 5, same envelope
+
+
+@dataclass
+class RecapRunEstimate:
+    companies: int
+    model_cost_usd: float
+
+    @property
+    def per_company_usd(self) -> float:
+        return round(self.model_cost_usd / self.companies, 4) if self.companies else 0.0
+
+
+def estimate_recap_run(n_companies: int) -> RecapRunEstimate:
+    extract_cost = (RECAP_EXTRACT_IN_TOK * SONNET_IN + RECAP_EXTRACT_OUT_TOK * SONNET_OUT) / 1e6
+    return RecapRunEstimate(companies=n_companies, model_cost_usd=round(extract_cost * n_companies, 2))
+
+
+def render_recap(est: RecapRunEstimate) -> str:
+    return "\n".join([
+        "═══ RECAP PRE-FLIGHT ESTIMATE (nothing has been spent) ═══",
+        f"Companies:            {est.companies}",
+        f"Model bill (Sonnet 5 extraction ONLY — no Opus/scoring): "
+        f"${est.model_cost_usd}  (~${est.per_company_usd}/company)",
+        "Run for real by adding --live.",
+    ])
+
+
 def serp_quota_check(est: RunEstimate) -> str | None:
     """Compare the run's SERP need against the LIVE remaining SerpAPI quota.
 

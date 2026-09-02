@@ -278,6 +278,31 @@ class RunSnapshot(Base):
     imported_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class MegaCapRecap(Base):
+    """One verbatim recap fact for the "top 10-15 mega-cap" trend-watch
+    (pipeline/recap.py, `--recap` CLI mode). Distinct from `Signal`: this mode
+    has NO scoring step (never Opus, never `assessed_score`) — it just files
+    facts by category so Nathalie can see what changed at a mega-cap without
+    it being pulled into the scored 620-company universe.
+
+    One row per accepted recap evidence item (not one row per company),
+    append-only — mirrors `RunSnapshot`'s per-run history pattern so a future
+    trend view can compare runs. Written by `pipeline.recap.write_recap_rows`;
+    never updated."""
+    __tablename__ = "megacap_recaps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_name: Mapped[str] = mapped_column(String(256), index=True)
+    run_date: Mapped[datetime] = mapped_column(DateTime, index=True)
+    category: Mapped[str] = mapped_column(String(24))   # new_product|ma_activity|tech_platform|other
+    summary_text: Mapped[str] = mapped_column(Text)      # deterministic, non-LLM (see recap.py)
+    quote: Mapped[str] = mapped_column(Text)             # verbatim — audit trail
+    source: Mapped[str] = mapped_column(String(64))
+    url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    event_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Contact(Base):
     """Decision-maker contacts (CEO/CTO/CFO…) pulled via Apollo for shortlisted
     companies, with Inès's radar tags. One row per (company, person)."""

@@ -19,6 +19,45 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-09-02 (2) — **Chantier 2/4 du recap réunion Nathalie : veille "top 10-15 méga-caps" livrée
+  (mode `--recap`, jamais scoré).** Suite directe du chantier 1 (plafond de revenu, log ci-dessous) :
+  les sociétés au-dessus du plafond routent maintenant vers CE mode plutôt que d'être ignorées.
+  **Décisions Betty (ce tour)** : (1) nouvelle table DB dédiée `MegaCapRecap` (+ export CSV en
+  prime) plutôt qu'un CSV seul — même pattern append-only que `RunSnapshot`, pour pouvoir comparer
+  les runs dans le temps plus tard ; (2) **citations verbatim uniquement, aucune synthèse IA** —
+  zéro appel Opus, zéro risque d'interprétation, cohérent avec le "juste pour être au courant" de
+  Nathalie ; (3) **déclenchement CLI uniquement** (`python -m pipeline.runner --recap --names "..."
+  --live`), aucune commande chat, aucune page UI — Hugo reste strictement scopé à la base scorée,
+  pas étendu.
+  **Fait** : nouveau module `pipeline/recap.py` — mode structurellement séparé du pipeline scoré,
+  réutilise Steps 1-3 mais s'arrête AVANT le scoring (jamais d'appel `score.interpret_and_score`) :
+  (a) `gather_recap()` — pool de sources plus PETIT que les 9 du pipeline scoré (pas de registre UE,
+  pas de job-board, pas de scan social) : `research.serp_news` + `research.exa_search` (réutilisés
+  tels quels) + 2 sources NOUVELLES scopées à ce mode seulement (jamais touché `research.gather()`
+  du pipeline scoré) : `ir_sources()` (balaie `/investors`, `/investor-relations`, `/en/investors`,
+  `/news`, `/press-releases`, `/media/press-releases` avant repli sur la page d'accueil, 1er hit
+  gagne) et `financial_statement_query()` (Perplexity Sonar, formulation annual report/10-K/investor
+  day/earnings call) ; (b) extraction verbatim-lockée avec son PROPRE prompt/taxonomie
+  (`pipeline/prompts/recap_sonnet.md`, 4 catégories `new_product`/`ma_activity`/`tech_platform`/
+  `other` — les lancements produits sont explicitement INCLUS ici, contrairement aux 6 catégories du
+  pipeline scoré qui les excluent) et son propre QA dupliqué à dessein (`verbatim_qa_recap`, pas un
+  partage paramétré avec `extract.verbatim_qa` — pour qu'un item recap ne puisse JAMAIS glisser dans
+  `score.interpret_and_score()` par un futur refactor : type distinct `RecapItem` vs `EvidenceItem`,
+  erreur de type dure plutôt que bug silencieux) ; (c) `summarize_item()` = résumé déterministe non-IA
+  (préfixe `[unconfirmed]` sur une citation hedgée via `extract.has_negation`, jamais un paragraphe
+  rédigé par un modèle — décision Betty ci-dessus) ; (d) `write_recap_rows()` (table
+  `app/models.py::MegaCapRecap`, une ligne par fait accepté, append-only) + `export_recap_csv()`
+  (courtoisie, pas la source de vérité). `pipeline/runner.py` : flag `--recap` (exige `--live` +
+  `--names`), `_run_recap()`, tôt dans `main()` juste après la sélection des sociétés — jamais
+  d'appel à `_assemble()`/`CompanyResult`. `pipeline/estimate.py` : `estimate_recap_run()` +
+  `render_recap()` (coût extraction seule, sans le levier Opus — `--recap --estimate` fonctionne
+  sans clé). +14 tests (`tests/test_recap.py`, fail-open/QA/CLI, aucun appel réseau). **294 tests
+  verts.** Vérifié : `--recap --names "Pfizer;Sanofi;Merck" --estimate` tourne sans clé
+  (~$0,0233/société, "no Opus/scoring") ; `--recap` sans `--live` refuse proprement (money gate).
+  Pas encore commité au moment de l'écriture. **RESTE (chantiers 3-4, déjà conçus, à valider avant
+  de coder)** : (3) curation 70/30 Europe/monde ; (4) tracker mouvements exécutifs (le plus gros,
+  point RGPD à trancher avant le live). La LISTE réelle des 10-15 méga-caps reste à fournir par
+  Nathalie (le code est agnostique à la liste — `--names` — donc rien ne bloque côté implémentation).
 - 2026-09-02 — **Chantier 1/4 du recap réunion Nathalie (2026-09-01) : plafond de revenu mega-cap
   (~$20 Mds) livré.** Suite du meeting du 01/09 (mémoire auto `project_tpdl_meeting_20260901`) :
   4 chantiers conçus le jour même par des agents de planification dédiés (session interrompue avant
@@ -1152,6 +1191,16 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-09-02 (2)
+- Fait : **chantier 2/4 du recap réunion Nathalie : veille "top 10-15 méga-caps" livrée**
+  (`pipeline/recap.py` + flag CLI `--recap`, détail complet dans le log 2026-09-02 (2) en haut).
+  Mode séparé qui s'arrête AVANT le scoring (jamais d'appel Opus), nouvelle table `MegaCapRecap`,
+  citations verbatim uniquement (pas de synthèse IA), déclenchement CLI seul. +14 tests,
+  **294 tests verts**. Vérifié : `--recap --estimate` tourne sans clé, `--recap` sans `--live`
+  refuse proprement.
+- Prochaine étape : chantier 3 — curation 70/30 Europe/monde, puis chantier 4 — tracker mouvements
+  exécutifs (le plus gros, point RGPD à trancher avant le live). Les deux sont déjà conçus en détail
+  (session `942839c7…` du 01/09, toujours sur disque).
 - Date : 2026-09-02
 - Fait : **chantier 1/4 du recap réunion Nathalie du 01/09 : plafond de revenu mega-cap (~$20 Mds)
   livré et testé** (détail complet dans le log 2026-09-02 en haut). `app/tools/icp.py` gagne
@@ -1161,8 +1210,6 @@
   **280 tests verts**. Vérifié en dry-run. Les 3 chantiers suivants (veille méga-caps, curation
   70/30, tracker mouvements exécutifs) sont déjà conçus en détail (session `942839c7…` du 01/09,
   toujours sur disque) et restent à valider un par un avant de coder, dans cet ordre.
-- Prochaine étape : chantier 2 — veille "top 10-15 méga-caps" (Nathalie doit fournir la liste
-  exacte ; le code est list-agnostic donc ça ne bloque rien côté implémentation).
 - Date : 2026-08-13 (2)
 - Fait : **9e source Hugo — scan social/vidéo via agent-reach (voir log détaillé en haut).**
   `pipeline/social_research.py` (Twitter/Reddit/LinkedIn jobs/Instagram/YouTube, opt-in
