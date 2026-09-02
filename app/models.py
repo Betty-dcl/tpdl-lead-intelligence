@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -326,6 +326,81 @@ class Contact(Base):
     premium: Mapped[bool] = mapped_column(default=False)              # Premium 5 → Andrés (human)
     status: Mapped[str] = mapped_column(String(24), default="new")    # new | queued_julie | handed_andres
     source: Mapped[str] = mapped_column(String(24), default="apollo")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class ExecutiveMove(Base):
+    """A detected executive-level role change in pharma/life-science — market
+    intelligence on WHO moved WHERE, independent of whether either company is
+    in the scored `companies` universe. One row per detected move.
+
+    Chantier 4/4 of the 2026-09-01 Nathalie meeting recap (.claude/state.md).
+    Slice 0 (this table + app/tools/exec_titles.py classifier) ships now;
+    discovery/extraction (pipeline/exec_moves.py) and the /moves command
+    surface (Inès review queue + Julie drafting) are NOT built yet — see
+    state.md for the phasing. `status`/outreach fields exist from Slice 0 so
+    later slices need no migration.
+
+    NOT a Contact: Contact assumes the company is already scored and scoped
+    to outreach for that company; this table is scoped to the PERSON and
+    their career event, and may reference companies TPDL never scanned.
+
+    ⚠️ GDPR (decision Betty, 2026-09-02): stores named individuals' career
+    history (previous employer/title, move date) sourced from public press
+    releases — more sensitive than Contact. Default retention policy:
+    `dismissed` rows auto-purge after RETENTION_DAYS_DISMISSED days (see
+    app/tools/exec_titles.py::purge_due). To CONFIRM with Andrés/Nathalie
+    before any live discovery run (not blocking — this table has no live
+    writer yet)."""
+    __tablename__ = "executive_moves"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # ── Who / what happened (future verbatim-extraction output) ──
+    person_name: Mapped[str] = mapped_column(String(128), index=True)
+    new_title: Mapped[str] = mapped_column(String(160))
+    new_company: Mapped[str] = mapped_column(String(256), index=True)
+    # Free-text, NOT a real FK to companies.name — the new/previous employer is
+    # very often NOT in the scored universe (that's the whole point of this
+    # feature: it's industry-wide, not shortlist-derived). Resolved to a real
+    # Company row only opportunistically via resolved_company_name below.
+    previous_company: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    previous_title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    move_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # as stated in source; often month-precision only
+
+    # ── Geography (for the 70/30 curation, app/tools/curation.py) ──
+    location: Mapped[str | None] = mapped_column(String(128), nullable=True)   # person/company HQ location, free text
+    country: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resolved_company_name: Mapped[str | None] = mapped_column(
+        ForeignKey("companies.name"), nullable=True, index=True)  # set IFF new_company matches a scored Company row
+
+    # ── Role classification (deterministic — app/tools/exec_titles.py) ──
+    seniority_tier: Mapped[str] = mapped_column(String(16))   # c_level | minus_1 | minus_2
+    role_function: Mapped[str | None] = mapped_column(String(24), nullable=True)  # cmo|coo|cio|cto|chief_innovation|other
+
+    # ── Evidence (verbatim lock — same doctrine as EvidenceItem, own schema) ──
+    quote: Mapped[str] = mapped_column(Text)          # MUST appear verbatim in source_url's fetched text
+    source_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    source_type: Mapped[str] = mapped_column(String(16), default="news")  # news | press_release | linkedin
+
+    # ── Review / workflow state (manual approve queue — not built yet) ──
+    status: Mapped[str] = mapped_column(String(24), default="new", index=True)
+    # new → approved → connection_sent → follow_up_due → follow_up_sent → dismissed
+    reviewed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # GDPR retention clock
+
+    # ── Outreach mechanic (not built yet — fields exist so no later migration) ──
+    connection_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    connection_message: Mapped[str | None] = mapped_column(Text, nullable=True)   # drafted text, Julie/Andrés voice
+    follow_up_date: Mapped[date | None] = mapped_column(Date, nullable=True)      # connection_sent_at + ~4 months, editable
+    follow_up_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    follow_up_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # ── Dedup / provenance ──
+    dedup_key: Mapped[str] = mapped_column(String(300), unique=True, index=True)
+    # normalized "person_name|new_company|new_title" — prevents re-inserting the
+    # same move if a weekly search surfaces the same press release twice.
+    discovered_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

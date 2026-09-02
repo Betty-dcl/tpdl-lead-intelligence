@@ -19,6 +19,51 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-09-02 (4) — **Chantier 4/4 du recap réunion Nathalie : tracker mouvements exécutifs —
+  SLICE 0 livrée (modèle de données + classificateur seniorité seulement, pas encore la
+  découverte/extraction ni les commandes `/moves`).** Le plus gros des 4 chantiers ; découpé en
+  tranches livrables (voir plan de conception du 01/09) — celle-ci pose la fondation, zéro appel
+  réseau, révisable avant d'aller plus loin.
+  **Décisions Betty (ce tour)** : (1) **périmètre de cette session = Slice 0 uniquement** (modèle +
+  classificateur), pas la découverte/extraction/file de revue (Slice 1) ; (2) **retenue RGPD** :
+  purge auto des mouvements `dismissed` après **90 jours** — politique par défaut encodée
+  (`RETENTION_DAYS_DISMISSED`), à confirmer avec Andrés/Nathalie avant tout run LIVE réel (aucun
+  writer live n'existe encore, donc rien de bloquant pour écrire le code) ; (3) **envoi LinkedIn
+  100% humain, toujours** — aucun hook d'automatisation prévu dans le code, cohérent avec le
+  risque LinkedIn déjà identifié par Nathalie (UI IA à venir).
+  **Fait** : (a) nouvelle table `app/models.py::ExecutiveMove` (26 colonnes) — personne + poste +
+  société (texte libre, PAS de FK dure : la plupart des mouvements ciblent des sociétés hors de
+  l'univers scoré, c'est le principe même de la fonctionnalité) ; `resolved_company_name` = seule
+  vraie FK, nullable, posée seulement si la nouvelle société matche une `Company` déjà scorée (pour
+  que la curation 70/30 du chantier 3 s'applique gratuitement via `market_tier(company.location)`) ;
+  champs de revue (`status` new→approved→connection_sent→follow_up_due→follow_up_sent→dismissed,
+  `dismissed_at` = horloge RGPD) et d'outreach (`connection_sent_at/message`, `follow_up_date/
+  sent_at/message`) présents dès maintenant pour qu'aucune migration ne soit nécessaire aux
+  slices suivantes ; `dedup_key` unique (anti-doublon sur re-découverte de la même annonce).
+  (b) nouveau `app/tools/exec_titles.py` — **3 paliers** C-suite / -1 / -2 (PAS le même
+  classificateur que `segmentation.py` : celui-ci sert une problématique différente — le ciblage
+  commercial/data/digital de TPDL, où un "General Manager" de petite société vaut c_level ; ici
+  Nathalie veut GM/Deputy GM comme palier **-2 séparé**, distinct du vrai C-suite, et surtout un
+  "Manager" nu ne doit **jamais** matcher — sinon ça dilue le filtre au lieu de l'élever comme
+  demandé). **Bug de précédence trouvé et corrigé en testant** : "Senior Vice President, Commercial"
+  tombait à tort en `c_level` — le mot nu "president" (hint générique pour capter "President" seul
+  = CEO-equivalent) matchait aussi à l'intérieur de "Vice President"/"Senior Vice President" ; fixé
+  en isolant "president" dans son propre hint checké **après** les hints -1 (SVP/VP), pas avant.
+  **2e bug trouvé** : le rôle "cmo" pointait par erreur vers "Chief Marketing Officer" au lieu de
+  "Chief Medical Officer" (lecture standard en pharma, cohérente avec CMO/COO/CIO/CTO cités
+  ensemble en réunion) — corrigé. `classify_role_function` (cmo/coo/cio/cto/chief_innovation/other),
+  `compute_follow_up_date()` (+4 mois calendaires, borné en fin de mois — rationale Nathalie : les
+  gens font des changements stratégiques ~6 mois après une prise de poste, donc relancer juste
+  AVANT cette fenêtre), `purge_due()` (fonction pure RGPD, la requête de suppression réelle vivra
+  dans le futur module pipeline). +12 tests (`tests/test_exec_titles.py`, incluant le cas négatif
+  explicite "Manager, Regulatory Affairs" → hors-scope). **312 tests verts.** Vérifié le schéma
+  SQLite réel (`PRAGMA table_info`, 26 colonnes créées). Pas encore commité au moment de l'écriture.
+  **RESTE (slices suivantes, déjà conçues, à valider avant de coder)** : Slice 1 — découverte
+  (`pipeline/exec_moves.py`, requêtes Serper News industrie-large, ≤10 requêtes/run) + extraction
+  verbatim-lockée + file de revue `/moves review`/`/moves approve` (hébergée sur Inès, décision déjà
+  actée le 01/09) ; Slice 2 — `/moves draft` sur Julie (réutilise `andres_linkedin.md`) ; Slice 3 —
+  `/moves followup`. **Les 4 chantiers du recap du 01/09 sont maintenant TOUS entamés** (1-3 livrés
+  complets, 4 fondation posée) — reste la découverte/UI du chantier 4 en propres sessions futures.
 - 2026-09-02 (3) — **Chantier 3/4 du recap réunion Nathalie : curation 70/30 Europe/monde livrée
   (lot de lecture hebdomadaire de Nathalie).** **Clarification Betty (ce tour) sur le périmètre
   du 70/30 à travers les 3 phases** : (a) phase de base (les ~620 sociétés scorées) = **70/30
@@ -1228,6 +1273,18 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-09-02 (4)
+- Fait : **chantier 4/4 du recap réunion Nathalie : tracker mouvements exécutifs — Slice 0 livrée**
+  (`app/models.py::ExecutiveMove` + `app/tools/exec_titles.py`, détail complet dans le log
+  2026-09-02 (4) en haut). Classificateur C-suite/-1/-2 distinct de `segmentation.py` (GM/Deputy GM
+  = palier -2 séparé, "Manager" nu ne matche jamais), politique RGPD (purge dismissed >90j) posée
+  mais pas encore appliquée (pas de writer live). 2 bugs de précédence trouvés+corrigés en testant
+  (SVP tombait à tort en c_level ; CMO pointait vers "Marketing" au lieu de "Medical"). +12 tests,
+  **312 tests verts**. **Les 4 chantiers du recap du 01/09 sont maintenant tous entamés.**
+- Prochaine étape : Slice 1 du chantier 4 — découverte/extraction (`pipeline/exec_moves.py`) + file
+  de revue `/moves review`/`/moves approve` sur Inès. Nécessite de trancher le budget de requêtes
+  et le backend de recherche (Serper vs Exa) avant de coder ; le point RGPD (90 jours, déjà posé)
+  devra être confirmé avec Andrés/Nathalie avant tout run LIVE (pas avant d'écrire le code).
 - Date : 2026-09-02 (3)
 - Fait : **chantier 3/4 du recap réunion Nathalie : curation 70/30 Europe/monde livrée**
   (`app/tools/curation.py` + endpoint `GET /api/intel/weekly-review` + carte sur la page Sales,
