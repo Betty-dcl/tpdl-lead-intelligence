@@ -19,6 +19,46 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-09-02 — **Chantier 1/4 du recap réunion Nathalie (2026-09-01) : plafond de revenu mega-cap
+  (~$20 Mds) livré.** Suite du meeting du 01/09 (mémoire auto `project_tpdl_meeting_20260901`) :
+  4 chantiers conçus le jour même par des agents de planification dédiés (session interrompue avant
+  écriture du plan final), repris et livrés un par un, dans l'ordre convenu avec Betty (plus petit/
+  moins risqué → plus gros ; validation à chaque étape). **Ce chantier** : au-dessus d'un certain CA,
+  une société ne doit plus être scorée par le moteur classique — elle route vers le futur chantier 2
+  (« veille top 10-15 méga-caps », pas construit ici). `app/tools/icp.py` : nouvelle
+  `revenue_above_ceiling()` + constante `MEGA_CAP_REASON`, câblées dans `assess_icp()` **après** le
+  plancher 100 M€ existant (même garde-fous conservateurs : inconnu/privé/regional → jamais exclu ;
+  comparaison de MAGNITUDE seule, pas de conversion €/$ ; précédence : un nom curaté type Danaher
+  garde SA raison "tools/instruments conglomerate", jamais écrasée par la raison mega-cap ; les 6
+  cibles confirmées restent testées en tout premier, jamais exclues même sous un CA absurde).
+  **Décisions Betty (ce tour)** : (1) seuil **configurable dans `scoring_config.yaml`**
+  (`icp_ceiling_musd: 20000`, lu par `EngineConfig.load()` comme `outreach_threshold` — contrairement
+  au plancher 100 M€ qui reste en dur, non touché) ; (2) **pas de backfill** sur les ~620 sociétés
+  déjà en base — `icp_flag_reason` reste `NULL` jusqu'à leur prochain scoring naturel ; (3) la RAISON
+  de l'exclusion est désormais **persistée** (`icp_flag_reason`, nouvelle colonne, pas juste le
+  booléen `icp_flag`) — décision actée le 01/09, pour que le futur chantier 2 n'ait pas à re-dériver
+  "pourquoi" une société est hors-ICP. La raison circule de bout en bout : `assess_icp()` →
+  `CompanyResult.icp_flag_reason` (`pipeline/types.py`) → `pipeline/runner.py` (`_assemble()`, un seul
+  appel, ne jette plus la moitié du dict) → CSV colonne **"ICP Flag Reason"** ajoutée en **dernière**
+  position (`pipeline/export.py`, 38→39 colonnes — gardée en dernier pour ne pas casser
+  `test_csv_headers_match_import_contract`, qui compare par égalité stricte au CSV Neotek de mai figé ;
+  ce test passe maintenant en comparaison de PRÉFIXE) → `import_csv.py` → `Company.icp_flag_reason`
+  (`app/models.py`, migration additive SQLite dans `app/database.py`, même pattern que
+  `review_status`/`reviewed_at`/`reviewed_note`) → exposée dans `_serialize_company()`
+  (`app/routers/intel.py`) pour que le futur chantier 2 puisse la lire sans nouveau round-trip.
+  +9 tests (`test_icp_revenue_ceiling`, `test_revenue_above_ceiling_parsing`,
+  `test_mega_cap_ceiling_flows_through_to_csv`). **280 tests verts.** Vérifié en dry-run
+  (`python -m pipeline.runner --fixture pipeline/fixtures/probe_diagnostics.json`) : CSV bien à 39
+  colonnes, "ICP Flag Reason" en dernière position. Pas encore commité au moment de l'écriture.
+  **RESTE (chantiers 2-4, déjà conçus en détail, à valider un par un avant de coder)** : (2) veille
+  "top 10-15 méga-caps" — mode séparé qui s'arrête AVANT le scoring (jamais d'appel Opus), nouvelle
+  table `MegaCapRecap`, flag CLI `--recap` ; (3) curation 70/30 Europe/monde — nouveau
+  `app/tools/curation.py` (interleave pondéré déterministe), nouvel endpoint
+  `GET /api/intel/weekly-review`, sans toucher `shortlist.py` (contrat Maya/Inès préservé) ; (4)
+  tracker mouvements exécutifs — nouvelle table `ExecutiveMove`, `pipeline/exec_moves.py`, commandes
+  `/moves …` portées par Inès (file de revue) + Julie (rédaction, réutilise `andres_linkedin.md`) —
+  le plus gros chantier, avec un point RGPD à trancher avant de le passer en live (données de
+  carrière de personnes nommées, hors du cadre `Contact` existant).
 - 2026-08-13 — **9e source de recherche pour Hugo : scan social/vidéo via les CLI d'agent-reach
   (demande Betty « ajoute-lui le skill agent reach pour scraper YouTube/Twitter/LinkedIn/Insta/
   Reddit »).** Clarifié d'abord : `agent-reach` (skill Claude installé chez Betty) n'est pas
@@ -1112,6 +1152,17 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-09-02
+- Fait : **chantier 1/4 du recap réunion Nathalie du 01/09 : plafond de revenu mega-cap (~$20 Mds)
+  livré et testé** (détail complet dans le log 2026-09-02 en haut). `app/tools/icp.py` gagne
+  `revenue_above_ceiling()`/`MEGA_CAP_REASON` ; la raison d'exclusion (`icp_flag_reason`) circule
+  maintenant de bout en bout jusqu'au CSV (39 colonnes) et à l'API. Seuil configurable dans
+  `scoring_config.yaml`, pas de backfill sur la base existante (décisions Betty). +9 tests,
+  **280 tests verts**. Vérifié en dry-run. Les 3 chantiers suivants (veille méga-caps, curation
+  70/30, tracker mouvements exécutifs) sont déjà conçus en détail (session `942839c7…` du 01/09,
+  toujours sur disque) et restent à valider un par un avant de coder, dans cet ordre.
+- Prochaine étape : chantier 2 — veille "top 10-15 méga-caps" (Nathalie doit fournir la liste
+  exacte ; le code est list-agnostic donc ça ne bloque rien côté implémentation).
 - Date : 2026-08-13 (2)
 - Fait : **9e source Hugo — scan social/vidéo via agent-reach (voir log détaillé en haut).**
   `pipeline/social_research.py` (Twitter/Reddit/LinkedIn jobs/Instagram/YouTube, opt-in

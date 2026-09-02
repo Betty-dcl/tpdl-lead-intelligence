@@ -217,6 +217,32 @@ def test_icp_targeting_classifier():
         assert assess_icp("Some Pharma", location=loc)["out_of_scope"] is False, loc
 
 
+def test_icp_revenue_ceiling():
+    from app.tools.icp import assess_icp, MEGA_CAP_REASON
+    # above the ~$20B mega-cap ceiling → out of ICP, route to trend-watch
+    assert assess_icp("Mega Pharma Co", revenue="~$25B") == {
+        "out_of_scope": True, "reason": MEGA_CAP_REASON}
+    # below / at the boundary stays in scope (strictly-above semantics)
+    assert assess_icp("Mega Pharma Co", revenue="~$19B")["out_of_scope"] is False
+    assert assess_icp("Mega Pharma Co", revenue="~$20B")["out_of_scope"] is False
+    assert assess_icp("Mega Pharma Co", revenue="~$20.5B")["out_of_scope"] is True
+    # precedence: a curated off-ICP name keeps ITS reason, never overridden by mega-cap
+    assert assess_icp("Danaher", revenue="~$23B")["reason"] == \
+        "tools/instruments conglomerate — out of ICP"
+    # confirmed campaign targets are never excluded, even under an absurd revenue
+    assert assess_icp("Cantabria Labs", revenue="~$25B")["out_of_scope"] is False
+
+
+def test_revenue_above_ceiling_parsing():
+    from app.tools.icp import revenue_above_ceiling
+    assert revenue_above_ceiling("~$6B+") is False
+    assert revenue_above_ceiling("private") is False
+    assert revenue_above_ceiling("NA") is False
+    assert revenue_above_ceiling("~€22B") is True
+    assert revenue_above_ceiling("~$19.99B") is False
+    assert revenue_above_ceiling("~$25B (regional listing)") is False
+
+
 def test_revenue_parser_and_failopen():
     from pipeline.enrich import parse_revenue, estimate_revenue
     from pipeline.config import EngineConfig

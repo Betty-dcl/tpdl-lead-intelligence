@@ -112,6 +112,7 @@ class CompanyResult:
     historical_context: str | None = None
 
     icp_flag: bool = False
+    icp_flag_reason: str | None = None
     review_flag: bool = False
     review_flag_reason: str | None = None
 

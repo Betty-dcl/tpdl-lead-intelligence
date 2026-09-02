@@ -148,6 +148,7 @@ def _serialize_company(
         "tech_stack_summary": c.tech_stack_summary,
         "historical_context": c.historical_context,
         "icp_flag":           c.icp_flag,
+        "icp_flag_reason":    c.icp_flag_reason,
         "review_flag":        c.review_flag,
         "review_flag_reason": c.review_flag_reason,
         "run_date":           c.run_date.isoformat() if c.run_date else None,

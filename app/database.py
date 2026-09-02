@@ -45,6 +45,7 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
         ("review_status", "VARCHAR(16)"),  # Vera human-review queue
         ("reviewed_at", "DATETIME"),
         ("reviewed_note", "TEXT"),
+        ("icp_flag_reason", "TEXT"),        # mega-cap ceiling + other ICP exclusions
     ],
 }
 

@@ -220,6 +220,7 @@ class Company(Base):
 
     # Flags
     icp_flag: Mapped[bool] = mapped_column(default=False, index=True)
+    icp_flag_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     review_flag: Mapped[bool] = mapped_column(default=False, index=True)
     review_flag_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 

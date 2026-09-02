@@ -12,6 +12,11 @@ Negative ICP (hard exclusions):
   3. Known revenue < €100M  — BUT private / undisclosed revenue is KEPT
      (mid-size Spanish players often don't publish; a floor set too high would
      cut dynamic growers like Leti Pharma at €200–300M).
+  4. Known revenue above the mega-cap ceiling (~$20B, configurable via
+     scoring_config.yaml's `icp_ceiling_musd`, e.g. Pfizer/Sanofi/Merck) — these
+     route to the separate "top 10-15 mega-cap" trend-watch instead of being
+     scored (client request, Nathalie, 2026-09-01). Same conservative logic as
+     the floor: unknown/private revenue is never excluded.
 
 Everything else stays in scope. The six confirmed campaign targets (Cantabria
 Labs, Mediderma/Sesderma, Ferrer, ISDIN, Leti Pharma, Biologix) are never
@@ -156,11 +161,45 @@ def revenue_below_floor(revenue: str | None, floor_musd: float = 100.0) -> bool:
     return max(millions) < floor_musd
 
 
+# Mega-cap ceiling default (M$) — overridable via scoring_config.yaml's
+# `icp_ceiling_musd` (see pipeline/config.py::EngineConfig). Companies above
+# this route to the separate "top 10-15 mega-cap" trend-watch, not scoring.
+DEFAULT_ICP_CEILING_MUSD = 20000.0
+MEGA_CAP_REASON = "revenue above $20B — mega-cap, out of ICP scope (watch-list candidate)"
+
+
+def _revenue_musd_max(low: str) -> float | None:
+    """Max magnitude (in millions) found in an already-normalized revenue
+    string, reading both million (`\\d+m`) and billion (`\\d+b`) figures.
+    None if nothing parseable — caller must treat that as 'unknown, keep'."""
+    millions = [float(n) for n in re.findall(r"(\d+(?:\.\d+)?)\s*m", low)]
+    billions = [float(n) * 1000 for n in re.findall(r"(\d+(?:\.\d+)?)\s*b(?:illion)?", low)]
+    magnitudes = millions + billions
+    return max(magnitudes) if magnitudes else None
+
+
+def revenue_above_ceiling(revenue: str | None, ceiling_musd: float = DEFAULT_ICP_CEILING_MUSD) -> bool:
+    """True only when we can CONFIDENTLY read a total revenue above the
+    ceiling (in millions). Private / undisclosed / unparseable → False (keep
+    it) — same conservative philosophy as revenue_below_floor()."""
+    low = _norm(revenue)
+    if not low or low in {"na", "n/a", "none", "-", "unknown", "private", "undisclosed"}:
+        return False
+    # Partial/regional figures aren't the company's true size — don't exclude.
+    if any(q in low for q in ("regional", "ops)", " ops", "local", "segment", "division")):
+        return False
+    top = _revenue_musd_max(low)
+    if top is None:
+        return False                       # no clear figure → keep
+    return top > ceiling_musd
+
+
 def assess_icp(name: str | None,
                sector: str | None = None,
                sector_bucket: str | None = None,
                revenue: str | None = None,
-               location: str | None = None) -> dict:
+               location: str | None = None,
+               icp_ceiling_musd: float = DEFAULT_ICP_CEILING_MUSD) -> dict:
     """Return {'out_of_scope': bool, 'reason': str|None}. `out_of_scope=True`
     maps to Company.icp_flag=True (ICP-flagged / not a target)."""
     n = _norm(name)
@@ -179,6 +218,8 @@ def assess_icp(name: str | None,
         return {"out_of_scope": True, "reason": "CDMO / contract manufacturing — out of ICP"}
     if revenue_below_floor(revenue):
         return {"out_of_scope": True, "reason": "revenue below €100M floor"}
+    if revenue_above_ceiling(revenue, icp_ceiling_musd):
+        return {"out_of_scope": True, "reason": MEGA_CAP_REASON}
 
     # NB: geography never excludes — see market_tier() for prioritisation.
     return {"out_of_scope": False, "reason": None}

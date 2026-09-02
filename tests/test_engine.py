@@ -427,12 +427,16 @@ def test_csv_headers_match_import_contract():
     if reference.exists():
         with open(reference, encoding="utf-8", newline="") as f:
             expected = next(csv.reader(f))
-        assert export.CSV_HEADERS == expected
+        # Prefix check, not exact equality: "ICP Flag Reason" was appended
+        # AFTER the frozen 38-column May reference CSV's own header, so the
+        # first 38 columns stay byte-for-byte identical to that historical file.
+        assert export.CSV_HEADERS[: len(expected)] == expected
     # And the fields import_csv.py reads are all present
     for col in ("Company Name", "Assessed Score", "Outreach Eligible",
-                "Signal 1 Category", "Signal 3 URLs", "Review Flag Reason", "Run Date"):
+                "Signal 1 Category", "Signal 3 URLs", "Review Flag Reason", "Run Date",
+                "ICP Flag Reason"):
         assert col in export.CSV_HEADERS
-    assert len(export.CSV_HEADERS) == 38
+    assert len(export.CSV_HEADERS) == 39
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -456,6 +460,20 @@ def test_full_dry_run_chain(cfg, tmp_path):
     # Perplexity-only signal ⇒ corroboration 0
     pe = next(s for s in result.signals if s.signal.category == "pe_event")
     assert pe.corroboration_points == 0
+
+
+def test_mega_cap_ceiling_flows_through_to_csv(cfg, tmp_path):
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    result = run_company(cfg, payload["company"], payload["sector"], fixture=FIXTURE,
+                         identity={"website": payload.get("website"),
+                                   "location": payload.get("location"),
+                                   "revenue": "~$25B"})
+    assert result.icp_flag is True
+    from app.tools.icp import MEGA_CAP_REASON
+    assert result.icp_flag_reason == MEGA_CAP_REASON
+    row = export.result_row(result, cfg)
+    assert row["ICP Flag"] == "TRUE"
+    assert row["ICP Flag Reason"] == MEGA_CAP_REASON
 
     # Deterministic derivations
     assert 0 < result.assessed_score <= 10

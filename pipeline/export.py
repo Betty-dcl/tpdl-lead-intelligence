@@ -27,6 +27,8 @@ CSV_HEADERS = [
     "Signal 3 TPDL Relevance", "Signal 3 Confidence", "Signal 3 Sources", "Signal 3 URLs",
     "Tech Stack Summary", "Historical Context Summary",
     "ICP Flag", "Review Flag", "Review Flag Reason", "Run Date",
+    "ICP Flag Reason",  # appended last (kept the frozen 38-col reference CSV's
+                        # header untouched — see test_csv_headers_match_import_contract)
 ]
 
 
@@ -65,6 +67,7 @@ def result_row(result: CompanyResult, cfg: EngineConfig) -> dict[str, str]:
         "Review Flag": "TRUE" if result.review_flag else "FALSE",
         "Review Flag Reason": result.review_flag_reason or "",
         "Run Date": result.run_date,
+        "ICP Flag Reason": result.icp_flag_reason or "",
     }
     for slot in (1, 2, 3):
         s = top[slot - 1] if len(top) >= slot else None

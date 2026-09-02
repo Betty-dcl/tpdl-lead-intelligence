@@ -18,3 +18,5 @@ corroboration:
   single_unverified: 0 # Perplexity only, no URL
 
 outreach_threshold: 8.0  # assessed_score >= this  →  Outreach Eligible: TRUE
+
+icp_ceiling_musd: 20000  # mega-cap: revenue above this (in M$) → hors-ICP, candidat veille top 10-15

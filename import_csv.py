@@ -199,6 +199,7 @@ def import_csv(path: Path) -> None:
                     "historical_context": empty_to_none(row.get("Historical Context Summary")),
                     # Flags
                     "icp_flag":           parse_bool(row.get("ICP Flag")),
+                    "icp_flag_reason":    empty_to_none(row.get("ICP Flag Reason")),
                     "review_flag":        parse_bool(row.get("Review Flag")),
                     "review_flag_reason": empty_to_none(row.get("Review Flag Reason")),
                     # Run

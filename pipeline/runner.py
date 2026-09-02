@@ -124,6 +124,11 @@ def _assemble(cfg: EngineConfig, name: str, sector: str | None, identity: dict,
         review = True
         reason = "; ".join(filter(None, [reason, *extra]))
 
+    icp_result = _icp.assess_icp(
+        name, sector, identity.get("sector_bucket"),
+        identity.get("revenue"), identity.get("location"),
+        icp_ceiling_musd=cfg.icp_ceiling_musd,
+    )
     result = CompanyResult(
         name=name, sector=sector,
         website=identity.get("website"),
@@ -134,10 +139,8 @@ def _assemble(cfg: EngineConfig, name: str, sector: str | None, identity: dict,
         signals_not_evidenced=not_evidenced,
         tech_stack_summary=tech_stack,
         historical_context=identity.get("historical_context"),
-        icp_flag=_icp.assess_icp(
-            name, sector, identity.get("sector_bucket"),
-            identity.get("revenue"), identity.get("location"),
-        )["out_of_scope"],
+        icp_flag=icp_result["out_of_scope"],
+        icp_flag_reason=icp_result["reason"],
         review_flag=review,
         review_flag_reason=reason,
         run_date=datetime.now(timezone.utc).isoformat(),

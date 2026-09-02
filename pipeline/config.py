@@ -105,6 +105,7 @@ class EngineConfig:
     corroboration: dict = field(default_factory=lambda: {
         "multiple_sources": 2, "single_verified": 1, "single_unverified": 0})
     outreach_threshold: float = 8.0
+    icp_ceiling_musd: float = 20000.0      # mega-cap ceiling (M$) — app/tools/icp.py
 
     @classmethod
     def load(cls, live: bool = False) -> "EngineConfig":
@@ -139,6 +140,8 @@ class EngineConfig:
             cfg.corroboration = weights.get("corroboration", cfg.corroboration)
             cfg.outreach_threshold = float(
                 weights.get("outreach_threshold", cfg.outreach_threshold))
+            cfg.icp_ceiling_musd = float(
+                weights.get("icp_ceiling_musd", cfg.icp_ceiling_musd))
         return cfg
 
 
