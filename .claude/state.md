@@ -19,6 +19,18 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-09-02 (9) — **UI : clustering des pins carte + suppression du filtre Run redondant +
+  Top-N réduit à 3 + header encore allégé.** Betty « pourquoi 1 seul point Act now en Europe ? »
+  → en fait 23, mais plusieurs sociétés partagent EXACTEMENT les mêmes coordonnées dans la table
+  statique (Ferrer/ISDIN = toutes deux "Barcelona") → les pins se superposaient parfaitement.
+  Ajouté `leaflet.markercluster` (même CDN jsdelivr que Leaflet) : les pins proches/superposés se
+  regroupent en bulle avec compteur, cliquable pour zoomer/éclater. **Décision confirmée par
+  Betty** (question posée) : il y avait 2 mécanismes "run" qui se chevauchaient (frise "Compare
+  runs" + menu déroulant "Run" simple) → **frise gardée, menu déroulant retiré** (+ JS mort
+  nettoyé : `runOptions`, `filters.vintage`, `vintageOK`). Top-N réduit de 6 options à 3
+  (**15 / 50 / All**). Header encore allégé : paragraphe d'intro retiré, bande "Recent team
+  activity" (données de démo périmées "Guest claimed Cantabria Labs") retirée. **339 tests
+  verts**, vérifié en live (TestClient + serveur dev).
 - 2026-09-02 (8) — **UI Map : 3 corrections rapides sur retour capture d'écran de Betty.**
   (1) Espace perdu entre le cockpit replié et le tableau → marges resserrées (`mb-12→mb-6`,
   `mt-8→mt-4`, `mt-6→mt-4`). (2) Carte pas centrée sur l'Europe (`fitBounds()` s'exécutait à
