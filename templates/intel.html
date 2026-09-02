@@ -307,13 +307,23 @@
             <strong x-text="weeklyMeta.core"></strong> Europe/core ·
             <strong x-text="weeklyMeta.world"></strong> world.
           </p>
-          <div class="flex flex-wrap gap-2">
+          <div class="divide-y" style="border-color:rgba(255,255,255,0.12)">
             <template x-for="c in weeklyBatch" :key="c.name">
               <a :href="`/intel/company?c=${encodeURIComponent(c.name)}`"
-                 class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs"
-                 style="background:rgba(255,255,255,0.12)">
-                <span x-text="c.name"></span>
-                <span style="opacity:.6" x-text="c.market_tier === 'core' ? '🇪🇺' : '🌍'"></span>
+                 class="flex items-center gap-3 py-2 text-sm hover:opacity-80"
+                 style="border-color:rgba(255,255,255,0.12)">
+                <span class="text-xs shrink-0" :title="c.market_tier === 'core' ? 'Europe/core' : 'World'"
+                      x-text="c.market_tier === 'core' ? '🇪🇺' : '🌍'"></span>
+                <span class="score-pill shrink-0"
+                      :style="`background:${scoreClass(c.assessed_score).bg};color:${scoreClass(c.assessed_score).color}`"
+                      x-text="c.assessed_score.toFixed(1)"></span>
+                <span class="font-medium shrink-0 truncate" style="max-width:180px" x-text="c.name"></span>
+                <template x-if="c.signals && c.signals.length">
+                  <span class="text-[11px] uppercase tracking-wide shrink-0" style="opacity:.7"
+                        x-text="signalLabel(c.signals[0].category)"></span>
+                </template>
+                <span class="text-xs truncate" style="opacity:.65"
+                      x-text="(c.intelligence_summary || 'No signal detail yet.').split(/(?<=[.!?])\s/)[0]"></span>
               </a>
             </template>
           </div>
