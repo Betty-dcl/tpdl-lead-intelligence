@@ -1,11 +1,15 @@
 """Executive moves — discovery + verbatim extraction (chantier 4/4 Slice 1,
 2026-09-01 Nathalie meeting recap; .claude/state.md).
 
-Industry-wide, NOT per-company: a handful of Serper News queries covering the
-whole pharma/life-science/biotech/medtech industry replace what would
-otherwise be 620× per-company calls — this is exactly the shape Nathalie
-asked for ("chaque semaine 10 personnes"), a small bounded weekly batch, not
-a full-universe scan.
+Industry-wide, NOT per-company: a handful of Serper News queries + one Exa
+neural search covering the whole pharma/life-science/biotech/medtech industry
+replace what would otherwise be 620× per-company calls — this is exactly the
+shape Nathalie asked for ("chaque semaine 10 personnes"), a small bounded
+weekly batch, not a full-universe scan. Two sources, not one (Betty,
+2026-09-02: "tu es sûr qu'il n'y a pas d'autres sources intéressantes?") —
+Serper's keyword search and Exa's semantic search cover different phrasings
+of the same announcement, mirroring the two-source pattern the main scored
+pipeline already uses per company (research.py's serp_news + exa_search).
 
 No Opus/interpretation step: a move is a FACT, not a scored opinion. The
 C-suite/-1/-2 filter (app/tools/exec_titles.py) and geography tagging happen
@@ -91,16 +95,51 @@ def serp_press_release_search(cfg: EngineConfig, query: str,
     ]
 
 
+_EXA_QUERY = (
+    "pharmaceutical life sciences biotech medtech company announces new Chief "
+    "Medical Officer Chief Operating Officer Chief Technology Officer Chief "
+    "Innovation Officer Senior Vice President General Manager appointment"
+)
+
+
+def exa_moves_search(cfg: EngineConfig, query: str = _EXA_QUERY, num: int = 15) -> list[RawDoc]:
+    """Exa neural search — industry-wide (no company scoping), complements
+    Serper's keyword search with semantic recall (same two-source pattern
+    the main scored pipeline already uses per company: research.py's
+    serp_news + exa_search)."""
+    require_live(cfg, cfg.exa_api_key, "Exa (exec moves)")
+    data = research._post_json(
+        "https://api.exa.ai/search",
+        {"query": query, "numResults": num, "contents": {"text": {"maxCharacters": 2000}}},
+        {"x-api-key": cfg.exa_api_key},
+    )
+    return [
+        RawDoc(
+            source="exa_moves",
+            url=item.get("url"),
+            title=item.get("title") or "",
+            text=(item.get("text") or "")[:2000],
+            published=research._parse_date(item.get("publishedDate")),
+        )
+        for item in data.get("results", [])
+    ]
+
+
 def discover_moves(cfg: EngineConfig, queries: list[str] | None = None) -> list[RawDoc]:
-    """Loop the query set (default: one broad industry query), fail-open per
-    query — a bad query or a transient error never kills the whole batch."""
+    """Loop the query set (default: one broad industry query) plus Exa's
+    semantic search, fail-open per source — a bad query, a missing key, or a
+    transient error never kills the whole batch."""
     queries = (queries or [press_release_query()])[:MAX_QUERIES]
     docs: list[RawDoc] = []
     for q in queries:
         try:
             docs.extend(serp_press_release_search(cfg, q))
         except Exception as exc:
-            logger.info("[exec_moves] discovery query skipped: %s", exc)
+            logger.info("[exec_moves] Serper discovery query skipped: %s", exc)
+    try:
+        docs.extend(exa_moves_search(cfg))
+    except Exception as exc:
+        logger.info("[exec_moves] Exa discovery skipped: %s", exc)
     return research.dedupe(docs)
 
 

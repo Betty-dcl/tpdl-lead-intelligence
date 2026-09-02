@@ -9,12 +9,14 @@ Slash commands:
   - /radars             → Lunch Campaign (CH/Spain) & Language (ES) candidates.
   - /premium            → the Premium 5 hand-picked for Andrés (a real human).
   - /generate [company] → alias of /contacts (used by the workspace "Generate brief" button).
-  - /moves [review|approved|approve <id>|dismiss <id>] → executive-moves review
-    queue (chantier 4/4, 2026-09-01 recap). Inès HOSTS this queue (decision Betty,
-    2026-09-01) — the actual message drafting is Julie's (`/moves draft`, not built
-    yet). Data comes from `pipeline/exec_moves.py` (Terminal-only, industry-wide
-    discovery, NOT per-company like her other commands). LinkedIn sending is ALWAYS
-    100% human — never automated from here.
+  - /moves [review|approved|approve <id>|dismiss <id>|connected <id>|
+    followed-up <id>|followup] → executive-moves review queue + workflow state
+    (chantier 4/4, 2026-09-01 recap). Inès HOSTS the queue (decision Betty,
+    2026-09-01); the actual message drafting is Julie's (`/moves draft <id>`).
+    State machine: new → approved → connection_sent → follow_up_sent (or
+    dismissed at any point pre-send). Data comes from `pipeline/exec_moves.py`
+    (Terminal-only, industry-wide discovery, NOT per-company like her other
+    commands). LinkedIn sending is ALWAYS 100% human — never automated from here.
 
 Contacts data needs APOLLO_API_KEY. Until it's set, Inès still runs the radars
 on the companies' own locations (real data) and explains what she'd fetch.
@@ -383,6 +385,72 @@ class InesAgent(BaseAgent):
                             )
                 return {"augmented_message": augmented, "action": "exec_move_review",
                         "task_title": f"Move {sub} #{move_id}"}
+
+            if sub in ("connected", "followed-up"):
+                move_id_raw = parts[2].strip() if len(parts) > 2 else ""
+                if not move_id_raw.isdigit():
+                    return {
+                        "augmented_message": f"The user ran `/moves {sub}` without a valid id. As "
+                                             f"Inès, ask which move id — never guess.",
+                        "action": "exec_move_review", "task_title": f"/moves {sub} (no id)",
+                    }
+                move_id = int(move_id_raw)
+                from app.tools.moves import mark_connected, mark_followed_up
+                with SessionLocal() as db:
+                    m, outcome = (mark_connected(db, move_id) if sub == "connected"
+                                 else mark_followed_up(db, move_id))
+                    if outcome == "not_found":
+                        augmented = (f"No executive move with id {move_id}. As Inès, say it wasn't "
+                                    f"found — check `/moves review`/`/moves approved` for the queue.")
+                    elif outcome == "not_approved":
+                        augmented = (f"Move #{move_id} ({m.person_name}) is '{m.status}', not "
+                                    f"'approved' — it must be approved first. As Inès, explain the "
+                                    f"order: `/moves approve <id>` before `/moves connected <id>`.")
+                    elif outcome == "not_due":
+                        augmented = (f"Move #{move_id} ({m.person_name}) is '{m.status}', not "
+                                    f"'connection_sent' — nothing to follow up on yet. As Inès, "
+                                    f"explain the order: `/moves connected <id>` happens first.")
+                    elif sub == "connected":
+                        augmented = (
+                            f"Marked move #{move_id} as connected: {m.person_name} → {m.new_title} @ "
+                            f"{m.new_company}. Follow-up window opens {m.follow_up_date} (~4 months — "
+                            f"people tend to make strategic changes ~6 months into a new role, so this "
+                            f"lands just before that). As Inès, confirm; `/moves followup` will surface "
+                            f"it when due."
+                        )
+                    else:
+                        augmented = (
+                            f"Marked move #{move_id} as followed up: {m.person_name} → {m.new_title} @ "
+                            f"{m.new_company}. As Inès, confirm — this move's cycle is complete."
+                        )
+                return {"augmented_message": augmented, "action": "exec_move_review",
+                        "task_title": f"Move {sub} #{move_id}"}
+
+            # /moves followup — connected moves whose 4-month window has arrived
+            if sub == "followup":
+                from app.tools.moves import due_for_follow_up
+                with SessionLocal() as db:
+                    rows = due_for_follow_up(db)
+                if rows:
+                    lines = "\n".join(
+                        f"- #{m.id} {m.person_name} @ {m.new_company} — connected "
+                        f"{m.connection_sent_at.date() if m.connection_sent_at else '—'}, "
+                        f"follow-up due {m.follow_up_date}"
+                        for m in rows
+                    )
+                    augmented = (
+                        f"The user ran `/moves followup`. {len(rows)} move(s) due for their 4-month "
+                        f"follow-up:\n{lines}\n\n"
+                        f"As Inès, list them and tell the user Julie can draft the follow-up message "
+                        f"(`/moves draft <id>`), then a human sends it and marks it with "
+                        f"`/moves followed-up <id>`."
+                    )
+                else:
+                    augmented = ("The user ran `/moves followup`. Nothing due right now — moves "
+                                "surface here 4 months after `/moves connected <id>` was run. As "
+                                "Inès, say so plainly.")
+                return {"augmented_message": augmented, "action": "exec_move_review",
+                        "task_title": "Moves follow-up", "metadata": {"count": len(rows)}}
 
             # /moves approved — approved, not yet connected (ready for a human to send)
             if sub == "approved":

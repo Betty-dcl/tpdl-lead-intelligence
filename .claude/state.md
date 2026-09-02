@@ -19,6 +19,47 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-09-02 (10) — **Chantier 4/4 SLICE 2+3 livrées : Julie rédige (`/moves draft`), Inès gère le
+  cycle complet (`connected`/`followup`/`followed-up`), + Exa ajouté comme 2e source de
+  découverte.** Le chantier 4 est maintenant COMPLET de bout en bout (découverte → filtre →
+  stockage → revue humaine → rédaction → suivi de la relance).
+  **Questions Betty (ce tour) et réponses actées** : (1) LinkedIn automatisé — jugé trop risqué,
+  **pas connecté** (risque déjà identifié par Nathalie + `linkedin_jobs()` déjà fragile) ; le
+  côté humain reste la vérification manuelle du profil avant envoi, jamais du scraping ; (2) coder
+  ne coûte rien (zéro appel API) — seul un run LIVE réel coûterait quelques centimes, et celui-là
+  reste soumis à la confirmation RGPD finale avant lancement, pas le code ; (3) **Exa ajouté en 2e
+  source** de découverte à côté de Serper (même clé déjà en `.env`, même pattern que le pipeline
+  principal qui utilise déjà les deux par société) — recherche sémantique complémentaire aux
+  requêtes mots-clés de Serper.
+  **Fait** :
+  - `pipeline/exec_moves.py` : nouveau `exa_moves_search()` (requête neuronale industrie-large,
+    fail-open comme Serper) ; `discover_moves()` combine maintenant les deux sources, chacune
+    pouvant échouer sans casser l'autre.
+  - `app/tools/moves.py` (partagé chat/API) : `mark_connected()` (exige `status=="approved"`,
+    pose `connection_sent_at` + calcule `follow_up_date` via `exec_titles.compute_follow_up_date`),
+    `due_for_follow_up()` (requête pure sur `status=="connection_sent" AND follow_up_date<=today`,
+    PAS un scheduler — un humain lance `/moves followup` quand il vérifie, même logique pull que
+    tout le reste de l'app), `mark_followed_up()`. `serialize_move()` étendu avec les 3 nouveaux
+    champs de date.
+  - **Inès** (`app/agents/ines.py`) : `/moves connected <id>`, `/moves followed-up <id>`,
+    `/moves followup` — même convention que `/moves approve`/`dismiss` (état machine
+    new→approved→connection_sent→follow_up_sent). **Bug réel trouvé en testant** : le code
+    construisait le message `augmented` APRÈS avoir fermé la session DB (`with SessionLocal()`),
+    alors que `mark_connected`/`mark_followed_up` font un `db.commit()` qui expire les attributs
+    de l'objet retourné → `DetachedInstanceError` dès qu'on lisait `m.person_name` hors du bloc
+    `with`. Corrigé en remontant la construction du message À L'INTÉRIEUR du bloc `with` (même
+    pattern que le bloc `approve`/`dismiss` existant, qui lui était déjà correct).
+  - **Julie** (`app/agents/julie.py`) : `/moves draft <id>` — utilise le type de déclencheur déjà
+    présent dans `andres_linkedin.md` (**"Job Switch / New Role (External Move)"**, avec 2 vrais
+    exemples de félicitations sur une nouvelle prise de poste) — **aucun nouveau contenu
+    nécessaire**, la voix Andrés couvrait déjà ce cas exact. Grounding strict sur les champs réels
+    de `ExecutiveMove` (poste précédent si connu, règle de langue via `detect_country`, citation
+    verbatim comme ancrage jamais recopiée). Si le mouvement n'est pas encore approuvé par Inès,
+    le prompt le signale mais rédige quand même (le blocage réel est côté envoi, 100% humain).
+  +13 tests (4 Exa, 3 cycle de vie Inès, 6 draft Julie). **352 tests verts**, 0 pollution DB
+  vérifiée après coup. **Le chantier 4 des 4 chantiers du recap du 01/09 est maintenant construit
+  intégralement en code** — reste uniquement la décision de lancer un run LIVE réel (liste Nathalie
+  pour les méga-caps ; confirmation RGPD Andrés/Nathalie pour les mouvements exécutifs).
 - 2026-09-02 (9) — **UI : clustering des pins carte + suppression du filtre Run redondant +
   Top-N réduit à 3 + header encore allégé.** Betty « pourquoi 1 seul point Act now en Europe ? »
   → en fait 23, mais plusieurs sociétés partagent EXACTEMENT les mêmes coordonnées dans la table
@@ -1419,6 +1460,15 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-09-02 (10)
+- Fait : **chantier 4/4 terminé — Slice 2 (Julie rédige) + Slice 3 (suivi relance) + Exa comme 2e
+  source de découverte** (détail complet dans le log 2026-09-02 (10) en haut). 1 vrai bug trouvé et
+  corrigé (DetachedInstanceError sur `/moves connected`/`followed-up`, message construit hors de la
+  session DB). +13 tests, **352 tests verts**. **Les 4 chantiers du recap Nathalie du 01/09 sont
+  désormais tous entièrement codés.**
+- Prochaine étape : décision Betty à prendre séparément — lancer un vrai run LIVE (méga-caps :
+  liste de Nathalie à obtenir ; mouvements exécutifs : confirmation RGPD d'Andrés/Nathalie
+  d'abord). Aucun code supplémentaire requis pour l'un ou l'autre.
 - Date : 2026-09-02 (7)
 - Fait : **carte "weekly review batch" retirée (jugée pas assez utile/claire par Betty), Top 15
   ajouté au tableau, carte géographique avec un pin par société ajoutée** (détail complet dans le

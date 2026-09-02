@@ -93,3 +93,65 @@ def test_moves_approved_lists_approved_only():
         assert f"#{move_id}" in out["augmented_message"]
     finally:
         _cleanup()
+
+
+def test_moves_connected_requires_approved_first():
+    agent = _make_agent()
+    move_id = _insert_move(status="new")
+    try:
+        out = agent._dispatch_command(f"/moves connected {move_id}")
+        assert "must be approved first" in out["augmented_message"]
+        with SessionLocal() as db:
+            assert db.get(ExecutiveMove, move_id).status == "new"
+    finally:
+        _cleanup()
+
+
+def test_moves_full_lifecycle_to_followup():
+    from datetime import date, timedelta
+
+    agent = _make_agent()
+    move_id = _insert_move(status="new")
+    try:
+        agent._dispatch_command(f"/moves approve {move_id}")
+        connected = agent._dispatch_command(f"/moves connected {move_id}")
+        assert "connected" in connected["augmented_message"].lower()
+        with SessionLocal() as db:
+            m = db.get(ExecutiveMove, move_id)
+            assert m.status == "connection_sent"
+            assert m.connection_sent_at is not None
+            assert m.follow_up_date is not None
+            # Not due yet (follow-up is ~4 months out) — force it into the past
+            # to exercise /moves followup deterministically, no time travel needed.
+            m.follow_up_date = date.today() - timedelta(days=1)
+            db.commit()
+
+        followup = agent._dispatch_command("/moves followup")
+        assert followup["metadata"]["count"] >= 1
+        assert f"#{move_id}" in followup["augmented_message"]
+
+        followed_up = agent._dispatch_command(f"/moves followed-up {move_id}")
+        assert "followed up" in followed_up["augmented_message"].lower()
+        with SessionLocal() as db:
+            m = db.get(ExecutiveMove, move_id)
+            assert m.status == "follow_up_sent"
+            assert m.follow_up_sent_at is not None
+
+        # Now nothing left due
+        followup_again = agent._dispatch_command("/moves followup")
+        assert not any(f"#{move_id}" in line for line in
+                       followup_again["augmented_message"].splitlines())
+    finally:
+        _cleanup()
+
+
+def test_moves_followed_up_requires_connected_first():
+    agent = _make_agent()
+    move_id = _insert_move(status="approved")
+    try:
+        out = agent._dispatch_command(f"/moves followed-up {move_id}")
+        assert "connected" in out["augmented_message"].lower()
+        with SessionLocal() as db:
+            assert db.get(ExecutiveMove, move_id).status == "approved"
+    finally:
+        _cleanup()

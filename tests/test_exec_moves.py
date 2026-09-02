@@ -63,6 +63,41 @@ def test_discover_moves_caps_query_count(monkeypatch):
     assert len(seen) == exec_moves.MAX_QUERIES
 
 
+def test_exa_moves_search_requires_live():
+    dry = EngineConfig(live=False, exa_api_key="k")
+    with pytest.raises(EngineOffline):
+        exec_moves.exa_moves_search(dry)
+
+
+def test_exa_moves_search_parses_results(monkeypatch):
+    monkeypatch.setattr(exec_moves.research, "_post_json", lambda url, payload, headers: {
+        "results": [{"url": "https://x/1", "title": "T", "text": "body", "publishedDate": None}]
+    })
+    cfg = EngineConfig(live=True, exa_api_key="k")
+    docs = exec_moves.exa_moves_search(cfg)
+    assert len(docs) == 1 and docs[0].source == "exa_moves"
+
+
+def test_discover_moves_combines_serper_and_exa(monkeypatch):
+    monkeypatch.setattr(exec_moves, "serp_press_release_search",
+                        lambda cfg, q, num=10: [_doc(text="from serper", url="https://a")])
+    monkeypatch.setattr(exec_moves, "exa_moves_search",
+                        lambda cfg: [_doc(text="from exa", url="https://b", source="exa_moves")])
+    cfg = EngineConfig(live=True, serper_api_key="k", exa_api_key="k")
+    docs = exec_moves.discover_moves(cfg)
+    assert {d.text for d in docs} == {"from serper", "from exa"}
+
+
+def test_discover_moves_survives_exa_failure(monkeypatch):
+    monkeypatch.setattr(exec_moves, "serp_press_release_search",
+                        lambda cfg, q, num=10: [_doc(text="ok")])
+    monkeypatch.setattr(exec_moves, "exa_moves_search",
+                        lambda cfg: (_ for _ in ()).throw(RuntimeError("no key")))
+    cfg = EngineConfig(live=True, serper_api_key="k")
+    docs = exec_moves.discover_moves(cfg)
+    assert len(docs) == 1 and docs[0].text == "ok"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # verbatim_qa_moves — same anti-hallucination contract as extract.verbatim_qa
 # ─────────────────────────────────────────────────────────────────────────────

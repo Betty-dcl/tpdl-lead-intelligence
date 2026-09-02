@@ -10,6 +10,10 @@ Slash commands:
   - /draft [company]    → a segmented, signal-anchored outreach email.
   - /generate [company] → alias of /draft (used by the workspace "Generate brief" button).
   - /linkedin [company] → a LinkedIn message in Andrés's voice (playbook v2.1).
+  - /moves draft <id>   → executive-moves chantier (4/4, 2026-09-01 recap):
+    a "Job Switch / New Role" LinkedIn message for one detected move (Inès
+    hosts review/approve/dismiss/connected/followup — this is Julie's only
+    step on that queue). The human send stays 100% manual either way.
 
 Sector angles are populated with TPDL's real (anonymised) positioning (see
 app/tools/sectors.py); brand voice + the real company signal ground every draft.
@@ -243,6 +247,87 @@ class JulieAgent(BaseAgent):
                 "action": "drafted_linkedin",
                 "task_title": f"LinkedIn — {operator_input[:50]}",
                 "metadata": {"channel": "linkedin"},
+            }
+
+        # ── /moves draft <id> ────────────────────────────────────────────
+        # Executive-moves chantier (4/4, 2026-09-01 recap): the ONLY step
+        # Julie owns on this queue — Inès hosts review/approve/dismiss/
+        # connected/followup (app/agents/ines.py). This just drafts the text;
+        # the LinkedIn send stays 100% human, and Inès's `/moves connected`
+        # is what actually advances the workflow state.
+        if low.startswith("/moves"):
+            parts = text.split(maxsplit=2)
+            sub = parts[1].lower() if len(parts) > 1 else ""
+            if sub != "draft":
+                return {
+                    "augmented_message": (
+                        f"The user ran `/moves {sub}`. As Julie, explain that she only handles "
+                        f"`/moves draft <id>` (writing the message) — review/approve/dismiss/"
+                        f"connected/followup live with Inès."
+                    ),
+                    "action": "drafted_move", "task_title": f"/moves {sub} (wrong agent)",
+                }
+            move_id_raw = parts[2].strip() if len(parts) > 2 else ""
+            if not move_id_raw.isdigit():
+                return {
+                    "augmented_message": "The user ran `/moves draft` without a valid id. As "
+                                         "Julie, ask which move id (see Inès's `/moves review` "
+                                         "or `/moves approved`) — never guess.",
+                    "action": "drafted_move", "task_title": "/moves draft (no id)",
+                }
+            move_id = int(move_id_raw)
+            from app.models import ExecutiveMove
+            with SessionLocal() as db:
+                m = db.get(ExecutiveMove, move_id)
+            if m is None:
+                return {
+                    "augmented_message": f"No executive move with id {move_id}. As Julie, say it "
+                                         f"wasn't found — check with Inès's `/moves review`.",
+                    "action": "drafted_move", "task_title": f"/moves draft #{move_id} (not found)",
+                }
+            playbook = _linkedin_playbook()
+            if not playbook:
+                return {
+                    "augmented_message": "The user ran `/moves draft` but the Andres outreach "
+                                         "playbook could not be loaded. As Julie, say the "
+                                         "playbook file is missing.",
+                    "action": "drafted_move", "task_title": "/moves draft (no playbook)",
+                }
+            country = detect_country(m.location)
+            prev_line = (f"{m.previous_title or 'a previous role'} at {m.previous_company}"
+                        if m.previous_company else "no previous role stated in the source")
+            stage_note = ("" if m.status == "approved" else
+                          f" (note: this move is still '{m.status}', not yet approved by Inès — "
+                          f"draft it anyway if asked, but flag that it needs `/moves approve "
+                          f"{move_id}` before a human sends it)")
+            augmented = (
+                f"Draft a LinkedIn message strictly following the Andrés Burdett outreach system "
+                f"prompt below, using the 'Job Switch / New Role (External Move)' trigger type "
+                f"(see TRIGGER TYPES AND FRAMING + examples #4/#5: congratulate on the new role, "
+                f"connect their new context to a relevant organisational challenge, land on the "
+                f"expertise anchor). This is a REAL detected move{stage_note} — every fact below is "
+                f"verbatim-sourced; do NOT invent anything beyond it.\n\n"
+                f"PERSON: {m.person_name}\n"
+                f"NEW ROLE: {m.new_title} at {m.new_company}"
+                f"{f' ({m.location})' if m.location else ''}\n"
+                f"PREVIOUSLY: {prev_line}\n"
+                f"SENIORITY TIER: {m.seniority_tier}\n"
+                + (f"LOCATION RULE: country={country} (Spain→Spanish+in-person; "
+                   f"Switzerland→English+in-person; else standard)\n" if country else "")
+                + f"SOURCE QUOTE (verbatim, grounding only — never quote it back verbatim): "
+                  f"{m.quote}\n\n"
+                f"Apply every playbook rule: Andrés's voice (no dashes anywhere, ≤90 words, "
+                f"peer-to-peer), the location rules above, the expertise-anchor close, the "
+                f"two-line sign-off, and the exact OUTPUT FORMAT. Never invent a client or "
+                f"result.\n\n"
+                f"{get_brand_dna_block()}\n\n=== PLAYBOOK ===\n{playbook}"
+            )
+            return {
+                "augmented_message": augmented,
+                "action": "drafted_move",
+                "task_title": f"Move draft — {m.person_name}",
+                "metadata": {"channel": "linkedin", "move_id": move_id,
+                             "person": m.person_name, "company": m.new_company},
             }
 
         # ── /draft [company] ─────────────────────────────────────────────
