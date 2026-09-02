@@ -73,14 +73,19 @@ def test_runs_redirects_to_intel_tab(client):
     assert r.headers["location"] == "/intel?tab=runs"
 
 
-def test_intel_page_carries_all_three_tabs(client):
+def test_intel_page_carries_all_five_tabs(client):
     body = client.get("/intel").text
-    # All three original Alpine components must render on the merged page —
+    # All 5 Alpine components must render on the merged "Market Watch" page —
     # nothing was dropped, just given a tab instead of its own nav entry/route.
+    # (2026-09-02: mega-cap watch + people moves added alongside the original 3.)
     assert "intelPage()" in body
     assert "recurringPage()" in body
     assert "traceability()" in body
+    assert "megacapPage()" in body
+    assert "movesPage()" in body
     assert 'class="tpdl-hub-tabbar"' in body
+    assert "Market Watch" in body
+    assert ">Sales<" not in body   # renamed everywhere (Betty, 2026-09-02)
 
 
 # ── Agents ────────────────────────────────────────────────────────────────────
@@ -168,6 +173,54 @@ def test_intel_weekly_review(client):
     assert data["core_count"] + data["world_count"] == data["n_returned"]
     # ICP-flagged companies never appear in Nathalie's weekly batch
     assert all(not c["icp_flag"] for c in data["companies"])
+
+
+def test_intel_megacap_recap_shape(client):
+    data = client.get("/api/intel/megacap-recap").json()
+    assert "companies" in data and "total_facts" in data
+    assert data["total_facts"] == sum(c["fact_count"] for c in data["companies"])
+    for c in data["companies"]:
+        assert c["fact_count"] == len(c["facts"])
+        assert c["runs"] == sorted(c["runs"])
+
+
+def test_intel_moves_list_and_actions_roundtrip(client):
+    from app.database import SessionLocal
+    from app.models import ExecutiveMove
+
+    person = "__Test Smoke Moves Person__"
+    with SessionLocal() as db:
+        m = ExecutiveMove(
+            person_name=person, new_title="Chief Operating Officer",
+            new_company="__Test Smoke Pharma__", quote="q", source_url="https://x",
+            seniority_tier="c_level", role_function="coo", status="new",
+            dedup_key="smoketestmoves|1",
+        )
+        db.add(m)
+        db.commit()
+        move_id = m.id
+    try:
+        listed = client.get("/api/intel/moves?status=new").json()
+        assert any(mv["id"] == move_id for mv in listed["moves"])
+        found = next(mv for mv in listed["moves"] if mv["id"] == move_id)
+        assert found["person_name"] == person
+        assert found["new_title"] == "Chief Operating Officer"
+        assert "market_tier" in found
+
+        approved = client.post(f"/api/intel/moves/{move_id}/approve").json()
+        assert approved["outcome"] == "ok"
+        assert approved["move"]["status"] == "approved"
+
+        dismissed = client.post(f"/api/intel/moves/{move_id}/dismiss").json()
+        assert dismissed["outcome"] == "ok"
+        assert dismissed["move"]["status"] == "dismissed"
+
+        missing = client.post("/api/intel/moves/999999999/approve")
+        assert missing.status_code == 404
+    finally:
+        with SessionLocal() as db:
+            db.query(ExecutiveMove).filter(ExecutiveMove.person_name == person).delete()
+            db.commit()
 
 
 def test_intel_trajectory(client, a_company):

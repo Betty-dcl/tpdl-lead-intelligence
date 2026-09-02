@@ -19,7 +19,6 @@ Slash commands:
 Contacts data needs APOLLO_API_KEY. Until it's set, Inès still runs the radars
 on the companies' own locations (real data) and explains what she'd fetch.
 """
-from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import func
@@ -349,7 +348,6 @@ class InesAgent(BaseAgent):
                         f"({m.seniority_tier}{role})")
 
             if sub in ("approve", "dismiss"):
-                target_status = "approved" if sub == "approve" else "dismissed"
                 move_id_raw = parts[2].strip() if len(parts) > 2 else ""
                 if not move_id_raw.isdigit():
                     return {
@@ -358,20 +356,18 @@ class InesAgent(BaseAgent):
                         "action": "exec_move_review", "task_title": f"/moves {sub} (no id)",
                     }
                 move_id = int(move_id_raw)
+                from app.tools.moves import approve_move, dismiss_move
                 with SessionLocal() as db:
-                    m = db.get(ExecutiveMove, move_id)
-                    if m is None:
+                    m, outcome = (approve_move(db, move_id) if sub == "approve"
+                                 else dismiss_move(db, move_id))
+                    if outcome == "not_found":
                         augmented = (f"No executive move with id {move_id}. As Inès, say it wasn't "
                                     f"found — check `/moves review` for the current queue.")
-                    elif m.status != "new" and sub == "approve":
+                    elif outcome == "already":
                         augmented = (f"Move #{move_id} ({m.person_name} → {m.new_title} @ "
                                     f"{m.new_company}) is already '{m.status}', not 'new'. As Inès, "
                                     f"confirm no change was made.")
                     else:
-                        m.status = target_status
-                        if sub == "dismiss":
-                            m.dismissed_at = datetime.now(timezone.utc)  # GDPR retention clock
-                        db.commit()
                         if sub == "approve":
                             augmented = (
                                 f"Approved move #{move_id}: {m.person_name} → {m.new_title} @ "

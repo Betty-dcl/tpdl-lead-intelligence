@@ -329,7 +329,7 @@ function intelPage() {
       if (f.review_flag) parts.push("review-flagged");
       if (this.periodOn) parts.push(`${this.runLabelFor(this.period.from)} → ${this.runLabelFor(this.period.to)}`);
       else if (f.vintage) parts.push(f.vintage);
-      return "Sales · " + parts.join(" · ");
+      return "Companies · " + parts.join(" · ");
     },
     // Rich exports: post the shown companies (in order) → full-depth CSV (summary,
     // signals + source links, trajectory) and a detailed PDF (one brief per company:
@@ -337,23 +337,23 @@ function intelPage() {
     _shownNames() { return this.displayedCompanies.map(c => c.name); },
     exportCsv() {
       tpdlPostDownload("/api/intel/export_rich.csv", {
-        names: this._shownNames(), filename: "tpdl_sales.csv",
-        title: "Lead Intelligence — Sales pipeline", subtitle: this._viewSubtitleSales(),
+        names: this._shownNames(), filename: "tpdl_companies.csv",
+        title: "Lead Intelligence — Companies", subtitle: this._viewSubtitleSales(),
       });
     },
     // PDF — LIST: a one-page table snapshot of the shown rows.
     exportPdfList() {
       tpdlDownloadViewPdf({
-        title: "Lead Intelligence — Sales pipeline", subtitle: this._viewSubtitleSales(),
+        title: "Lead Intelligence — Companies", subtitle: this._viewSubtitleSales(),
         columns: this._viewColumnsSales(), rows: this._viewRowsSales(),
         widths: [5, 34, 30, 18, 30, 12, 20, 10, 12, 12, 14, 12, 8, 10, 12],
-        filename: "tpdl_sales_list.pdf",
+        filename: "tpdl_companies_list.pdf",
       });
     },
     // PDF — DETAIL: one full brief per shown company (score, curve, summary, links).
     exportPdfDetail() {
       tpdlPostDownload("/api/intel/view_briefs.pdf", {
-        names: this._shownNames(), filename: "tpdl_sales_briefs.pdf",
+        names: this._shownNames(), filename: "tpdl_companies_briefs.pdf",
         title: this._viewSubtitleSales(), subtitle: this._viewSubtitleSales(),
       });
     },

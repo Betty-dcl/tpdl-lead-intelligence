@@ -1091,6 +1091,81 @@ def weekly_review(n: int = 10, db: Session = Depends(get_db)) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Mega-cap trend-watch (chantier 2/4, `pipeline/recap.py --recap`) — read-only,
+# groups MegaCapRecap rows by company with their run history for the "Mega-cap
+# watch" tab. No scoring concept here (see recap.py's own docstring).
+# ---------------------------------------------------------------------------
+
+@router.get("/megacap-recap")
+def megacap_recap(db: Session = Depends(get_db)) -> dict:
+    from app.models import MegaCapRecap
+
+    rows = (db.query(MegaCapRecap)
+            .order_by(MegaCapRecap.company_name, MegaCapRecap.run_date).all())
+    by_company: dict[str, dict] = {}
+    for r in rows:
+        slot = by_company.setdefault(r.company_name, {
+            "company_name": r.company_name, "runs": [], "facts": [],
+        })
+        day = r.run_date.date().isoformat() if r.run_date else None
+        if day and day not in slot["runs"]:
+            slot["runs"].append(day)
+        slot["facts"].append({
+            "category": r.category,
+            "summary": r.summary_text,
+            "quote": r.quote,
+            "source": r.source,
+            "url": r.url,
+            "event_date": r.event_date.date().isoformat() if r.event_date else None,
+            "run_date": day,
+        })
+    companies = sorted(by_company.values(), key=lambda c: c["company_name"])
+    for c in companies:
+        c["runs"].sort()
+        c["fact_count"] = len(c["facts"])
+    return {"companies": companies, "total_facts": len(rows)}
+
+
+# ---------------------------------------------------------------------------
+# Executive moves (chantier 4/4, `pipeline/exec_moves.py`) — read + the two
+# human decisions (approve/dismiss). Shares its state-transition logic with
+# Inès's `/moves` chat command via app/tools/moves.py, so the dashboard UI and
+# the chat can never disagree about what "approve"/"dismiss" means.
+# ---------------------------------------------------------------------------
+
+@router.get("/moves")
+def list_moves(status: Optional[str] = None, db: Session = Depends(get_db)) -> dict:
+    from app.models import ExecutiveMove
+    from app.tools.moves import serialize_move
+
+    q = db.query(ExecutiveMove)
+    if status:
+        q = q.filter(ExecutiveMove.status == status)
+    rows = q.order_by(ExecutiveMove.discovered_at.desc()).limit(200).all()
+    return {"count": len(rows), "moves": [serialize_move(m) for m in rows]}
+
+
+@router.post("/moves/{move_id}/approve")
+def approve_move_endpoint(move_id: int, db: Session = Depends(get_db)) -> dict:
+    from app.tools.moves import approve_move, serialize_move
+
+    m, outcome = approve_move(db, move_id)
+    if outcome == "not_found":
+        raise HTTPException(status_code=404, detail=f"No executive move with id {move_id}")
+    return {"outcome": outcome, "move": serialize_move(m)}
+
+
+@router.post("/moves/{move_id}/dismiss")
+def dismiss_move_endpoint(move_id: int, db: Session = Depends(get_db)) -> dict:
+    from app.tools.moves import dismiss_move, serialize_move
+
+    m, outcome = dismiss_move(db, move_id)
+    if outcome == "not_found":
+        raise HTTPException(status_code=404, detail=f"No executive move with id {move_id}")
+    return {"outcome": outcome, "move": serialize_move(m)}
+
+
+# ---------------------------------------------------------------------------
 # Run comparison — pick any two runs (a "from" and a "to") and see what moved,
 # like filtering a bank statement to a date range. Today there are two runs
 # (Neotek May reference + the July TPDL run); the moment more runs land, the

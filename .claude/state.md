@@ -19,6 +19,53 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-09-02 (6) — **UI : page « Sales » renommée « Market Watch » + 2 nouveaux onglets (Veille
+  méga-caps, Mouvements de personnes) pour rendre visibles les chantiers 2 et 4 du recap du 01/09
+  (jusque-là CLI/chat only, décision Betty « je veux voir le dashboard, simplifie-le, 3 phases,
+  3 onglets »).**
+  **Décisions Betty (ce tour)** : (1) nom retenu **« Market Watch »** (au lieu de « Sales », jugé
+  pas représentatif) ; (2) **1 seule entrée de menu, 3+ onglets à l'intérieur** plutôt que
+  d'alourdir la barre de nav — la page `/intel` a déjà un mécanisme d'onglets (`?tab=`, ajouté le
+  31/08 pour fusionner Sales/Recurring/Runs) : j'ai simplement ajouté 2 onglets au même système
+  au lieu d'en inventer un nouveau. Structure finale (5 onglets) : **Scored companies** (ex-Sales,
+  inchangé dans le fond) · Recurring · Runs · **Mega-cap watch** (nouveau) · **People moves**
+  (nouveau).
+  **Fait** :
+  - `app/tools/moves.py` (nouveau, partagé) : `approve_move()`/`dismiss_move()`/`serialize_move()`
+    — même définition utilisée par la commande chat `/moves` d'Inès ET la nouvelle API REST (même
+    convention que `shortlist.py` Maya/Inès : les deux ne peuvent jamais se contredire). `ines.py`
+    refactoré pour appeler ces fonctions au lieu de dupliquer la logique inline.
+  - **3 nouveaux endpoints** `app/routers/intel.py` : `GET /api/intel/megacap-recap` (groupe les
+    lignes `MegaCapRecap` par société, avec la liste des dates de run = « l'évolution » demandée +
+    le compte de faits par catégorie), `GET /api/intel/moves?status=` (liste filtrable, réutilise
+    `serialize_move`), `POST /api/intel/moves/{id}/approve`, `POST /api/intel/moves/{id}/dismiss`.
+  - **Onglet « Mega-cap watch »** (`templates/intel.html`, Alpine `megacapPage()`) : une fiche par
+    société (nom, nombre de faits, **badges de date par run = la frise d'évolution**), faits
+    groupés par catégorie (New product / M&A / Tech platform / Other), chaque fait = résumé
+    déterministe + date + lien source cliquable. État vide explicite (« aucun run recap encore »)
+    plutôt qu'un tableau vide muet.
+  - **Onglet « People moves »** (`movesPage()`) : **fiches contact** (nom de la personne, nouveau
+    poste @ société, badge de palier C-suite/SVP-VP/GM, poste précédent si connu, **la citation
+    verbatim = « la news »**, date, localisation (🇪🇺/🌍), **lien source**), filtre par statut
+    (New/Approved/Dismissed), boutons Approve/Dismiss appelant directement l'API (plus besoin de
+    passer par le chat). Rappel explicite sur chaque fiche approuvée : l'envoi LinkedIn reste
+    100% humain.
+  - Renommage du texte visible partout ailleurs (`base.html` nav, breadcrumbs Recurring/Runs/
+    company_detail, how-it-works, export CSV/PDF « Sales » → « Companies »/« Market Watch »).
+  Aucune perte de détail : le contenu de l'ex-onglet Sales est identique, juste réétiqueté ;
+  Recurring/Runs inchangés.
+  +4 tests API (`test_intel_megacap_recap_shape`, `test_intel_moves_list_and_actions_roundtrip`)
+  + test existant `test_intel_page_carries_all_three_tabs` renommé/étendu
+  (`..._all_five_tabs`, vérifie aussi qu'aucun « >Sales< » ne subsiste). **333 tests verts.**
+  Vérifié en LIVE contre le serveur dev déjà tournant (`--reload`, donc mes changements étaient
+  déjà pris en compte) : page `/intel` 200 avec les 5 composants Alpine + « Market Watch » présents,
+  `GET /api/intel/megacap-recap` et `GET /api/intel/moves` répondent `{}`/`[]` proprement (tables
+  vides — normal, aucun run recap/exec_moves live n'a encore été exécuté). ⚠️ Pas de capture d'écran
+  navigateur (aucun outil Chromium/Playwright disponible) — vérifié par HTML/JSON réels + logs
+  serveur, pas par l'œil humain sur le rendu visuel final.
+  **RESTE** : les 2 nouveaux onglets resteront vides tant qu'un run réel n'aura pas été lancé
+  (`python -m pipeline.runner --recap ...` et `python pipeline/exec_moves.py --live`) — décision
+  Betty à prendre séparément (coût + confirmation RGPD pour exec_moves).
 - 2026-09-02 (5) — **Chantier 4/4 SLICE 1 livrée : découverte + extraction verbatim-lockée +
   file de revue `/moves` sur Inès (approve/dismiss/approved).** Suite directe de la Slice 0
   (modèle + classificateur, log ci-dessous), le même jour, sur demande explicite de Betty de
@@ -1315,6 +1362,16 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-09-02 (6)
+- Fait : **UI Market Watch — page « Sales » renommée + 2 nouveaux onglets (Mega-cap watch, People
+  moves) pour rendre visibles les chantiers 2 et 4** (détail complet dans le log 2026-09-02 (6) en
+  haut). Nouveau `app/tools/moves.py` partagé chat/API, 3 nouveaux endpoints REST, 2 nouvelles
+  fiches-style (société pour méga-caps, personne pour les mouvements exécutifs). +4 tests,
+  **333 tests verts**. Vérifié en live contre le serveur dev (déjà tournant en `--reload`) —
+  pas de capture d'écran (pas d'outil Chromium disponible).
+- Prochaine étape : les 2 nouveaux onglets sont prêts mais vides — il faudra soit lancer un vrai
+  run (`--recap`, `exec_moves.py --live`, décision Betty à prendre) soit continuer le chantier 4
+  (Slice 2 : `/moves draft` sur Julie) pendant que les onglets attendent leurs premières données.
 - Date : 2026-09-02 (5)
 - Fait : **chantier 4/4 Slice 1 : découverte/extraction industrie-large (`pipeline/exec_moves.py`)
   + file de revue `/moves` sur Inès** (détail complet dans le log 2026-09-02 (5) en haut). Aucun
