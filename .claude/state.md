@@ -19,6 +19,17 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-09-02 (8) — **UI Map : 3 corrections rapides sur retour capture d'écran de Betty.**
+  (1) Espace perdu entre le cockpit replié et le tableau → marges resserrées (`mb-12→mb-6`,
+  `mt-8→mt-4`, `mt-6→mt-4`). (2) Carte pas centrée sur l'Europe (`fitBounds()` s'exécutait à
+  chaque rendu et dézoomait sur tout le monde à cause des pins USA/APAC) → vue fixe Europe
+  (`[48,12]`, zoom 4) posée une seule fois à la création de la carte, plus jamais recentrée
+  automatiquement (les changements de filtre redessinent juste les pins en place, le pan/zoom de
+  l'utilisateur est préservé). (3) **Légende ajoutée** : couleur de remplissage = bande de score
+  (toujours, réutilise `scoreClass()`) ; couleur d'anneau = mouvement (new/rose/fell), visible
+  seulement quand une comparaison de runs est active, réutilise EXACTEMENT les mêmes couleurs que
+  la bordure gauche du tableau (`reappearedBorder`) pour que carte et tableau ne se contredisent
+  jamais. **339 tests verts** (aucun test cassé), vérifié en live.
 - 2026-09-02 (7) — **UI Scored companies : carte « weekly review batch » retirée (Betty : « c'est
   une de tes initiatives, jsp » — trop d'ambiguïté produit) + Top 15 ajouté au tableau + carte
   géographique (un pin par société) ajoutée.**
