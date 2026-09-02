@@ -162,6 +162,14 @@ def test_intel_run_summary(client):
     assert n["risers"] + n["faders"] + n["stable"] <= n["reappeared"]
 
 
+def test_intel_weekly_review(client):
+    data = client.get("/api/intel/weekly-review?n=10").json()
+    assert data["n_returned"] <= 10
+    assert data["core_count"] + data["world_count"] == data["n_returned"]
+    # ICP-flagged companies never appear in Nathalie's weekly batch
+    assert all(not c["icp_flag"] for c in data["companies"])
+
+
 def test_intel_trajectory(client, a_company):
     data = client.get(f"/api/intel/companies/{a_company}/trajectory").json()
     assert data["company"] == a_company

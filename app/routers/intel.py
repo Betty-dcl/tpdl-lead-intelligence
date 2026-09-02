@@ -1065,6 +1065,32 @@ def recurring(db: Session = Depends(get_db)) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Weekly review batch — 70/30 Europe/world curation (chantier 3/4, 2026-09-01
+# meeting recap). Nathalie's personal weekly reading list, NOT Maya's
+# /shortlist (Inès's SDR batch hand-off keeps consuming that one unchanged —
+# see app/tools/shortlist.py's own "never disagree" contract).
+# ---------------------------------------------------------------------------
+
+@router.get("/weekly-review")
+def weekly_review(n: int = 10, db: Session = Depends(get_db)) -> dict:
+    from app.tools.curation import weekly_review_batch
+
+    rows = (db.query(Company).filter(Company.icp_flag.is_(False))
+            .order_by(Company.assessed_score.desc()).all())
+    baseline = _neotek_baseline(db)
+    serialized = [_serialize_company(r, baseline) for r in rows]
+    batch = weekly_review_batch(serialized, n)
+    core_n = sum(1 for c in batch if c["market_tier"] == "core")
+    return {
+        "n_requested": n,
+        "n_returned": len(batch),
+        "core_count": core_n,
+        "world_count": len(batch) - core_n,
+        "companies": batch,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Run comparison — pick any two runs (a "from" and a "to") and see what moved,
 # like filtering a bank statement to a date range. Today there are two runs
 # (Neotek May reference + the July TPDL run); the moment more runs land, the

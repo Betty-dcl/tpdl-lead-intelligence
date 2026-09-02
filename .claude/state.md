@@ -19,6 +19,43 @@
   `RunSnapshot` ; `/recurring` s'active au 2e import réel.
 
 ## Décisions prises (log — ajouter en haut, avec la date)
+- 2026-09-02 (3) — **Chantier 3/4 du recap réunion Nathalie : curation 70/30 Europe/monde livrée
+  (lot de lecture hebdomadaire de Nathalie).** **Clarification Betty (ce tour) sur le périmètre
+  du 70/30 à travers les 3 phases** : (a) phase de base (les ~620 sociétés scorées) = **70/30
+  confirmé littéral** ; (b) phase "personnes" (mouvements exécutifs, futur chantier 4) — le recap
+  du 01/09 dit explicitement que le même 70/30 s'applique **aux deux** phases (base scorée ET
+  mouvements exécutifs) ⇒ `app/tools/curation.py` est volontairement écrit GÉNÉRIQUE
+  (`interleave_by_tier` prend deux listes pré-triées quelconques) pour que le chantier 4 le
+  réutilise au lieu de dupliquer la logique de ratio ; (c) phase "top 10-15 méga-caps" (chantier 2,
+  déjà livré) = **monde entier, aucun split** — confirmé cohérent avec ce qui a été codé (aucune
+  logique géo dans `pipeline/recap.py`).
+  **Autres décisions (ce tour)** : aucun plancher de score (tout l'univers in-scope éligible,
+  colle à l'exemple réunion "10 boîtes" sans hypothèse supplémentaire) ; affichage = petite carte
+  sur la page Sales existante (pas de nouvelle page dans le menu).
+  **Fait** : nouveau `app/tools/curation.py` — `DEFAULT_RATIO = (7, 3)`, `interleave_by_tier()`
+  (round-robin pondéré déterministe, même entrée → même sortie toujours, ne perd jamais une société :
+  quand un côté s'épuise l'autre continue à se vider — reprend la règle du 22/07 "la géo n'exclut
+  rien" même à cette couche de présentation) + `weekly_review_batch()` (partitionne par
+  `market_tier` déjà exposé par `_serialize_company`, aucun plancher). Volontairement PAS fusionné
+  dans `app/tools/shortlist.py` : son propre docstring est un contrat dur ("Maya OWNS it, Inès
+  CONSUMES it, they can never disagree") — y mélanger un ratio de curation changerait
+  silencieusement ce qu'Inès remet à Marketeering.ai, jamais demandé. Nouvel endpoint
+  `GET /api/intel/weekly-review?n=10` (lecture seule, exclut `icp_flag=True`, réutilise
+  `_serialize_company`/`_neotek_baseline` déjà en place). Nouvelle carte sur la page Sales
+  (`templates/intel.html`, sous le cockpit du run) + état Alpine isolé (`weeklyBatch`/`weeklyN`/
+  `weeklyMeta`/`loadWeeklyBatch()` dans `static/js/intel.js`, v=20) — délibérément SANS toucher
+  `filteredCompanies`/`topN`/le picker de période existants (ils filtrent l'univers AVANT le
+  tri, donc un ré-ordre 70/30 câblé dessus aurait pu être cassé par les propres filtres ad-hoc de
+  Nathalie ; carte indépendante = jamais ce risque). +6 tests (`tests/test_curation.py` +
+  1 test smoke API). **300 tests verts.** Vérifié : test API réel (curl authentifié, `n=5` → 3
+  core / 2 world, données réelles Eurobio Scientific etc.), page `/intel` sert bien le nouveau
+  markup, JS validé (`node --check`), 0 erreur dans les logs serveur. ⚠️ Vérif visuelle navigateur
+  (capture d'écran) PAS faite cette fois — aucun outil Chromium/Playwright disponible dans
+  l'environnement ; vérifié à la place par HTML/JSON/logs bout-en-bout, ce qui couvre le rendu et
+  la donnée mais pas l'œil humain sur le layout final. Pas encore commité au moment de l'écriture.
+  **RESTE (chantier 4, déjà conçu, à valider avant de coder)** : tracker mouvements exécutifs — le
+  plus gros chantier, réutilisera `app/tools/curation.py` pour son propre 70/30, point RGPD à
+  trancher avant le live (données de carrière de personnes nommées).
 - 2026-09-02 (2) — **Chantier 2/4 du recap réunion Nathalie : veille "top 10-15 méga-caps" livrée
   (mode `--recap`, jamais scoré).** Suite directe du chantier 1 (plafond de revenu, log ci-dessous) :
   les sociétés au-dessus du plafond routent maintenant vers CE mode plutôt que d'être ignorées.
@@ -1191,6 +1228,19 @@
 - ⏳ RESTE : `--fetch` des 2 batchs (≤24h) + `import_csv.py` chacun → Sales. Puis fusion vendredi↔gros run (futur).
 
 ## Dernière session
+- Date : 2026-09-02 (3)
+- Fait : **chantier 3/4 du recap réunion Nathalie : curation 70/30 Europe/monde livrée**
+  (`app/tools/curation.py` + endpoint `GET /api/intel/weekly-review` + carte sur la page Sales,
+  détail complet dans le log 2026-09-02 (3) en haut). Clarifié avec Betty : le 70/30 s'applique à
+  la fois à la base scorée ET au futur tracker mouvements exécutifs (chantier 4) — le module est
+  écrit générique pour être réutilisé là-bas ; la veille méga-caps (chantier 2) reste monde entier,
+  sans split. Aucun plancher de score, carte simple sur Sales (pas de nouvelle page). +6 tests,
+  **300 tests verts**. Vérifié API réelle (curl authentifié) + rendu HTML/JS ; pas de vérif
+  navigateur visuelle (pas d'outil Chromium disponible).
+- Prochaine étape : chantier 4 — tracker mouvements exécutifs (le plus gros ; réutilise
+  `app/tools/curation.py` pour son 70/30 ; point RGPD à trancher avant tout run live — données de
+  carrière de personnes nommées, hors du cadre `Contact` existant). Déjà conçu en détail (session
+  `942839c7…` du 01/09, toujours sur disque).
 - Date : 2026-09-02 (2)
 - Fait : **chantier 2/4 du recap réunion Nathalie : veille "top 10-15 méga-caps" livrée**
   (`pipeline/recap.py` + flag CLI `--recap`, détail complet dans le log 2026-09-02 (2) en haut).

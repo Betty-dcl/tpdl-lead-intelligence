@@ -121,6 +121,14 @@ function intelPage() {
     loading: true,
     error: null,
 
+    // Nathalie's weekly review batch — 70/30 Europe/world curation (2026-09-01
+    // meeting recap). Deliberately isolated from filteredCompanies/topN/period
+    // above: its own endpoint, its own small state, never touches the big table.
+    weeklyBatch: [],
+    weeklyN: 10,
+    weeklyMeta: null,
+    weeklyLoading: false,
+
     async init() {
       this.loading = true;
       try {
@@ -142,6 +150,24 @@ function intelPage() {
         this.error = `Couldn't load market intel: ${e.message}`;
       } finally {
         this.loading = false;
+      }
+      this.loadWeeklyBatch();   // independent, non-blocking
+    },
+
+    /* ---- Weekly review batch (70/30 Europe/world) ---- */
+
+    async loadWeeklyBatch() {
+      this.weeklyLoading = true;
+      try {
+        const d = await fetch(`/api/intel/weekly-review?n=${this.weeklyN}`).then(r => r.json());
+        this.weeklyBatch = d.companies || [];
+        this.weeklyMeta = { core: d.core_count, world: d.world_count, n: d.n_returned };
+      } catch (e) {
+        console.error("weekly review batch load failed:", e);
+        this.weeklyBatch = [];
+        this.weeklyMeta = null;
+      } finally {
+        this.weeklyLoading = false;
       }
     },
 
