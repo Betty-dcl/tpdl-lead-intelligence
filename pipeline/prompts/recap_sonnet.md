@@ -7,7 +7,7 @@ your verbatim quotes are assembled into a plain recap, never judged or ranked.
 
 ## YOUR ONLY JOB
 From the raw documents below, copy out sentences that report a concrete, dated
-fact in one of the 4 recap categories below. COPY. EXACT. CHARACTERS.
+fact in one of the recap categories below. COPY. EXACT. CHARACTERS.
 
 ## THE VERBATIM LOCK (absolute — identical rule to the scored pipeline)
 1. Every `quote` MUST be a character-for-character substring of one source
@@ -23,18 +23,37 @@ fact in one of the 4 recap categories below. COPY. EXACT. CHARACTERS.
 6. If nothing in the documents fits a category, that category simply has no
    items. NEVER manufacture evidence.
 
-## THE 4 RECAP CATEGORIES
-- new_product   — product/pipeline/platform launches, regulatory approvals,
-                  R&D milestones. (Unlike the scored pipeline, product launches
-                  ARE in scope here — this is a trend-watch, not commercial
-                  transformation scoring. Do not "fix" this on purpose.)
-- ma_activity   — M&A, divestiture, partnership, joint venture — any change in
-                  corporate structure.
-- tech_platform — CRM / engagement-platform / digital-infrastructure rollouts
-                  ("are they rolling out a new CRM" angle).
-- other         — evidently strategic but doesn't fit the 3 above (e.g. a
-                  leadership change worth knowing about). Keep this bucket
-                  small — only use it when nothing else fits.
+## THE RECAP CATEGORIES
+- new_product        — product/pipeline/platform launches, regulatory
+                        approvals, R&D milestones. (Unlike the scored
+                        pipeline, product launches ARE in scope here — this
+                        is a trend-watch, not commercial transformation
+                        scoring. Do not "fix" this on purpose.)
+- ma_activity        — M&A, divestiture, partnership, joint venture — any
+                        change in corporate structure.
+- tech_platform      — CRM / engagement-platform / digital-infrastructure
+                        rollouts ("are they rolling out a new CRM" angle).
+- capacity_investment — manufacturing plants, capex, facility expansion/
+                        construction, production-capacity announcements.
+                        NOT a product launch itself — the investment/capex
+                        angle, even when the plant will make an existing or
+                        future product (e.g. "$2.3bn Houston manufacturing
+                        campus" is capacity_investment, not new_product).
+- leadership_change  — C-suite/board appointments, elections, retirements,
+                        departures. Named individual + role change.
+- legal_regulatory   — litigation, settlements, FDA/EMA warnings or actions,
+                        product recalls/market withdrawals for compliance
+                        reasons.
+- restructuring      — layoffs, cost-cutting programs, site closures/
+                        consolidation. Distinct from ma_activity: no change
+                        of corporate ownership/structure, just headcount or
+                        footprint.
+- other              — evidently strategic but doesn't fit any of the above
+                        (e.g. a sponsorship, an award, a share buyback, a
+                        revenue milestone). Keep this bucket small — it exists
+                        for genuine one-offs, not as a default when a fact is
+                        merely hard to place. If in doubt between "other" and
+                        a specific category above, prefer the specific one.
 
 ## OUTPUT — strict JSON, nothing else
 ```json
@@ -45,7 +64,7 @@ fact in one of the 4 recap categories below. COPY. EXACT. CHARACTERS.
       "source": "<source id of that document>",
       "url": "<document url or null>",
       "event_date": "YYYY-MM-DD or null",
-      "category": "<one of: new_product, ma_activity, tech_platform, other>"
+      "category": "<one of: new_product, ma_activity, tech_platform, capacity_investment, leadership_change, legal_regulatory, restructuring, other>"
     }
   ]
 }

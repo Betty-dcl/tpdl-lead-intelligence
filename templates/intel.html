@@ -115,6 +115,85 @@
   }
 
   .sort-arrow { font-size: 9px; margin-left: 4px; color: var(--tpdl-text-faint); }
+
+  /* Mega-cap watch — same compact-row/expand language as the Scored companies
+     grid above, sized for its own (fewer, different) columns. A dynamic
+     number of category chips lives in one flexible column rather than one
+     fixed column per category (doesn't break layout as categories evolve). */
+  .megacap-head, .megacap-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.1fr) minmax(260px, 2fr) 92px 24px;
+    gap: 0.75rem;
+    align-items: center;
+  }
+  .megacap-head {
+    padding: 0.6rem 1rem 0.6rem 1rem;
+    background: var(--tpdl-bg-2);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--tpdl-text-muted); font-weight: 500;
+    border-bottom: 1px solid var(--tpdl-border);
+  }
+  .megacap-row {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--tpdl-border);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.1s ease;
+  }
+  .megacap-row:hover { background: var(--tpdl-bg-2); }
+  .megacap-row.is-expanded { background: var(--tpdl-bg); cursor: default; }
+  .megacap-row.is-expanded:hover { background: var(--tpdl-bg); }
+  .cat-chip {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    color: white;
+    font-size: 11px; font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* Mega-cap — Clusters view (2026-09-10, FY2025 top-30 revenue list): a
+     second lens on the same watch, grouping by STRATEGIC THEME (GLP-1, ADC,
+     patent cliff...) rather than by event type (new_product/ma_activity/...)
+     above. Revenue/HQ/strategy are reference facts from that revenue list,
+     not recap-pipeline output — kept in their own COMPANY_META table below
+     and merged with live `companies` only to compute the "watched" dot. */
+  .cluster-chip-btn {
+    display: flex; flex-direction: column; gap: 4px; text-align: left;
+    padding: 0.6rem 0.75rem; border-radius: var(--tpdl-radius-lg, 12px);
+    border: 1px solid var(--tpdl-border); background: white; cursor: pointer;
+    font: inherit; color: inherit; transition: border-color 0.15s ease;
+  }
+  .cluster-chip-btn:hover { border-color: var(--tpdl-dark-ink); }
+  .cluster-chip-btn.is-active { border-color: var(--cdot); box-shadow: 0 0 0 1px var(--cdot) inset; }
+  .cluster-chip-btn .top { display: flex; align-items: center; gap: 6px; }
+  .cluster-chip-btn .dot { width: 9px; height: 9px; border-radius: 9999px; background: var(--cdot); flex: none; }
+  .cluster-chip-btn .lbl { font-weight: 600; font-size: 12.5px; }
+  .cluster-chip-btn .cnt { margin-left: auto; font-size: 11px; color: var(--tpdl-text-muted); }
+
+  .cbar-row { display: grid; grid-template-columns: 168px 1fr 56px; gap: 10px; align-items: center; padding: 3px 0; }
+  .cbar-row .nm { font-size: 12.5px; color: var(--tpdl-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cbar-track { background: var(--tpdl-bg-2); border-radius: 4px; height: 14px; }
+  .cbar-fill { height: 100%; border-radius: 4px; background: var(--cdot); }
+  .cbar-row .val { font-size: 11.5px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .cluster-head, .cluster-row {
+    display: grid;
+    grid-template-columns: 28px minmax(160px,1.3fr) 118px 76px minmax(150px,1fr) minmax(220px,2fr) 60px;
+    gap: 0.65rem; align-items: center;
+  }
+  .cluster-head {
+    padding: 0.6rem 1rem; background: var(--tpdl-bg-2);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--tpdl-text-muted); font-weight: 500;
+    border-bottom: 1px solid var(--tpdl-border);
+  }
+  .cluster-row { padding: 0.7rem 1rem; border-bottom: 1px solid var(--tpdl-border); font-size: 0.8125rem; }
+  .cluster-row:last-child { border-bottom: none; }
+  .cluster-row .rk { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--tpdl-text-muted); }
+  .cluster-row .rev { font-variant-numeric: tabular-nums; text-align: right; }
+  .cluster-row .strat { color: var(--tpdl-text-muted); font-size: 12px; line-height: 1.4; }
+  .cluster-row .watch-dot { display: inline-block; width: 7px; height: 7px; border-radius: 9999px; }
 </style>
 
 <!-- Recurring tab styles (was recurring.html) -->
@@ -1449,15 +1528,89 @@ function traceability() {
       The biggest players, watched — never scored
     </h1>
     <p class="text-ink-2 max-w-2xl">
-      Companies above the ~$20B revenue ceiling (Pfizer/Sanofi/Merck-tier) don't get
-      scored — they're too big for outreach targeting, but Nathalie still wants to
-      stay current on them. This is a lightweight radar: new products, M&amp;A, and
-      tech/CRM platform moves, filed <strong>verbatim</strong> from public sources.
-      No score, no opinion — just the facts, refreshed every few months from the
-      Terminal (<code class="text-xs bg-white px-1.5 py-0.5 rounded border" style="border-color:var(--tpdl-border)">python -m pipeline.runner --recap</code>).
+      The biggest players don't get scored — too big for outreach — but still worth
+      tracking. A lightweight news radar: launches, M&amp;A, leadership moves, and more,
+      updated regularly. Facts only, no score, no opinion.
     </p>
   </section>
 
+  <!-- View switch: same watch, two lenses — event-type radar (facts, existing)
+       vs strategic-theme clusters (FY2025 top-30 revenue list, 2026-09-10). -->
+  <div class="flex gap-2 mb-6">
+    <button type="button" class="filter-pill" :class="{ 'is-active': view === 'clusters' }"
+            @click="view = 'clusters'">Trend clusters (30)</button>
+    <button type="button" class="filter-pill" :class="{ 'is-active': view === 'radar' }"
+            @click="view = 'radar'">Event radar</button>
+  </div>
+
+  <!-- ============ CLUSTERS VIEW ============ -->
+  <div x-show="view === 'clusters'" x-cloak>
+    <p class="text-ink-2 max-w-2xl mb-5 text-sm">
+      The 30 largest pharma companies worldwide (FY2025 revenue), grouped by the strategic
+      trend running through them rather than by isolated event — to spot the underlying moves
+      that eventually reach mid-size players.
+    </p>
+
+    <div class="grid gap-2 mb-6" style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));">
+      <template x-for="cl in CLUSTERS" :key="cl.key">
+        <button type="button" class="cluster-chip-btn" :class="{ 'is-active': clusterFilter === cl.key }"
+                :style="`--cdot:${cl.color}`" @click="clusterFilter = clusterFilter === cl.key ? null : cl.key">
+          <div class="top"><span class="dot"></span><span class="lbl" x-text="cl.label"></span>
+            <span class="cnt" x-text="clusterCompanies(cl.key).length"></span></div>
+        </button>
+      </template>
+    </div>
+
+    <div class="tpdl-card p-4 mb-6">
+      <template x-for="cl in (clusterFilter ? CLUSTERS.filter(c => c.key === clusterFilter) : CLUSTERS)" :key="cl.key">
+        <div class="mb-4 last:mb-0" x-show="clusterCompanies(cl.key).length">
+          <div class="flex items-baseline gap-2 mb-1.5">
+            <span class="w-2 h-2 rounded-full inline-block" :style="`background:${cl.color}`"></span>
+            <b class="text-xs" x-text="cl.label"></b>
+            <span class="text-ink-3 text-xs" x-text="clusterCompanies(cl.key).length + ' companies · $' + clusterRevSum(cl.key).toFixed(1) + 'B combined'"></span>
+          </div>
+          <template x-for="m in clusterCompanies(cl.key)" :key="m.name">
+            <div class="cbar-row" :style="`--cdot:${cl.color}`">
+              <span class="nm" x-text="m.name"></span>
+              <span class="cbar-track"><span class="cbar-fill" :style="`width:${(m.rev / maxRev() * 100).toFixed(1)}%`"></span></span>
+              <span class="val" x-text="m.rev.toFixed(1)"></span>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <div class="tpdl-card p-0 overflow-hidden">
+      <div class="cluster-head">
+        <div>#</div><div>Company</div><div>HQ</div><div style="text-align:right">Revenue ($B)</div>
+        <div>Cluster</div><div>Current signal</div><div>Watch</div>
+      </div>
+      <template x-for="m in (clusterFilter ? clusterCompanies(clusterFilter) : COMPANY_META)" :key="m.name">
+        <div class="cluster-row">
+          <div class="rk" x-text="m.rank"></div>
+          <div class="font-semibold text-ink" x-text="m.name"></div>
+          <div class="text-ink-3 text-xs" x-text="m.hq"></div>
+          <div class="rev" x-text="m.rev.toFixed(1)"></div>
+          <div>
+            <span class="cat-chip" :style="`background:${clusterOf(m).color}`" x-text="clusterOf(m).label"></span>
+          </div>
+          <div class="strat" x-text="currentSignal(m)"></div>
+          <div>
+            <span class="watch-dot" :style="`background:${isWatched(m.name) ? 'var(--tpdl-accent)' : 'var(--tpdl-border)'}`"
+                  :title="isWatched(m.name) ? 'Tracked by the recap pipeline' : 'Not yet in the recap'"></span>
+          </div>
+        </div>
+      </template>
+    </div>
+    <p class="text-ink-3 text-xs mt-3 max-w-2xl">
+      Source: FY2025 revenue reference list — 2026-09-10. Clusters are a working grouping, not an
+      official taxonomy. "Pure pharma" revenue shown where the parent group also covers
+      diagnostics/life-science/animal health (Roche, J&amp;J, Bayer, Merck KGaA).
+    </p>
+  </div>
+
+  <!-- ============ RADAR VIEW (existing, unchanged) ============ -->
+  <div x-show="view === 'radar'" x-cloak>
   <template x-if="loading">
     <div class="text-ink-3 text-sm">Loading…</div>
   </template>
@@ -1472,49 +1625,252 @@ function traceability() {
     </div>
   </template>
 
-  <div class="space-y-4" x-show="!loading && companies.length > 0">
-    <template x-for="c in companies" :key="c.company_name">
-      <div class="tpdl-card p-5">
-        <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
-          <div>
-            <h3 class="font-semibold text-lg" x-text="c.company_name"></h3>
-            <p class="text-xs text-ink-3 mt-0.5">
-              <span x-text="c.fact_count"></span> fact<span x-show="c.fact_count !== 1">s</span>
-              across <span x-text="c.runs.length"></span> run<span x-show="c.runs.length !== 1">s</span>
-            </p>
-          </div>
-          <!-- Evolution across runs: one badge per date this company was watched -->
-          <div class="flex flex-wrap gap-1.5 justify-end" title="Runs this company appeared in">
-            <template x-for="r in c.runs" :key="r">
-              <span class="tpdl-badge tpdl-badge--outline" x-text="formatDate(r)"></span>
-            </template>
-          </div>
-        </div>
-        <template x-for="cat in ['new_product', 'ma_activity', 'tech_platform', 'other']" :key="cat">
-          <div x-show="c.facts.some(f => f.category === cat)" class="mb-3 last:mb-0">
-            <p class="text-[11px] uppercase tracking-wider text-ink-3 mb-1.5" x-text="categoryLabel(cat)"></p>
-            <template x-for="f in c.facts.filter(x => x.category === cat)" :key="f.quote + f.run_date">
-              <div class="text-sm border-l-2 pl-3 mb-2 last:mb-0" style="border-color:var(--tpdl-border-strong)">
-                <p class="text-ink" x-text="f.summary"></p>
-                <p class="text-xs text-ink-3 mt-0.5">
-                  <span x-text="f.event_date ? formatDate(f.event_date) : 'undated'"></span>
-                  <span x-show="f.url"> · <a :href="f.url" target="_blank" rel="noopener" class="underline" x-text="f.source"></a></span>
-                  <span x-show="!f.url"> · <span x-text="f.source"></span></span>
-                </p>
-              </div>
-            </template>
-          </div>
-        </template>
-      </div>
+  <!-- Category filter — colored dot per category so the filter bar itself
+       teaches the color code before you ever see a badge in the table -->
+  <div class="flex gap-2 mb-4 flex-wrap" x-show="!loading && companies.length > 0">
+    <template x-for="cat in ['all', ...ALL_CATEGORIES]" :key="cat">
+      <button type="button" class="filter-pill" :class="{ 'is-active': categoryFilter === cat }"
+              @click="categoryFilter = cat">
+        <span x-show="cat !== 'all'" class="inline-block w-2 h-2 rounded-full"
+              :style="`background:${categoryColor(cat)}`"></span>
+        <span x-text="cat === 'all' ? 'All' : categoryLabel(cat)"></span>
+      </button>
     </template>
   </div>
 
+  <template x-if="!loading && companies.length > 0 && visibleCompanies().length === 0">
+    <div class="tpdl-card p-8 text-center max-w-lg">
+      <p class="text-ink-2">No company has a fact in this category.</p>
+    </div>
+  </template>
+
+  <div class="tpdl-card p-0 overflow-hidden" x-show="!loading && visibleCompanies().length > 0">
+    <div class="megacap-head">
+      <div>Company</div>
+      <div>Categories</div>
+      <div>Last run</div>
+      <div></div>
+    </div>
+    <template x-for="c in visibleCompanies()" :key="c.company_name">
+      <div>
+        <div class="megacap-row" :class="expandedCompany === c.company_name ? 'is-expanded' : ''"
+             @click="toggle(c.company_name)">
+          <div class="min-w-0">
+            <span class="font-semibold text-ink" x-text="c.company_name"></span>
+            <span x-show="c.new_fact_count > 0" class="tpdl-badge tpdl-badge--accent text-[10px] ml-1"
+                  x-text="c.new_fact_count + ' new'"></span>
+          </div>
+          <div class="flex flex-wrap gap-1">
+            <template x-for="cat in presentCategories(c)" :key="cat">
+              <span class="cat-chip" :style="`background:${categoryColor(cat)}`"
+                    :title="categoryLabel(cat)"
+                    x-text="categoryLabel(cat) + ' · ' + categoryCount(c, cat)"></span>
+            </template>
+          </div>
+          <div class="text-xs text-ink-3" x-text="formatDate(c.latest_run)"></div>
+          <div class="text-right text-ink-3 text-lg" x-text="expandedCompany === c.company_name ? '−' : '+'"></div>
+        </div>
+
+        <div class="detail-panel" x-show="expandedCompany === c.company_name" x-cloak>
+          <!-- AI trend synthesis (2026-09-07, opt-in exception to verbatim-only)
+               — visually distinct box, clearly labeled, never mixed in with the
+               verbatim facts below it. Absent until `--recap-trends` has run. -->
+          <div x-show="c.trend_summary" class="mb-5 p-4 rounded-lg" style="background:#f5f3ff; border:1px solid #ddd6fe">
+            <p class="text-[10px] uppercase tracking-wider font-semibold mb-1.5" style="color:#6d28d9">
+              ✨ AI trend synthesis — verify against the facts below
+            </p>
+            <p class="text-sm text-ink" x-text="c.trend_summary?.summary"></p>
+            <p class="text-[11px] mt-1.5" style="color:#7c6f9e">
+              Based on <span x-text="c.trend_summary?.supporting_quotes?.length"></span> cited
+              quote<span x-show="c.trend_summary?.supporting_quotes?.length !== 1">s</span>
+              out of <span x-text="c.trend_summary?.facts_considered"></span> facts ·
+              generated <span x-text="formatDate(c.trend_summary?.generated_at)"></span>
+            </p>
+          </div>
+          <template x-for="cat in ALL_CATEGORIES" :key="cat">
+            <div x-show="(categoryFilter === 'all' || categoryFilter === cat) && c.facts.some(f => f.category === cat)"
+                 class="mb-4 last:mb-0">
+              <p class="text-[11px] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <span class="inline-block w-2 h-2 rounded-full" :style="`background:${categoryColor(cat)}`"></span>
+                <span style="color:var(--tpdl-text-muted)" x-text="categoryLabel(cat)"></span>
+              </p>
+              <template x-for="f in c.facts.filter(x => x.category === cat)" :key="f.quote + f.run_date">
+                <div class="text-sm border-l-2 pl-3 mb-2 last:mb-0"
+                     :style="`border-color:${f.is_new ? 'var(--tpdl-accent-ink)' : categoryColor(cat)}`">
+                  <p class="text-ink">
+                    <span x-show="f.is_new" class="tpdl-badge tpdl-badge--accent text-[10px] mr-1">New</span>
+                    <span x-text="f.summary"></span>
+                  </p>
+                  <p class="text-xs text-ink-3 mt-0.5">
+                    <span x-text="f.event_date ? formatDate(f.event_date) : 'undated'"></span>
+                    <span x-show="f.url"> · <a :href="f.url" target="_blank" rel="noopener" class="underline" x-text="f.source"></a></span>
+                    <span x-show="!f.url"> · <span x-text="f.source"></span></span>
+                  </p>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+  </div>
+  <!-- /RADAR VIEW -->
+
 </div>
 <script>
+/* Same taxonomy as pipeline/types.py::RECAP_CATEGORIES. Colors reuse
+   SIGNAL_COLORS (static/js/intel.js) where the concept overlaps
+   (leadership_change, restructuring) so the same idea reads as the same
+   color everywhere in the app — not just within this one tab. */
+const RECAP_CATEGORY_META = {
+  new_product:         { label: "New product",         color: "#0d9488" },
+  ma_activity:         { label: "M&A",                  color: "#8B5CF6" },
+  tech_platform:       { label: "Tech platform",        color: "#f97316" },
+  capacity_investment: { label: "Capacity investment",  color: "#2563eb" },
+  leadership_change:   { label: "Leadership change",    color: "#6366f1" },
+  legal_regulatory:    { label: "Legal / regulatory",   color: "#dc2626" },
+  restructuring:       { label: "Restructuring",        color: "#d946ef" },
+  other:               { label: "Other",                color: "#8a8a8a" },
+};
+const ALL_CATEGORIES = Object.keys(RECAP_CATEGORY_META);
+
+/* Clusters view (2026-09-10) — a "Top 30 Pharma Companies & Annual Revenues"
+   reference list (FY2025), grouped by STRATEGIC THEME rather than by event
+   type. This is reference data (revenue/HQ/strategy), not recap-pipeline
+   output — it doesn't come from the DB, so it renders even before a company
+   has any recap facts. Hue order kept fixed (a validated CVD-safe 8-step
+   sequence) — never reassign a color to a different cluster. Tiles show the
+   cluster name only (no blurb) — keep it that way, it was cut on purpose. */
+const CLUSTERS = [
+  { key: "metabolic", label: "GLP-1 & Metabolic", color: "#2a78d6" },
+  { key: "cliff", label: "Patent-Cliff Defense", color: "#eb6834" },
+  { key: "onco", label: "Oncology — ADC & Cell Therapy", color: "#1baf7a" },
+  { key: "ai", label: "AI & Digital Data", color: "#eda100" },
+  { key: "platform", label: "Gene/Cell/RNA Platforms", color: "#e87ba4" },
+  { key: "biosim", label: "Biosimilars & Generics", color: "#008300" },
+  { key: "immuno", label: "Immunology & Vaccines", color: "#4a3aa7" },
+  { key: "neuro", label: "Neuroscience & Alzheimer's", color: "#e34948" },
+  { key: "other", label: "Atypical Structures", color: "#82888d" },
+];
+const CLUSTER_BY_KEY = Object.fromEntries(CLUSTERS.map(c => [c.key, c]));
+
+const COMPANY_META = [
+ { rank:1, name:"Eli Lilly", hq:"US · Indianapolis", rev:65.2, cluster:"metabolic",
+   strategy:"Dominates metabolic health: biomanufacturing scale-up for Mounjaro/Zepbound, orforglipron in oral, Alzheimer's expansion (Kisunla)." },
+ { rank:2, name:"Merck & Co.", hq:"US · Rahway, NJ", rev:65.0, cluster:"cliff",
+   strategy:"Keytruda patent cliff approaching; historic operational split under review; cardiology diversification (Winrevair)." },
+ { rank:3, name:"Pfizer", hq:"US · New York", rev:62.6, cluster:"onco",
+   strategy:"Post-pandemic pivot to an ADC portfolio via Seagen; oral weight-loss push so far unsuccessful." },
+ { rank:4, name:"AbbVie", hq:"US · North Chicago", rev:61.2, cluster:"cliff",
+   strategy:"Absorbs the Humira cliff via Skyrizi/Rinvoq; investing in neuroscience, aesthetics, targeted biopharma M&A." },
+ { rank:5, name:"Johnson & Johnson", hq:"US · New Brunswick, NJ", rev:60.4, cluster:"ai",
+   strategy:"Pure-play biopharma + MedTech after the consumer-health spin-off; Darzalex in oncology + AI partnership with Isomorphic Labs." },
+ { rank:6, name:"AstraZeneca", hq:"UK/Sweden · Cambridge", rev:58.7, cluster:"onco",
+   strategy:"Targeting $80B revenue by 2030; launch wave prioritizing ADCs and cell therapies." },
+ { rank:7, name:"Roche", hq:"Switzerland · Basel", rev:53.6, cluster:"ai",
+   strategy:"In-vitro diagnostics + precision therapeutics; Ocrevus/Vabysmo in neuro/ophthalmology; digital-oncology datasets via Flatiron Health." },
+ { rank:8, name:"Novartis", hq:"Switzerland · Basel", rev:54.5, cluster:"platform",
+   strategy:"Pure-play innovation after the Sandoz divestiture; early lead in radioligand therapy, gene therapy and RNA platforms." },
+ { rank:9, name:"Bristol-Myers Squibb", hq:"US · Princeton, NJ", rev:48.2, cluster:"cliff",
+   strategy:"Balances a broad oncology base with immunology/cardiovascular; managing legacy-blockbuster decline via new cell therapies." },
+ { rank:10, name:"Sanofi", hq:"France · Paris", rev:46.0, cluster:"immuno",
+   strategy:"Global vaccine infrastructure + mega-blockbuster Dupixent fund immunology expansion and next-gen mRNA vaccine platforms." },
+ { rank:11, name:"Novo Nordisk", hq:"Denmark · Bagsværd", rev:44.8, cluster:"metabolic",
+   strategy:"Sparked the global GLP-1 wave; investing in supply chain to fix shortages; large-scale cardiovascular/kidney trials." },
+ { rank:12, name:"GSK", hq:"UK · London", rev:41.1, cluster:"immuno",
+   strategy:"Specialty medicines + dominant adult-vaccination position (RSV, shingles); long-acting HIV pipeline and targeted oncology." },
+ { rank:13, name:"Takeda", hq:"Japan · Tokyo/Osaka", rev:30.1, cluster:"cliff",
+   strategy:"Diversified GI/neuroscience/rare-disease portfolio after ADHD patent expiries; prioritizing launches like Entyvio." },
+ { rank:14, name:"Bayer", hq:"Germany · Leverkusen", rev:19.8, cluster:"cliff",
+   strategy:"Leverages legacy cardiovascular/ophthalmology/women's health strengths; transitioning to Nubeqa (prostate) and targeted biotech M&A." },
+ { rank:15, name:"Amgen", hq:"US · Thousand Oaks", rev:36.8, cluster:"biosim",
+   strategy:"Leader in complex biologics/biosimilars; Horizon Therapeutics scales rare disease; own pipeline in oncology/inflammation." },
+ { rank:16, name:"Gilead Sciences", hq:"US · Foster City", rev:28.5, cluster:"onco",
+   strategy:"Maintains global HIV/antiviral leadership; actively diversifying into oncology and cell therapy for solid tumors." },
+ { rank:17, name:"Boehringer Ingelheim", hq:"Germany · Ingelheim", rev:28.9, cluster:"metabolic",
+   strategy:"Private giant leaning on cardiometabolic blockbusters and animal health; pipeline in respiratory, retinal, mental health." },
+ { rank:18, name:"Merck KGaA", hq:"Germany · Darmstadt", rev:9.2, cluster:"other",
+   strategy:"Dual model: life-science manufacturing + specialty pharma; targets in neuro/immunology/oncology, biological manufacturing hubs." },
+ { rank:19, name:"CSL Limited", hq:"Australia · Melbourne", rev:15.8, cluster:"platform",
+   strategy:"Global leader in plasma-derived therapies and iron-deficiency management; scaling recombinant therapies and genomic medicine." },
+ { rank:20, name:"Viatris", hq:"US · Canonsburg", rev:15.4, cluster:"biosim",
+   strategy:"Access-driven generics + legacy branded medicines; divesting non-core to fund biosimilars and complex injectables." },
+ { rank:21, name:"Teva Pharmaceutical Industries", hq:"Israel · Tel Aviv", rev:16.2, cluster:"biosim",
+   strategy:"Structural pivot from pure generics to innovative biopharma; \"Pivot to Growth\" led by branded neuroscience and biosimilars." },
+ { rank:22, name:"Astellas Pharma", hq:"Japan · Tokyo", rev:14.4, cluster:"onco",
+   strategy:"Full shift to high-unmet-need innovation; Padcev (ADC) and Izervay drive the 2030 strategic plan." },
+ { rank:23, name:"Regeneron", hq:"US · Tarrytown", rev:13.5, cluster:"platform",
+   strategy:"Proprietary VelocImmune platform for fast-targeted monoclonal antibodies; Eylea/Dupixent + expanding data-processing R&D centers." },
+ { rank:24, name:"Daiichi Sankyo", hq:"Japan · Tokyo", rev:11.8, cluster:"onco",
+   strategy:"Full transformation into an oncology innovator via ADC technology; Enhertu (AstraZeneca partnership) + independent ADC pipeline." },
+ { rank:25, name:"Vertex Pharmaceuticals", hq:"US · Boston", rev:11.2, cluster:"platform",
+   strategy:"Dominates the global cystic fibrosis market; diversifying into CRISPR gene editing (Casgevy) and new pain-management routes." },
+ { rank:26, name:"Sun Pharmaceutical Industries", hq:"India · Mumbai", rev:6.1, cluster:"biosim",
+   strategy:"Scaling a specialty-generics model; dermatology/ophthalmology acquisitions to move upmarket into branded specialty." },
+ { rank:27, name:"Biogen", hq:"US · Cambridge, MA", rev:9.4, cluster:"neuro",
+   strategy:"Multiple-sclerosis franchise as its base; shifting toward rare disease and Alzheimer's (Leqembi) as priorities." },
+ { rank:28, name:"Servier", hq:"France · Suresnes", rev:5.8, cluster:"other",
+   strategy:"Non-profit foundation, oncology and cardiometabolic focus; reinvests 20%+ of therapeutic revenue in R&D on solid tumors." },
+ { rank:29, name:"UCB", hq:"Belgium · Brussels", rev:6.0, cluster:"immuno",
+   strategy:"Focused on severe immunology and CNS; scaling plaque-psoriasis and generalized-myasthenia-gravis launches against aging epilepsy assets." },
+ { rank:30, name:"Eisai", hq:"Japan · Tokyo", rev:5.3, cluster:"neuro",
+   strategy:"Neuroscience and oncology under a \"human health care\" philosophy; Biogen partnership on Alzheimer's + early biomarker discovery." },
+];
+
+function normalizeCoName(s) {
+  return (s || "").toLowerCase().replace(/[.,&()]/g, "").replace(/\s+/g, " ").trim();
+}
+
 function megacapPage() {
   return {
     companies: [],
     loading: true,
+    view: "clusters",
+    categoryFilter: "all",
+    clusterFilter: null,
+    expandedCompany: null,
+    ALL_CATEGORIES,
+    CLUSTERS,
+    COMPANY_META,
+    toggle(name) {
+      this.expandedCompany = this.expandedCompany === name ? null : name;
+    },
+    categoryCount(c, cat) {
+      return c.facts.filter(f => f.category === cat).length;
+    },
+    presentCategories(c) {
+      return ALL_CATEGORIES.filter(cat => this.categoryCount(c, cat) > 0);
+    },
+    visibleCompanies() {
+      if (this.categoryFilter === "all") return this.companies;
+      return this.companies.filter(c => c.facts.some(f => f.category === this.categoryFilter));
+    },
+    clusterOf(m) {
+      return CLUSTER_BY_KEY[m.cluster] || CLUSTER_BY_KEY.other;
+    },
+    clusterCompanies(key) {
+      return COMPANY_META.filter(m => m.cluster === key).slice().sort((a, b) => b.rev - a.rev);
+    },
+    clusterRevSum(key) {
+      return this.clusterCompanies(key).reduce((s, m) => s + m.rev, 0);
+    },
+    maxRev() {
+      return Math.max(...COMPANY_META.map(m => m.rev));
+    },
+    isWatched(name) {
+      const n = normalizeCoName(name);
+      return this.companies.some(c => normalizeCoName(c.company_name) === n);
+    },
+    /* The news-derived read, when one exists: the same AI trend synthesis
+       shown in the Event radar view (grounded in verbatim recap facts, never
+       invented). Falls back to the static reference line only for a company
+       with no synthesis yet (no recap run, or 0 verified citations). */
+    currentSignal(m) {
+      const n = normalizeCoName(m.name);
+      const c = this.companies.find(x => normalizeCoName(x.company_name) === n);
+      return c?.trend_summary?.summary || m.strategy;
+    },
     async init() {
       this.loading = true;
       try {
@@ -1528,12 +1884,10 @@ function megacapPage() {
       }
     },
     categoryLabel(cat) {
-      return {
-        new_product: "New product",
-        ma_activity: "M&A activity",
-        tech_platform: "Tech / CRM platform",
-        other: "Other",
-      }[cat] || cat;
+      return RECAP_CATEGORY_META[cat]?.label || cat;
+    },
+    categoryColor(cat) {
+      return RECAP_CATEGORY_META[cat]?.color || "#5c5c5c";
     },
   };
 }
@@ -1558,8 +1912,8 @@ function megacapPage() {
     </p>
   </section>
 
-  <div class="flex gap-2 mb-6">
-    <template x-for="s in ['new', 'approved', 'dismissed']" :key="s">
+  <div class="flex gap-2 mb-6 flex-wrap">
+    <template x-for="s in ['new', 'approved', 'connection_sent', 'due_followup', 'follow_up_sent', 'dismissed']" :key="s">
       <button type="button" class="filter-pill" :class="{ 'is-active': statusFilter === s }"
               @click="statusFilter = s; load()" x-text="statusLabel(s)"></button>
     </template>
@@ -1572,9 +1926,13 @@ function megacapPage() {
   <template x-if="!loading && moves.length === 0">
     <div class="tpdl-card p-8 text-center max-w-lg">
       <p class="text-ink-2 mb-1" x-text="'No ' + statusLabel(statusFilter).toLowerCase() + ' moves.'"></p>
-      <p class="text-ink-3 text-sm">
+      <p class="text-ink-3 text-sm" x-show="statusFilter !== 'due_followup'">
         Run the weekly discovery pass from the Terminal to populate this view —
         nothing is ever invented here.
+      </p>
+      <p class="text-ink-3 text-sm" x-show="statusFilter === 'due_followup'">
+        Nothing due right now — a move surfaces here 4 months after you mark it
+        "I sent the connection request".
       </p>
     </div>
   </template>
@@ -1603,8 +1961,26 @@ function megacapPage() {
           <button type="button" class="tpdl-btn tpdl-btn--primary text-xs" @click="approve(m)">Approve</button>
           <button type="button" class="tpdl-btn tpdl-btn--outline text-xs" @click="dismiss(m)">Dismiss</button>
         </div>
-        <p class="text-xs" x-show="m.status === 'approved'" style="color:var(--tpdl-accent-ink)">
-          ✓ Approved — ready for a human LinkedIn message (never automated)
+        <div x-show="m.status === 'approved'">
+          <p class="text-xs mb-2" style="color:var(--tpdl-accent-ink)">
+            ✓ Approved — ready for a human LinkedIn message (never automated)
+          </p>
+          <button type="button" class="tpdl-btn tpdl-btn--outline text-xs" @click="markConnected(m)">
+            I sent the connection request
+          </button>
+        </div>
+        <div x-show="m.status === 'connection_sent'">
+          <p class="text-xs mb-2" :style="isDue(m) ? 'color:var(--tpdl-accent-ink); font-weight:600' : 'color:var(--tpdl-ink-3)'">
+            <span x-show="isDue(m)">⏰ Follow-up due</span>
+            <span x-show="!isDue(m)">Follow-up opens <span x-text="formatDate(m.follow_up_date)"></span></span>
+            — connected <span x-text="formatDate(m.connection_sent_at)"></span>
+          </p>
+          <button type="button" class="tpdl-btn tpdl-btn--outline text-xs" @click="markFollowedUp(m)">
+            I sent the follow-up
+          </button>
+        </div>
+        <p class="text-xs text-ink-3" x-show="m.status === 'follow_up_sent'">
+          ✓ Follow-up sent <span x-text="formatDate(m.follow_up_sent_at)"></span> — cycle complete
         </p>
         <p class="text-xs text-ink-3" x-show="m.status === 'dismissed'">Dismissed</p>
       </div>
@@ -1647,8 +2023,30 @@ function movesPage() {
       } catch (e) { console.error("dismiss failed:", e); }
       this.load();
     },
+    async markConnected(m) {
+      try {
+        const d = await fetch(`/api/intel/moves/${m.id}/connected`, { method: "POST" }).then(r => r.json());
+        if (d.move) Object.assign(m, d.move);
+      } catch (e) { console.error("connected failed:", e); }
+      this.load();
+    },
+    async markFollowedUp(m) {
+      try {
+        const d = await fetch(`/api/intel/moves/${m.id}/followed-up`, { method: "POST" }).then(r => r.json());
+        if (d.move) Object.assign(m, d.move);
+      } catch (e) { console.error("followed-up failed:", e); }
+      this.load();
+    },
+    isDue(m) {
+      if (!m.follow_up_date) return false;
+      return m.follow_up_date <= new Date().toISOString().slice(0, 10);
+    },
     statusLabel(s) {
-      return { new: "New", approved: "Approved", dismissed: "Dismissed" }[s] || s;
+      return {
+        new: "New", approved: "Approved", connection_sent: "Connected",
+        due_followup: "Due for follow-up", follow_up_sent: "Followed up",
+        dismissed: "Dismissed",
+      }[s] || s;
     },
     tierLabel(t) {
       return { c_level: "C-suite", minus_1: "SVP/VP", minus_2: "GM / Sr Director" }[t] || t;

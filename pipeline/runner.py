@@ -10,6 +10,9 @@
         python -m pipeline.runner --top 100 --live --resume
     RECAP a fixed mega-cap watch-list (verbatim facts only, never scored):
         python -m pipeline.runner --recap --names "Pfizer;Sanofi;Merck" --live
+    TREND-SYNTHESIZE already-recapped mega-caps (1 Sonnet call/company, no new
+    discovery spend — reads existing MegaCapRecap facts, writes MegaCapTrendSummary):
+        python -m pipeline.runner --recap-trends --live
 
 Output: a scored_results-compatible CSV (default data/csv/engine_run.csv),
 re-importable via `python import_csv.py <path>`. In sequential mode the CSV is
@@ -188,6 +191,41 @@ def _run_recap(cfg: EngineConfig, companies) -> None:
                 out_path, len(company_items), sum(len(i) for _, i in company_items))
 
 
+def _run_recap_trends(cfg: EngineConfig, names: list[str] | None) -> None:
+    """Chantier 2/4 extension (Betty, 2026-09-07): 1 Sonnet call per company
+    over ALREADY-STORED MegaCapRecap facts — no new discovery, so no company
+    selection via loader/_select_companies is needed. `names` (optional)
+    narrows to a subset; omitted = every company already in MegaCapRecap."""
+    from app.database import SessionLocal
+    from app.models import MegaCapRecap
+    from pipeline import recap_trends
+
+    written, skipped = 0, 0
+    with SessionLocal() as db:
+        q = db.query(MegaCapRecap.company_name).distinct()
+        if names:
+            q = q.filter(MegaCapRecap.company_name.in_(names))
+        companies = [row[0] for row in q.all()]
+        if not companies:
+            logger.warning("[recap_trends] no MegaCapRecap facts in DB — run --recap first")
+            return
+        for company in companies:
+            facts = [r.quote for r in db.query(MegaCapRecap)
+                     .filter(MegaCapRecap.company_name == company).all()]
+            candidate = recap_trends.summarize_company_trend(cfg, company, facts)
+            if candidate is None:
+                logger.warning("[recap_trends] %s: no summary stored (unparseable or "
+                               "0 verified citations)", company)
+                skipped += 1
+                continue
+            recap_trends.write_trend_summary(db, company, candidate, len(facts),
+                                             cfg.extraction_model)
+            written += 1
+            logger.info("[recap_trends] %s: summary stored (%d/%d quotes verified)",
+                        company, len(candidate.supporting_quotes), len(facts))
+    logger.info("[recap_trends] done: %d summaries written, %d skipped", written, skipped)
+
+
 _BOILERPLATE_MIN = 3        # a rationale shared by this many is boilerplate
 _BOILERPLATE_SIM = 0.9      # Jaccard ≥ this ⇒ "the same rationale" (near-duplicate)
 
@@ -317,6 +355,14 @@ def main() -> None:
                              "Opus call, no assessed_score. Requires --live + "
                              "--names \"A;B;C\". Writes MegaCapRecap rows + a CSV, "
                              "not a CompanyResult.")
+    parser.add_argument("--recap-trends", action="store_true",
+                        help="Chantier 2/4 extension: 1 Sonnet call per company "
+                             "synthesizing a short trend from ALREADY-STORED "
+                             "MegaCapRecap facts — no new discovery/search spend. "
+                             "Requires --live. --names optionally narrows to a "
+                             "subset; omitted = every company already recapped. "
+                             "Writes MegaCapTrendSummary rows (citation-checked; "
+                             "a summary with 0 verified quotes is discarded).")
     parser.add_argument("--discover", action="store_true",
                         help="Market-watch discovery: search the 6 signal themes + the "
                              "earnings-call angle across the broad life-science scope and "
@@ -351,6 +397,26 @@ def main() -> None:
     # ── fetch a previously-submitted batch (no company selection needed) ──
     if args.fetch is not None:
         _run_fetch(EngineConfig.load(live=True), args)
+        return
+
+    # ── trend synthesis: reads already-stored recap facts, no new company
+    # selection needed (it queries MegaCapRecap directly) ──
+    if args.recap_trends:
+        from pipeline import estimate as est_mod
+        names = args.names.split(";") if args.names else None
+        if args.estimate:
+            from app.database import SessionLocal
+            from app.models import MegaCapRecap
+            with SessionLocal() as db:
+                q = db.query(MegaCapRecap.company_name).distinct()
+                if names:
+                    q = q.filter(MegaCapRecap.company_name.in_(names))
+                n = q.count()
+            print(est_mod.render_trend(est_mod.estimate_trend_run(n)))
+            return
+        if not args.live:
+            parser.error("--recap-trends requires --live (Sonnet 5 synthesis)")
+        _run_recap_trends(EngineConfig.load(live=True), names)
         return
 
     # ── discovery: find NEW companies (no company selection needed) ──

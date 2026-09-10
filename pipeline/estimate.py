@@ -84,6 +84,37 @@ def render_recap(est: RecapRunEstimate) -> str:
     ])
 
 
+# Trend synthesis (pipeline/recap_trends.py): 1 Sonnet call per company over
+# ALREADY-STORED facts — no new discovery spend, so no SERP/Exa line here.
+TREND_IN_TOK, TREND_OUT_TOK = 1_500, 300  # ~24 facts in, a 2-3 sentence summary out
+
+
+@dataclass
+class TrendRunEstimate:
+    companies: int
+    model_cost_usd: float
+
+    @property
+    def per_company_usd(self) -> float:
+        return round(self.model_cost_usd / self.companies, 4) if self.companies else 0.0
+
+
+def estimate_trend_run(n_companies: int) -> TrendRunEstimate:
+    cost = (TREND_IN_TOK * SONNET_IN + TREND_OUT_TOK * SONNET_OUT) / 1e6
+    return TrendRunEstimate(companies=n_companies, model_cost_usd=round(cost * n_companies, 2))
+
+
+def render_trend(est: TrendRunEstimate) -> str:
+    return "\n".join([
+        "═══ TREND SYNTHESIS PRE-FLIGHT ESTIMATE (nothing has been spent) ═══",
+        f"Companies:            {est.companies}",
+        f"Model bill (Sonnet 5, reads already-stored facts — no new discovery spend): "
+        f"${est.model_cost_usd}  (~${est.per_company_usd}/company)",
+        "A summary citing zero verified quotes from its own facts is discarded, never stored.",
+        "Run for real by adding --live.",
+    ])
+
+
 def serp_quota_check(est: RunEstimate) -> str | None:
     """Compare the run's SERP need against the LIVE remaining SerpAPI quota.
 

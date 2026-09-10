@@ -58,7 +58,24 @@ class EvidenceItem:
 # Recap-mode categories (top 10-15 mega-cap trend-watch, pipeline/recap.py).
 # Deliberately separate from SIGNAL_CATEGORIES — recap mode has no scoring
 # step and explicitly WANTS product launches (excluded from the 6 above).
-RECAP_CATEGORIES = ("new_product", "ma_activity", "tech_platform", "other")
+#
+# Revised 2026-09-07 after auditing the first live run: the original 4-category
+# taxonomy's "other" bucket ballooned to 49/329 facts (the 2nd-biggest bucket,
+# meant to stay "small — only when nothing else fits") and, read by hand,
+# turned out to hide 3 clearly recurring, individually valuable patterns —
+# split out here rather than left buried:
+#   - capacity_investment (manufacturing/capex — Eli Lilly $50bn, BMS $2.3bn
+#     Houston plant, etc.)
+#   - leadership_change (CEO/CFO/board appointments+retirements — Merck
+#     chairman, Roche CEO, Amgen CFO, etc.)
+#   - legal_regulatory (litigation/settlements/FDA-EMA actions — J&J talc,
+#     Sanofi FDA warnings, Amgen drug pull, etc.)
+#   - restructuring (layoffs/cost-cutting — Novartis, Amgen, Takeda, Pfizer
+#     all showed up independently; a real cross-company trend, not noise)
+RECAP_CATEGORIES = (
+    "new_product", "ma_activity", "tech_platform", "capacity_investment",
+    "leadership_change", "legal_regulatory", "restructuring", "other",
+)
 
 
 @dataclass

@@ -6,6 +6,28 @@
 > Kaspr←Apollo, budget révisé). Là où un transcript contredit une décision plus récente, la
 > DÉCISION du 09/07 PRIME — voir « Conflits » en bas.
 
+## MISE À JOUR 2026-09-10 — Liste Top 30 pharma (Nathalie) pour le mega-cap watch
+> Source : liste "The Top 30 Pharma Companies & Annual Revenues" (chiffres FY2025) envoyée par
+> Nathalie, transmise par Betty le 10/09. À NE PAS confondre avec l'ICP « Market Intel July 2026 »
+> ci-dessous (mid-size Espagne/dermato) : ceci nourrit le **mega-cap watch**
+> (`pipeline/recap_trends.py`, extension du 07/09 — voir `state.md`), pas le scoring Neotek.
+
+- **14 sociétés déjà suivies** dans `MegaCapRecap`/`MegaCapTrendSummary`
+  (`data/csv/megacap_recap_2026-09-07.csv`) recoupent déjà une bonne partie du haut de la liste
+  Nathalie : AbbVie, Amgen, AstraZeneca, Bristol-Myers Squibb, Eli Lilly, GSK, Johnson & Johnson,
+  Merck & Co., Novartis, Novo Nordisk, Pfizer, Roche, Sanofi, Takeda.
+- **Sélection Betty (10/09)** parmi les 30 comme « spécialement intéressantes » si on étend le
+  watch : Regeneron, Daiichi Sankyo, Vertex Pharmaceuticals — PAS ENCORE dans `MegaCapRecap`, à
+  lancer via `--recap --names` **seulement après accord explicite de Betty** (coût API
+  Serper/Exa/Firecrawl — cf. « Aucun run live lancé sans accord » plus haut).
+- **Trends notées à l'échelle des 30** : vague GLP-1/obésité (Lilly, Novo Nordisk, bientôt Pfizer
+  en oral), falaises de brevets qui forcent des pivots structurels (Keytruda chez Merck après
+  Humira chez AbbVie), IA drug discovery explicite chez les gros pharma (J&J × Isomorphic Labs,
+  Roche × Flatiron Health), ADC devenue la classe la plus disputée en oncologie (Enhertu,
+  portefeuille AstraZeneca/Daiichi Sankyo).
+- Copie miroir dans le vault Obsidian TPDL (OneDrive) : `Mémoire long terme/Prospection &
+  outreach/Mega-cap Watch — Top 30 pharma (Nathalie, sept. 2026).md`.
+
 ## MISE À JOUR 2026-07-22 — ICP FORMALISÉ + 2 calls + brief scrapping (PRIME sur tout ce qui précède)
 > Sources : 5 docs fournis par Betty (dossier `Downloads/a poser/`) — 2 transcripts du 22/07
 > (« Call with Betty » 09:39 Betty+Nathalie ; « TPDL Commercial Agents Pilot » 09:04 Betty+Nathalie+

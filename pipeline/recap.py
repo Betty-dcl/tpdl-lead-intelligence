@@ -9,6 +9,14 @@ NEVER calls score.interpret_and_score(). No Opus call, no assessed_score, no
 CompanyResult. Output is a plain list of verbatim facts, filed by category —
 `MegaCapRecap` rows + a CSV — never a narrative synthesised by a model.
 
+The ONE deliberate exception (2026-09-07, Betty's explicit request) is
+`pipeline/recap_trends.py` — a separate, opt-in module that reads these
+already-verified facts back out and asks a model for a short trend synthesis
+per company. It never touches this module's verbatim-lock discipline: it's a
+distinct file, distinct table (`MegaCapTrendSummary`), distinct CLI flag, and
+its own citation-based guardrail (a summary citing zero real quotes from the
+facts it was given is rejected, never stored).
+
 Manual CLI invocation only (`python -m pipeline.runner --recap --names "..."
 --live`), roughly every 3-4 months. No agent chat command, no UI page, no
 scheduler — same "nothing automatic" doctrine as the rest of this repo.
@@ -203,7 +211,16 @@ _RECAP_HINTS: dict[str, tuple[str, ...]] = {
     "ma_activity": ("acquisition", "acquire", "merger", "divest", "joint venture", "partnership"),
     "tech_platform": ("crm", "digital platform", "digital transformation", "data platform"),
     "new_product": ("launch", "launches", "approval", "approved", "pipeline",
-                    "phase 3", "phase iii", "fda", "ema"),
+                    "phase 3", "phase iii", "fda approves", "ema approves"),
+    "capacity_investment": ("manufacturing", "campus", "capex", "expand", "expansion",
+                            "facility", "plant", "million investment", "billion investment"),
+    "leadership_change": ("appoint", "appoints", "appointed", "elect", "elected",
+                          "retire", "retirement", "steps down", "names new",
+                          "chief executive", "chief financial", "chairman"),
+    "legal_regulatory": ("lawsuit", "litigation", "settlement", "settles", "fda warns",
+                         "fda warning", "recall", "withdrawn from the market"),
+    "restructuring": ("layoffs", "layoff", "job cuts", "cost-cutting", "cost cutting",
+                      "restructuring", "site closure"),
 }
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
@@ -248,9 +265,16 @@ def extract_recap(cfg: EngineConfig, company: str, docs: list[RawDoc]
 
 def summarize_item(item: RecapItem) -> str:
     """Deterministic, non-LLM one-line summary. A hedged quote is prefixed
-    [unconfirmed] rather than silently dropping the negation signal."""
+    [unconfirmed] rather than silently dropping the negation signal.
+
+    No category prefix here (was `[{category}] quote` until 2026-09-07) —
+    `category` is already its own stored column and the dashboard groups/
+    badges facts by it, so baking the label into the text too just repeated
+    the same word the reader is already looking at (Betty: "ça va pas
+    d'afficher les news products tjrs" — every fact under the New Product
+    header re-said "[new_product]")."""
     prefix = "[unconfirmed] " if extract_mod.has_negation(item.quote) else ""
-    return f"{prefix}[{item.category}] {item.quote[:200]}"
+    return f"{prefix}{item.quote[:200]}"
 
 
 def write_recap_rows(db, company: str, run_date: datetime, items: list[RecapItem]) -> int:

@@ -1102,7 +1102,22 @@ def weekly_review(n: int = 10, db: Session = Depends(get_db)) -> dict:
 
 @router.get("/megacap-recap")
 def megacap_recap(db: Session = Depends(get_db)) -> dict:
-    from app.models import MegaCapRecap
+    import json as _json
+
+    from app.models import MegaCapRecap, MegaCapTrendSummary
+
+    # Latest trend summary per company (2026-09-07 extension) — a distinct,
+    # opt-in, citation-checked table (pipeline/recap_trends.py); absent for a
+    # company simply means `--recap-trends` hasn't been run yet, never an error.
+    trend_by_company: dict[str, dict] = {}
+    for t in (db.query(MegaCapTrendSummary)
+              .order_by(MegaCapTrendSummary.company_name, MegaCapTrendSummary.generated_at).all()):
+        trend_by_company[t.company_name] = {
+            "summary": t.summary_text,
+            "generated_at": t.generated_at.isoformat() if t.generated_at else None,
+            "facts_considered": t.facts_considered,
+            "supporting_quotes": _json.loads(t.supporting_quotes or "[]"),
+        }
 
     rows = (db.query(MegaCapRecap)
             .order_by(MegaCapRecap.company_name, MegaCapRecap.run_date).all())
@@ -1125,8 +1140,23 @@ def megacap_recap(db: Session = Depends(get_db)) -> dict:
         })
     companies = sorted(by_company.values(), key=lambda c: c["company_name"])
     for c in companies:
+        c["trend_summary"] = trend_by_company.get(c["company_name"])
         c["runs"].sort()
         c["fact_count"] = len(c["facts"])
+        # "New since last run": the latest run date for this company — a
+        # multi-run watch tool's whole point is spotting what changed, so a
+        # fact belonging to that run is flagged rather than left to blend
+        # into the pile with everything seen in prior runs.
+        latest_run = c["runs"][-1] if c["runs"] else None
+        c["latest_run"] = latest_run
+        c["new_fact_count"] = 0
+        for f in c["facts"]:
+            f["is_new"] = latest_run is not None and f["run_date"] == latest_run
+            if f["is_new"]:
+                c["new_fact_count"] += 1
+        # Newest-first within each category — scanning "what's new" beats
+        # reading chronologically once a few runs have accumulated.
+        c["facts"].sort(key=lambda f: f["run_date"] or "", reverse=True)
     return {"companies": companies, "total_facts": len(rows)}
 
 
@@ -1139,8 +1169,15 @@ def megacap_recap(db: Session = Depends(get_db)) -> dict:
 
 @router.get("/moves")
 def list_moves(status: Optional[str] = None, db: Session = Depends(get_db)) -> dict:
+    """status="due_followup" is a computed view (app.tools.moves.due_for_follow_up),
+    not a real column value — surfaces connection_sent moves whose 4-month window
+    has arrived without anyone having to remember to type `/moves followup`."""
     from app.models import ExecutiveMove
-    from app.tools.moves import serialize_move
+    from app.tools.moves import due_for_follow_up, serialize_move
+
+    if status == "due_followup":
+        rows = due_for_follow_up(db)
+        return {"count": len(rows), "moves": [serialize_move(m) for m in rows]}
 
     q = db.query(ExecutiveMove)
     if status:
@@ -1164,6 +1201,29 @@ def dismiss_move_endpoint(move_id: int, db: Session = Depends(get_db)) -> dict:
     from app.tools.moves import dismiss_move, serialize_move
 
     m, outcome = dismiss_move(db, move_id)
+    if outcome == "not_found":
+        raise HTTPException(status_code=404, detail=f"No executive move with id {move_id}")
+    return {"outcome": outcome, "move": serialize_move(m)}
+
+
+@router.post("/moves/{move_id}/connected")
+def mark_connected_endpoint(move_id: int, db: Session = Depends(get_db)) -> dict:
+    """A human confirms they manually sent the LinkedIn connection request —
+    this endpoint never sends anything itself. Computes follow_up_date (~4mo)."""
+    from app.tools.moves import mark_connected, serialize_move
+
+    m, outcome = mark_connected(db, move_id)
+    if outcome == "not_found":
+        raise HTTPException(status_code=404, detail=f"No executive move with id {move_id}")
+    return {"outcome": outcome, "move": serialize_move(m)}
+
+
+@router.post("/moves/{move_id}/followed-up")
+def mark_followed_up_endpoint(move_id: int, db: Session = Depends(get_db)) -> dict:
+    """A human confirms they manually sent the follow-up message."""
+    from app.tools.moves import mark_followed_up, serialize_move
+
+    m, outcome = mark_followed_up(db, move_id)
     if outcome == "not_found":
         raise HTTPException(status_code=404, detail=f"No executive move with id {move_id}")
     return {"outcome": outcome, "move": serialize_move(m)}

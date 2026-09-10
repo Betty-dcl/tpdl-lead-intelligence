@@ -173,7 +173,7 @@ class Company(Base):
     sector_bucket: Mapped[str] = mapped_column(String(32), default="Other", index=True)
     website: Mapped[str | None] = mapped_column(String(256), nullable=True)
     location: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    revenue: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    revenue: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     # Score block
     assessed_score: Mapped[float] = mapped_column(default=0.0, index=True)
@@ -300,6 +300,36 @@ class MegaCapRecap(Base):
     source: Mapped[str] = mapped_column(String(64))
     url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     event_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class MegaCapTrendSummary(Base):
+    """One AI-generated trend synthesis for a mega-cap company, built ONLY
+    from that company's own `MegaCapRecap` verbatim facts already in the DB
+    (pipeline/recap_trends.py) — no new discovery/search, so this never
+    re-spends on Serper/Exa/Firecrawl.
+
+    ⚠️ Betty decision (2026-09-02): the base mega-cap watch is verbatim-only,
+    zero synthesis, to eliminate interpretation risk on named companies.
+    This table is a DELIBERATE, EXPLICIT exception requested by Betty
+    (2026-09-07) — kept structurally separate from `MegaCapRecap` (own table,
+    own generation step, opt-in CLI flag) so the base watch can never be
+    silently coupled to an LLM opinion. Guardrail: `supporting_quotes` must
+    each be an exact verbatim substring of one of the facts fed to the model
+    (same anti-hallucination contract as `recap.verbatim_qa_recap`) — a
+    summary citing zero real quotes is rejected, never stored.
+
+    One row per generation, append-only (mirrors `MegaCapRecap`'s history
+    pattern) — the UI reads the latest row per company."""
+    __tablename__ = "megacap_trend_summaries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_name: Mapped[str] = mapped_column(String(256), index=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    summary_text: Mapped[str] = mapped_column(Text)
+    supporting_quotes: Mapped[str] = mapped_column(Text)  # JSON list[str], each verified verbatim
+    facts_considered: Mapped[int] = mapped_column(Integer)  # size of the input set, for transparency
+    model: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

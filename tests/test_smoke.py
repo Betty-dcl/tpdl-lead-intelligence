@@ -187,6 +187,44 @@ def test_intel_megacap_recap_shape(client):
         assert c["runs"] == sorted(c["runs"])
 
 
+def test_intel_megacap_recap_flags_new_since_last_run(client):
+    """A multi-run watch tool's whole point is spotting what changed — a fact
+    from the latest run for a company must be flagged `is_new`, an older one
+    from a prior run must not, and facts must render newest-first."""
+    from datetime import datetime, timedelta
+
+    from app.database import SessionLocal
+    from app.models import MegaCapRecap
+
+    company = "__Test Smoke Megacap Co__"
+    old_run = datetime.utcnow() - timedelta(days=60)
+    new_run = datetime.utcnow()
+    with SessionLocal() as db:
+        old = MegaCapRecap(
+            company_name=company, run_date=old_run, category="new_product",
+            summary_text="Old fact", quote="q1", source="serper_news_moves",
+        )
+        new = MegaCapRecap(
+            company_name=company, run_date=new_run, category="new_product",
+            summary_text="New fact", quote="q2", source="serper_news_moves",
+        )
+        db.add_all([old, new])
+        db.commit()
+    try:
+        data = client.get("/api/intel/megacap-recap").json()
+        c = next(x for x in data["companies"] if x["company_name"] == company)
+        assert c["latest_run"] == new_run.date().isoformat()
+        assert c["new_fact_count"] == 1
+        assert c["facts"][0]["summary"] == "New fact"
+        assert c["facts"][0]["is_new"] is True
+        assert c["facts"][1]["summary"] == "Old fact"
+        assert c["facts"][1]["is_new"] is False
+    finally:
+        with SessionLocal() as db:
+            db.query(MegaCapRecap).filter(MegaCapRecap.company_name == company).delete()
+            db.commit()
+
+
 def test_intel_moves_list_and_actions_roundtrip(client):
     from app.database import SessionLocal
     from app.models import ExecutiveMove
@@ -219,6 +257,64 @@ def test_intel_moves_list_and_actions_roundtrip(client):
         assert dismissed["move"]["status"] == "dismissed"
 
         missing = client.post("/api/intel/moves/999999999/approve")
+        assert missing.status_code == 404
+    finally:
+        with SessionLocal() as db:
+            db.query(ExecutiveMove).filter(ExecutiveMove.person_name == person).delete()
+            db.commit()
+
+
+def test_intel_moves_connected_followup_roundtrip(client):
+    """Dashboard-side equivalent of Inès's `/moves connected|followed-up|followup`
+    — same app.tools.moves functions, so chat and UI can never disagree."""
+    from datetime import date, timedelta
+
+    from app.database import SessionLocal
+    from app.models import ExecutiveMove
+
+    person = "__Test Smoke Moves Followup Person__"
+    with SessionLocal() as db:
+        m = ExecutiveMove(
+            person_name=person, new_title="Chief Marketing Officer",
+            new_company="__Test Smoke Pharma 2__", quote="q", source_url="https://x",
+            seniority_tier="c_level", role_function="cmo", status="approved",
+            dedup_key="smoketestmoves|2",
+        )
+        db.add(m)
+        db.commit()
+        move_id = m.id
+    try:
+        # Not approved yet → mark_followed_up must refuse (state machine order).
+        premature = client.post(f"/api/intel/moves/{move_id}/followed-up").json()
+        assert premature["outcome"] == "not_due"
+
+        connected = client.post(f"/api/intel/moves/{move_id}/connected").json()
+        assert connected["outcome"] == "ok"
+        assert connected["move"]["status"] == "connection_sent"
+        assert connected["move"]["follow_up_date"] is not None
+
+        # Freshly connected: follow-up date is ~4 months out, not due yet.
+        due_now = client.get("/api/intel/moves?status=due_followup").json()
+        assert not any(mv["id"] == move_id for mv in due_now["moves"])
+
+        # Backdate follow_up_date to simulate the 4-month window having arrived.
+        with SessionLocal() as db:
+            row = db.get(ExecutiveMove, move_id)
+            row.follow_up_date = date.today() - timedelta(days=1)
+            db.commit()
+
+        due_later = client.get("/api/intel/moves?status=due_followup").json()
+        assert any(mv["id"] == move_id for mv in due_later["moves"])
+
+        followed_up = client.post(f"/api/intel/moves/{move_id}/followed-up").json()
+        assert followed_up["outcome"] == "ok"
+        assert followed_up["move"]["status"] == "follow_up_sent"
+
+        # Cycle complete: no longer shows up as due.
+        due_after = client.get("/api/intel/moves?status=due_followup").json()
+        assert not any(mv["id"] == move_id for mv in due_after["moves"])
+
+        missing = client.post("/api/intel/moves/999999999/connected")
         assert missing.status_code == 404
     finally:
         with SessionLocal() as db:

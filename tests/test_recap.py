@@ -45,7 +45,7 @@ def test_verbatim_qa_recap_flags_source_mismatch_but_keeps_the_quote():
 
 def test_verbatim_qa_recap_rejects_unknown_category():
     docs = [_doc(text="Some fact.", source="s")]
-    bad = _recap_item(quote="Some fact.", source="s", category="leadership_change")  # scored-pipeline category, not a recap one
+    bad = _recap_item(quote="Some fact.", source="s", category="hiring")  # scored-pipeline category, not a recap one
     accepted, violations = recap.verbatim_qa_recap([bad], docs)
     assert accepted == []
     assert any("malformed" in v for v in violations)
@@ -66,6 +66,36 @@ def test_mock_extract_recap_classifies_by_category():
     assert "new_product" in cats
     assert "ma_activity" in cats
     # every quote is an exact substring of the source doc (verbatim by construction)
+    for it in items:
+        assert it.quote in docs[0].text
+
+
+def test_recap_categories_include_2026_09_07_split_out_from_other():
+    """The 2026-09-07 audit of the first live run found "other" holding 49/329
+    facts (meant to stay small) with 3 clearly recurring patterns buried in
+    it — this locks in that those categories actually exist in the taxonomy,
+    not just in the prompt doc."""
+    from pipeline.types import RECAP_CATEGORIES
+
+    for cat in ("capacity_investment", "leadership_change", "legal_regulatory", "restructuring"):
+        assert cat in RECAP_CATEGORIES
+    assert len(RECAP_CATEGORIES) == 8
+
+
+def test_mock_extract_recap_classifies_the_2026_09_07_new_categories():
+    docs = [_doc(
+        text=("The company invested $2 billion in a new manufacturing campus. "
+              "The board elected a new chief executive officer. "
+              "The company reached a settlement in ongoing litigation. "
+              "The company announced layoffs as part of a cost-cutting plan."),
+        source="serper_news",
+    )]
+    items = recap.mock_extract_recap("Mega Pharma Co", docs)
+    cats = {it.category for it in items}
+    assert "capacity_investment" in cats
+    assert "leadership_change" in cats
+    assert "legal_regulatory" in cats
+    assert "restructuring" in cats
     for it in items:
         assert it.quote in docs[0].text
 
@@ -153,7 +183,10 @@ def test_summarize_item_unconfirmed_prefix_on_hedged_quote():
     hedged = _recap_item(quote="The company may launch Product X next year.", category="new_product")
     assert not recap.summarize_item(clean).startswith("[unconfirmed]")
     assert recap.summarize_item(hedged).startswith("[unconfirmed]")
-    assert "[new_product]" in recap.summarize_item(clean)
+    # No redundant "[category]" text baked in — category is its own DB column
+    # and the dashboard already groups/badges facts by it (2026-09-07 fix).
+    assert "[new_product]" not in recap.summarize_item(clean)
+    assert recap.summarize_item(clean) == "The company launched Product X."
 
 
 # ─────────────────────────────────────────────────────────────────────────────
